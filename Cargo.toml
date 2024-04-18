@@ -1,5 +1,1 @@
-workspace = { members = ["app", "cult-common", "server"] }
-[package]
-name = "cult-pardy"
-version = "0.1.0"
-edition = "2021"
+workspace = { members = ["app", "cult-common", "server"], resolver = "2" }
