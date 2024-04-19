@@ -18,7 +18,7 @@ use serde::de::Error;
 #[actix_web::main]
 async fn main() -> Result<()>{
     let addr = "127.0.0.1";
-    let port = 8081;
+    let port = 8080;
     let addr = format!("{}:{}", addr, port);
     let addr = addr.parse::<SocketAddr>()
         .context("Failed to parse address")?;
