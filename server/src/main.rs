@@ -18,7 +18,7 @@ use serde::de::Error;
 #[actix_web::main]
 async fn main() -> Result<()>{
     let addr = "127.0.0.1";
-    let port = 8080;
+    let port = 8081;
     let addr = format!("{}:{}", addr, port);
     let addr = addr.parse::<SocketAddr>()
         .context("Failed to parse address")?;
@@ -28,8 +28,7 @@ async fn main() -> Result<()>{
             .service(start_ws)
             .service(ping)
             .service(index)
-    })
-        .bind(addr)?
+    }).bind(addr)?
         .run();
     println!("Started {} HttpServer! ", addr);
     server.await.expect("Server has crashed!");

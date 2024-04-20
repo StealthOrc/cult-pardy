@@ -2,3 +2,10 @@
 
 # app dirs
 /app/dist
+.idea/vcs.xml
+.idea/modules.xml
+.idea/cult-pardy.iml
+/node_modules/
+/public/build/
+
+.DS_Store
