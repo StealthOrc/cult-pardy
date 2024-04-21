@@ -1,23 +1,8 @@
 use yew::prelude::*;
 
-#[function_component]
-fn App() -> Html {
-    let counter = use_state(|| 0);
-    let onclick = {
-        let counter = counter.clone();
-        move |_| {
-            let value = *counter + 1;
-            counter.set(value);
-        }
-    };
+mod app;
 
-    html! {
-        <div>
-            <button {onclick} class="my-class">{ "+1" }</button>
-            <p>{ *counter }</p>
-        </div>
-    }
-}
+use app::App;
 
 fn main() {
     yew::Renderer::<App>::new().render();
