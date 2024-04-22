@@ -1,6 +1,8 @@
 mod custom_ws;
+mod session;
+mod server;
 
-use actix::{Actor, StreamHandler};
+use actix::{Actor, ActorFutureExt, Addr, ContextFutureSpawner, fut, StreamHandler, WrapFuture};
 use actix_files::NamedFile;
 use actix_web::{get, web, App, HttpServer, Responder};
 use actix_web::{HttpRequest, HttpResponse};
@@ -10,9 +12,16 @@ use std::any::Any;
 use std::env;
 use std::net::SocketAddr;
 use std::path::PathBuf;
+use std::time::Instant;
+use actix_web::error::UrlencodedError::ContentType;
+use actix_web::http::header::HeaderValue;
 
 use anyhow::{Context, Result};
+use futures::FutureExt;
 use serde::de::Error;
+use crate::session::{PlayerData, WsSession};
+
+
 
 #[actix_web::main]
 async fn main() -> Result<()> {
@@ -23,7 +32,17 @@ async fn main() -> Result<()> {
         .parse::<SocketAddr>()
         .context("Failed to parse address")?;
 
-    let server = HttpServer::new(|| App::new().service(start_ws).service(ping).service(index))
+    let server = server::GameServer::new().start();
+
+
+    let server = HttpServer::new(move||
+            App::new()
+                .app_data(web::Data::new(server.clone()))
+                .route("/ws", web::get().to(start_ws))
+                .service(ping)
+                .service(index)
+
+    )
         .bind(addr)?
         .run();
     println!("Started {} HttpServer! ", addr);
@@ -31,9 +50,45 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-#[get("/ws")]
-async fn start_ws(req: HttpRequest, stream: web::Payload) -> HttpResponse {
-    ws::start(custom_ws::GameWS, &req, stream).expect("Can´t start WS")
+async fn start_ws(req: HttpRequest, stream: web::Payload,  srv: web::Data<Addr<server::GameServer>>) -> std::result::Result<HttpResponse, actix_web::Error> {
+    let error = "{error: \"Somethings wrong\"}";
+    let error_response = Ok(HttpResponse::InternalServerError().json(error));
+
+    //TODO MAKE MATCHES GREAT AGAIN!
+    let mut lobby_id = match req.headers().get("lobby-id") {
+        None => return error_response,
+        Some(value) =>  match value.is_empty() {
+            true => return error_response,
+            false => value.to_str().expect("String conversion failed!").to_string(),
+        }
+    };
+
+    let session_token = match req.headers().get("session-token") {
+        None => return error_response,
+        Some(value) =>  match value.is_empty() {
+            true => return error_response,
+            false => value.to_str().expect("String conversion failed!").to_string(),
+        }
+    };
+
+    
+    let lobbies = srv.send(server::Rooms).await.expect("No Lobbies found");
+
+
+
+    //HACK SET Lobby to main
+    //let lobby_id = "main".to_owned();
+
+    if !lobbies.contains(&lobby_id) {
+        return error_response
+    }
+
+    println!("{} - {}", lobby_id, session_token);
+    ws::start(
+        WsSession::default(lobby_id, session_token,srv),
+        &req,
+        stream,)
+
 }
 
 #[get("/amialive")]

@@ -4,6 +4,8 @@ use actix_web::web::Bytes;
 use actix_web_actors::ws;
 use actix_web_actors::ws::Message;
 use actix_web_actors::ws::Message::{Binary,  Text};
+use rand::{Rng, thread_rng};
+use rand::distributions::Alphanumeric;
 use serde::{Deserialize, Serialize};
 
 pub struct GameWS;
@@ -60,6 +62,7 @@ enum GameType {
 pub struct GameState {
     gametype: GameType,
     categories: HashMap<String, Vec<Question>>,
+    lobby_id: String,
 }
 
 
@@ -96,7 +99,10 @@ impl GameState {
                 },
             ],
         );
-        GameState { gametype: GameType::GameData, categories }
+        GameState {
+            gametype: GameType::GameData, categories,
+            lobby_id : thread_rng().sample_iter(Alphanumeric).take(5).map(char::from).collect()
+        }
     }
 
 
