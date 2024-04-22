@@ -27,14 +27,62 @@ impl Component for App {
     }
 
     fn view(&self, ctx: &Context<Self>) -> Html {
-        html! {<main>
-            <div class="grid-container">
-              <div class="grid-item">{1}</div>
-              <div class="grid-item">{2}</div>
-              <div class="grid-item">{3}</div>
-              <div class="grid-item">{4}</div>
+        let test1 = "100€";
+        let test2 = "200€";
+        let test3 = "300€";
+        let cultpardy = "cult-pardy";
+        let header1 = "🌟 Anime";
+        let header2 = "🎨 Art";
+        let header3 = "🗻 Japan";
+        let header4 = "🎹 Music";
+        let header5 = "🍿 Movies and watchables";
+        html! {
+        <main>
+            <div class="listcontainer">
+                <ul>
+                  <li>
+                      <ul>
+                        <h2>{header1}</h2>
+                        <div class="button-container"><button>{test1}</button></div>
+                        <div class="button-container"><button>{test2}</button></div>
+                        <div class="button-container"><button>{test3}</button></div>
+                    </ul>
+                  </li>
+                  <li>
+                      <ul>
+                        <h2>{header2}</h2>
+                        <div class="button-container"><button>{test1} </button></div>
+                        <div class="button-container"><button>{test2}</button></div>
+                        <div class="button-container"><button>{test3}</button></div>
+                    </ul>
+                  </li>
+                  <li>
+                      <ul>
+                        <h2>{header3}</h2>
+                        <div class="button-container"><button>{test1}</button></div>
+                        <div class="button-container"><button>{test2}</button></div>
+                        <div class="button-container"><button>{test3}</button></div>
+                    </ul>
+                  </li>
+                  <li>
+                      <ul>
+                        <h2>{header4}</h2>
+                        <div class="button-container"><button>{test1}</button></div>
+                        <div class="button-container"><button>{test2}</button></div>
+                        <div class="button-container"><button>{test3}</button></div>
+                    </ul>
+                  </li>
+                  <li>
+                      <ul>
+                        <h2>{header5}</h2>
+                        <div class="button-container"><button>{test1}</button></div>
+                        <div class="button-container"><button>{test2}</button></div>
+                        <div class="button-container"><button>{test3}</button></div>
+                    </ul>
+                  </li>
+                </ul>
             </div>
         </main>
-        }
+                }
     }
 }
