@@ -18,12 +18,12 @@ builddebug: buildserverdebug buildappdebug
 
 buildapp:
 	(cd ./app/ && trunk build --release && cd ..)
-	mkdir ./target/release/www/
+	mkdir -p ./target/release/www/
 	(cp ./app/dist/* ./target/release/www/)
 
 buildappdebug:
 	(cd ./app/ && trunk build && cd ..)
-	mkdir ./target/debug/www/
+	mkdir -p ./target/debug/www/
 	(cp ./app/dist/* ./target/debug/www/)
 
 buildserver:
