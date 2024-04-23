@@ -9,6 +9,7 @@ use serde::{Serialize, Deserialize};
 use log::log;
 
 use crate::server;
+use crate::server::SessionDataType;
 
 /// How often heartbeat pings are sent
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
@@ -113,11 +114,15 @@ impl Handler<server::SessionDataType> for WsSession {
 
     fn handle(&mut self, msg: server::SessionDataType, ctx: &mut Self::Context) {
         match msg {
-            server::SessionDataType::MText(text) => {
+            SessionDataType::MText(text) => {
                 ctx.text(text)}
-            server::SessionDataType::MData(data) => {
+            SessionDataType::MData(data) => {
                 let json = serde_json::to_vec(&data).expect("Can´t convert to vec");
                 ctx.binary(json)}
+            SessionDataType::Disconnect => {
+                println!("STOPED!");
+                ctx.stop()
+            }
         }
     }
 }
@@ -213,6 +218,10 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
             ws::Message::Nop => (),
         }
     }
+
+    
+
+
 }
 
 

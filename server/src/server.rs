@@ -22,6 +22,7 @@ use crate::session::PlayerData;
 pub enum SessionDataType {
     MText(String),
     MData(usize),
+    Disconnect,
 }
 
 /// Message for chat server communications
@@ -44,9 +45,7 @@ pub struct Disconnect {
 #[derive(Message)]
 #[rtype(result = "()")]
 pub struct ClientMessage {
-    /// Id of the client session
     pub player_data: PlayerData,
-    /// Peer message
     pub msg: String,
 }
 
@@ -66,8 +65,16 @@ pub struct Join {
 }
 
 #[derive(Message)]
-#[rtype(result = "Vec<String>")]
-pub struct Rooms;
+#[rtype(result = "HashSet<String>")]
+pub struct Lobbies;
+
+pub struct Lobby{
+    pub lobby_id: String,
+
+}
+impl actix::Message for Lobby {
+    type Result = Option<HashSet<usize>>;
+}
 
 
 /// `ChatServer` manages chat rooms and responsible for coordinating chat session.
@@ -76,7 +83,7 @@ pub struct Rooms;
 #[derive(Debug)]
 pub struct GameServer {
     sessions: HashMap<usize, Recipient<SessionDataType>>,
-    pub rooms: HashMap<String, HashSet<usize>>,
+    lobby: HashMap<String, HashSet<usize>>,
     rng: ThreadRng,
 }
 
@@ -92,7 +99,7 @@ impl GameServer {
         println!("{:?}", rooms);
         GameServer {
             sessions: HashMap::new(),
-            rooms,
+            lobby: rooms,
             rng: rand::thread_rng(),
         }
     }
@@ -101,7 +108,7 @@ impl GameServer {
 impl GameServer {
     /// Send message to all users in the room
     fn send_message(&self, room: &str, message: &str, skip_id: usize) {
-        if let Some(sessions) = self.rooms.get(room) {
+        if let Some(sessions) = self.lobby.get(room) {
             for id in sessions {
                 if *id != skip_id {
                     if let Some(addr) = self.sessions.get(id) {
@@ -110,6 +117,21 @@ impl GameServer {
                 }
             }
         }
+    }
+
+    fn disconnect(&mut self, id:usize) {
+        match self.sessions.get(&id) {
+            Some(addr) => {
+                for (_, mut sessions) in &mut self.lobby {
+                    if let Some(session) = sessions.get(&id) {
+                        sessions.remove(&id);
+                    }
+                }
+                addr.do_send(SessionDataType::Disconnect);
+            }
+            _ => {}
+        }
+
     }
 }
 
@@ -129,6 +151,8 @@ impl Handler<Connect> for GameServer {
     fn handle(&mut self, msg: Connect, _: &mut Context<Self>) -> Self::Result {
         println!("Someone joined");
 
+
+
         // notify all users in same room
         self.send_message("main", "Someone joined", 0);
 
@@ -140,8 +164,7 @@ impl Handler<Connect> for GameServer {
 
 
         // auto join session to main room
-        self.rooms.entry("main".to_owned()).or_default().insert(id);
-
+        self.lobby.entry("main".to_owned()).or_default().insert(id);
 
         // send id back
         id
@@ -161,7 +184,7 @@ impl Handler<Disconnect> for GameServer {
         // remove address
         if self.sessions.remove(&msg.id).is_some() {
             // remove session from all rooms
-            for (name, sessions) in &mut self.rooms {
+            for (name, sessions) in &mut self.lobby {
                 if sessions.remove(&msg.id) {
                     rooms.push(name.to_owned());
                 }
@@ -190,7 +213,7 @@ impl Handler<ListRooms> for GameServer {
     fn handle(&mut self, _: ListRooms, _: &mut Context<Self>) -> Self::Result {
         let mut rooms = Vec::new();
 
-        for key in self.rooms.keys() {
+        for key in self.lobby.keys() {
             rooms.push(key.to_owned())
         }
 
@@ -199,18 +222,35 @@ impl Handler<ListRooms> for GameServer {
 }
 
 
-impl Handler<Rooms> for GameServer {
-    type Result = Vec<String>;
+impl Handler<Lobbies> for GameServer {
+    type Result = MessageResult<Lobbies>;
 
-    fn handle(&mut self, msg: Rooms, ctx: &mut Context<Self>) -> Self::Result {
-        let mut rooms = Vec::new();
+    fn handle(&mut self, msg: Lobbies, ctx: &mut Context<Self>) -> Self::Result {
+        let mut rooms = HashSet::new();
 
-        for key in self.rooms.keys() {
-            rooms.push(key.to_owned())
+        for key in self.lobby.keys() {
+            rooms.insert(key.to_owned());
         }
-        return rooms;
+        return MessageResult(rooms);
     }
 }
+
+impl Handler<Lobby> for GameServer {
+    type Result = Option<HashSet<usize>>;
+
+    fn handle(&mut self, msg: Lobby, ctx: &mut Context<Self>) -> Self::Result {
+        match self.lobby.get(&msg.lobby_id){
+            None => None,
+            Some(sessions) => Some(sessions.clone())
+        }
+    }
+}
+
+
+
+
+
+
 
 /// Join room, send disconnect message to old room
 /// send join message to new room
@@ -222,8 +262,12 @@ impl Handler<Join> for GameServer {
 
         let id = msg.playerdata.id.unwrap();
 
+
+
+
+
         // remove session from all rooms
-        for (n, sessions) in &mut self.rooms {
+        for (n, sessions) in &mut self.lobby {
             if sessions.remove(&id) {
                 rooms.push(n.to_owned());
             }
@@ -233,7 +277,7 @@ impl Handler<Join> for GameServer {
             self.send_message(&room, "Someone disconnected", 0);
         }
 
-        self.rooms.entry(msg.playerdata.name.clone()).or_default().insert(id);
+        self.lobby.entry(msg.playerdata.name.clone()).or_default().insert(id);
 
         self.send_message(&msg.playerdata.name, "Someone connected",id);
     }
