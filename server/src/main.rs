@@ -1,7 +1,6 @@
 mod api;
 mod gamewebsocket;
 mod error;
-mod gamewebsocket;
 mod lib;
 mod server;
 mod session;
