@@ -10,6 +10,7 @@ use actix::prelude::*;
 use rand::{rngs::ThreadRng, Rng};
 use rand::distributions::Alphanumeric;
 use serde::{Deserialize, Serialize};
+use cult_common::{UserSessionRequest};
 use crate::session::PlayerData;
 
 /// Chat server sends this messages to session
@@ -72,15 +73,25 @@ impl actix::Message for Lobby {
     type Result = Option<HashSet<usize>>;
 }
 
+pub struct UserSession {
+    pub user_session_request: Option<UserSessionRequest>,
+
+}
+impl actix::Message for UserSession {
+    type Result = usize;
+}
+
+
 
 /// `ChatServer` manages chat rooms and responsible for coordinating chat session.
 ///
 /// Implementation is very naïve.
 #[derive(Debug)]
 pub struct GameServer {
-    sessions: HashMap<usize, Recipient<SessionDataType>>,
+    wb_sessions: HashMap<usize, Recipient<SessionDataType>>,
     lobby: HashMap<String, HashSet<usize>>,
     rng: ThreadRng,
+    user_session: HashSet<usize>
 }
 
 impl GameServer {
@@ -94,9 +105,10 @@ impl GameServer {
         rooms.insert(random_id, HashSet::new());
         println!("{:?}", rooms);
         GameServer {
-            sessions: HashMap::new(),
+            wb_sessions: HashMap::new(),
             lobby: rooms,
             rng: rand::thread_rng(),
+            user_session: HashSet::new(),
         }
     }
 }
@@ -107,7 +119,7 @@ impl GameServer {
         if let Some(sessions) = self.lobby.get(room) {
             for id in sessions {
                 if *id != skip_id {
-                    if let Some(addr) = self.sessions.get(id) {
+                    if let Some(addr) = self.wb_sessions.get(id) {
                         addr.do_send(SessionDataType::MText(message.to_owned()));
                     }
                 }
@@ -116,7 +128,7 @@ impl GameServer {
     }
 
     fn disconnect(&mut self, id:usize) {
-        match self.sessions.get(&id) {
+        match self.wb_sessions.get(&id) {
             Some(addr) => {
                 for (_, sessions) in &mut self.lobby {
                     if let Some(_session) = sessions.get(&id) {
@@ -154,7 +166,7 @@ impl Handler<Connect> for GameServer {
 
         // register session with random id
         let id = self.rng.gen::<usize>();
-        self.sessions.insert(id, msg.addr.clone());
+        self.wb_sessions.insert(id, msg.addr.clone());
         msg.addr.do_send(SessionDataType::MData(1));
 
 
@@ -178,7 +190,7 @@ impl Handler<Disconnect> for GameServer {
 
 
         // remove address
-        if self.sessions.remove(&msg.id).is_some() {
+        if self.wb_sessions.remove(&msg.id).is_some() {
             // remove session from all rooms
             for (name, sessions) in &mut self.lobby {
                 if sessions.remove(&msg.id) {
@@ -242,8 +254,30 @@ impl Handler<Lobby> for GameServer {
     }
 }
 
+impl Handler<UserSession> for GameServer {
+    type Result = usize;
 
-
+    fn handle(&mut self, msg: UserSession, ctx: &mut Self::Context) -> Self::Result {
+        match msg.user_session_request {
+            None => {
+                let id =  self.rng.gen::<usize>();
+                self.user_session.insert(id);
+                println!("{:?}", self.user_session);
+                id
+            },
+            Some(req) => {
+                if let Some(id) = self.user_session.get(&req.session_id) {
+                    *id
+                } else {
+                    let id =  self.rng.gen::<usize>();
+                    self.user_session.insert(id);
+                    println!("{:?}", self.user_session);
+                    id
+                }
+            }
+        }
+    }
+}
 
 
 

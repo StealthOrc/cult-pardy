@@ -5,9 +5,12 @@ use actix::Addr;
 
 use actix_files::NamedFile;
 use actix_web::{get, HttpRequest, HttpResponse, patch, post, web};
+use actix_web::web::Json;
 use serde_json::json;
+use cult_common::{UserSessionRequest};
 use crate::lib::{extract_header_string, extract_value};
 use crate::server;
+use crate::server::UserSession;
 
 #[get("/info")]
 async fn game_info(req: HttpRequest, srv: web::Data<Addr<server::GameServer>>) -> Result<HttpResponse, actix_web::Error> {
@@ -30,6 +33,21 @@ async fn game_info(req: HttpRequest, srv: web::Data<Addr<server::GameServer>>) -
     };
     Ok(HttpResponse::from(HttpResponse::Ok().json(user)))
 }
+
+
+#[post("/session")]
+async fn session(req: HttpRequest, session_request: Option<web::Json<UserSessionRequest>>, srv: web::Data<Addr<server::GameServer>>) -> Result<HttpResponse, actix_web::Error> {
+    let session = match session_request {
+        None =>  srv.send(server::UserSession{user_session_request: None}),
+        Some(json) => {
+            println!("{:?}", json.0);
+            srv.send(server::UserSession{user_session_request:Some(json.0)})
+        },
+    }.await.expect("No User Session can be created");
+    Ok(HttpResponse::from(HttpResponse::Ok().json(UserSessionRequest{session_id:session})))
+}
+
+
 
 #[get("/authorization")]
 async fn has_authorization(_req: HttpRequest) -> HttpResponse {

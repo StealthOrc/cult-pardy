@@ -31,6 +31,7 @@ async fn main() -> Result<()> {
                 .app_data(web::Data::new(server.clone()))
                 .route("/ws", web::get().to(gamewebsocket::start_ws))
                 .service(api::game_info)
+                .service(api::session)
 
     )
         .bind(addr)?
