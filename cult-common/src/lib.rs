@@ -1,6 +1,5 @@
 use std::net::SocketAddr;
 
-
 pub fn parse_addr_str(domain: &str, port: usize) -> SocketAddr {
     let addr = "127.0.0.1";
     let port = 8081;
