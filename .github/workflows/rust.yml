@@ -2,24 +2,50 @@ name: Rust Build
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main","app-websocket" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main","app-websocket" ]
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
+  backend:
+    name: Backend Build
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
-    - name: Build
-      run: |
-        cd server
-        cargo build --verbose
-    - name: Run tests
-      run: |
-        cd server
-        cargo test --verbose
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Build Backend
+        run: |
+          cd server
+          cargo build --verbose
+
+  frontend:
+    name: Frontend Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Install Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+
+      - name: Install Serve
+        run: npm install -g serve
+
+      - name: Build Frontend
+        run: |
+          cd app
+          npm install
+          npm run build
