@@ -1,7 +1,7 @@
 mod session;
 mod server;
 mod api;
-mod ws;
+mod gamewebsocket;
 mod error;
 
 use actix::{Actor, ActorFutureExt, Addr, ContextFutureSpawner, StreamHandler, WrapFuture};
@@ -29,7 +29,7 @@ async fn main() -> Result<()> {
     let server = HttpServer::new(move||
             App::new()
                 .app_data(web::Data::new(server.clone()))
-                .route("/ws", web::get().to(ws::start_ws))
+                .route("/ws", web::get().to(gamewebsocket::start_ws))
                 .service(api::game_info)
 
     )
