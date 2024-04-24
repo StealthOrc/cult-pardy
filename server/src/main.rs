@@ -1,10 +1,9 @@
 mod api;
 mod error;
 mod gamewebsocket;
+mod lib;
 mod server;
 mod session;
-
-mod lib;
 
 use actix::Actor;
 
