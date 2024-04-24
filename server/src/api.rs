@@ -6,7 +6,7 @@ use actix::Addr;
 use actix_files::NamedFile;
 use actix_web::{get, HttpRequest, HttpResponse, patch, post, web};
 use serde_json::json;
-use cult_common::{extract_header_string, extract_value};
+use crate::lib::{extract_header_string, extract_value};
 use crate::server;
 
 #[get("/info")]

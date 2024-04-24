@@ -3,7 +3,8 @@ mod error;
 mod gamewebsocket;
 mod server;
 mod session;
-mod ws;
+
+mod lib;
 
 use actix::Actor;
 

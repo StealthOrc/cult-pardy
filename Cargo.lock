@@ -537,9 +537,6 @@ dependencies = [
 name = "cult-common"
 version = "0.1.0"
 dependencies = [
- "actix",
- "actix-web",
- "actix-web-actors",
  "anyhow",
  "serde",
  "serde_json",
