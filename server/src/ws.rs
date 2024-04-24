@@ -1,10 +1,10 @@
-use std::fmt::format;
-use std::vec;
+
+
 use actix::Addr;
 use actix_web::{HttpRequest, HttpResponse, web};
 use actix_web_actors::ws;
 use serde_json::json;
-use cult_common::{extract_header_string, extract_value, get_internal_server_error_json};
+use cult_common::{extract_value, get_internal_server_error_json};
 use crate::server;
 use crate::session::WsSession;
 

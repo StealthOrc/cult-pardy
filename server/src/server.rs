@@ -4,10 +4,6 @@
 
 use std::{
     collections::{HashMap, HashSet},
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
 };
 
 use actix::prelude::*;
@@ -122,8 +118,8 @@ impl GameServer {
     fn disconnect(&mut self, id:usize) {
         match self.sessions.get(&id) {
             Some(addr) => {
-                for (_, mut sessions) in &mut self.lobby {
-                    if let Some(session) = sessions.get(&id) {
+                for (_, sessions) in &mut self.lobby {
+                    if let Some(_session) = sessions.get(&id) {
                         sessions.remove(&id);
                     }
                 }
@@ -225,7 +221,7 @@ impl Handler<ListRooms> for GameServer {
 impl Handler<Lobbies> for GameServer {
     type Result = MessageResult<Lobbies>;
 
-    fn handle(&mut self, msg: Lobbies, ctx: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, _msg: Lobbies, _ctx: &mut Context<Self>) -> Self::Result {
         let mut rooms = HashSet::new();
 
         for key in self.lobby.keys() {
@@ -238,7 +234,7 @@ impl Handler<Lobbies> for GameServer {
 impl Handler<Lobby> for GameServer {
     type Result = Option<HashSet<usize>>;
 
-    fn handle(&mut self, msg: Lobby, ctx: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, msg: Lobby, _ctx: &mut Context<Self>) -> Self::Result {
         match self.lobby.get(&msg.lobby_id){
             None => None,
             Some(sessions) => Some(sessions.clone())
