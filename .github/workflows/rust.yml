@@ -20,6 +20,8 @@ jobs:
 
       - name: Cache Cargo dependencies
         uses: Swatinem/rust-cache@v2.7.3
+        with:
+          workspaces: "server"
         
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
@@ -41,6 +43,8 @@ jobs:
 
       - name: Cache Cargo dependencies
         uses: Swatinem/rust-cache@v2.7.3
+        with:
+          workspaces: "app"
 
       - name: Install Trunk and wasm32-unknown-unknown target
         run: |
