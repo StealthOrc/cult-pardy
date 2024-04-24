@@ -16,7 +16,9 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
+
+      - run: rustup toolchain install stable --profile minimal --no-self-update
 
       - name: Cache Cargo dependencies
         uses: Swatinem/rust-cache@v2.7.3
@@ -39,7 +41,9 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
+        
+      - run: rustup toolchain install stable --profile minimal --no-self-update
 
       - name: Cache Cargo dependencies
         uses: Swatinem/rust-cache@v2.7.3
