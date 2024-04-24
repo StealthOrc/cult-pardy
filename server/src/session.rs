@@ -1,12 +1,12 @@
-use std::any::Any;
+
 use std::time::{Duration, Instant};
 
 use actix::prelude::*;
 use actix_web::web;
 use actix_web_actors::ws;
-use actix_web_actors::ws::{CloseCode, CloseReason};
-use serde::{Serialize, Deserialize};
-use log::log;
+
+
+
 
 use crate::server;
 use crate::server::SessionDataType;
@@ -195,7 +195,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                         _ => ctx.text(format!("!!! unknown command: {m:?}")),
                     }
                 } else {
-                    let msg = if let Some(ref name) = self.player.id {
+                    let _msg = if let Some(ref name) = self.player.id {
                         format!("{name}: {m}");
                     } else {
                         let _ = m.to_owned();

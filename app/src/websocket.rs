@@ -1,4 +1,4 @@
-use futures::{channel::mpsc::Sender, future, SinkExt, StreamExt};
+use futures::{channel::mpsc::Sender, SinkExt, StreamExt};
 use gloo_net::websocket::{futures::WebSocket, Message};
 use wasm_bindgen_futures::spawn_local;
 
@@ -8,10 +8,10 @@ pub struct WebsocketService {
 impl WebsocketService {
     // add code here
     pub fn new(addr: &str) -> Self {
-        let mut ws = WebSocket::open(format!("ws://{}/ws", addr).as_str()).unwrap();
+        let ws = WebSocket::open(format!("ws://{}/ws", addr).as_str()).unwrap();
         let (mut write, mut read) = ws.split();
 
-        let (mut tunnel_send, mut tunnel_receive) = futures::channel::mpsc::channel::<String>(1000);
+        let (tunnel_send, mut tunnel_receive) = futures::channel::mpsc::channel::<String>(1000);
 
         spawn_local(async move {
             while let Some(s) = tunnel_receive.next().await {

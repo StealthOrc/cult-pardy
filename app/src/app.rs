@@ -31,17 +31,17 @@ impl Component for App {
         true
     }
 
-    fn view(&self, ctx: &Context<Self>) -> Html {
+    fn view(&self, _ctx: &Context<Self>) -> Html {
         let test1 = "100€";
         let test2 = "200€";
         let test3 = "300€";
-        let cultpardy = "cult-pardy";
+        let _cultpardy = "cult-pardy";
         let header1 = "🌟 Anime";
         let header2 = "🎨 Art";
         let header3 = "🗻 Japan";
         let header4 = "🎹 Music";
         let header5 = "🍿 Movies and watchables";
-        let onclick = {};
+        let _onclick = {};
         html! {
         <main>
             <div class="listcontainer">
