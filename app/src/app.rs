@@ -1,25 +1,30 @@
-use std::fmt::write;
-
+use cult_common::*;
 use yew::prelude::*;
+
+use crate::websocket::WebsocketService;
 
 pub enum Msg {
     TestMessage(String),
 }
 
-#[derive(Debug, Default)]
 pub struct App {
     test_data: String,
+    ws_service: WebsocketService,
 }
 
 impl Component for App {
     type Message = Msg;
     type Properties = ();
 
-    fn create(ctx: &Context<Self>) -> Self {
-        Self::default()
+    fn create(_ctx: &Context<Self>) -> Self {
+        let wss = WebsocketService::new(parse_addr_str("127.0.0.1", 8081).to_string().as_str());
+        App {
+            test_data: String::from("Test"),
+            ws_service: wss,
+        }
     }
 
-    fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
+    fn update(&mut self, _ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
             Msg::TestMessage(test) => self.test_data = test,
         };
@@ -36,6 +41,7 @@ impl Component for App {
         let header3 = "🗻 Japan";
         let header4 = "🎹 Music";
         let header5 = "🍿 Movies and watchables";
+        let onclick = {};
         html! {
         <main>
             <div class="listcontainer">

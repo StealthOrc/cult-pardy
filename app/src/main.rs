@@ -1,6 +1,7 @@
 use yew::prelude::*;
 
 mod app;
+mod websocket;
 
 use app::App;
 

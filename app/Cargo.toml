@@ -6,8 +6,11 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+cult-common = { path = "../cult-common/" }
 anyhow = "1.0.82"
+futures = "0.3.30"
+gloo-net = { version = "0.5.0", features = ["websocket"] }
 json = "0.12.4"
 serde = "1.0.198"
+wasm-bindgen-futures = "0.4.42"
 yew = { version = "0.21.0", features = ["csr", "ssr", "hydration"] }
-yew-websocket = "1.21.0"
