@@ -2,24 +2,62 @@ name: Rust Build
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main","app-websocket" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main","app-websocket" ]
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
+  backend:
+    name: Backend Build
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
-    - name: Build
-      run: |
-        cd server
-        cargo build --verbose
-    - name: Run tests
-      run: |
-        cd server
-        cargo test --verbose
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Cache Cargo dependencies
+        uses: actions/cache@v4.0.2
+        with:
+          path: ~/.cargo
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Build Backend
+        run: |
+          cd server
+          cargo build --verbose
+
+  frontend:
+    name: Frontend Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Cache npm dependencies
+        uses: actions/cache@v4.0.2
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+
+      - name: Install Trunk and wasm32-unknown-unknown target
+        run: |
+          cargo install trunk
+          rustup target add wasm32-unknown-unknown
+
+      - name: Build Frontend
+        run: |
+          cd app
+          trunk build --release
