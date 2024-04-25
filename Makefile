@@ -31,3 +31,6 @@ buildserver:
 
 buildserverdebug:
 	cargo build --bin server
+
+run:
+	cargo run --bin server --release
