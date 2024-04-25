@@ -6,19 +6,15 @@ use actix_web::{get, HttpRequest, HttpResponse, web};
 use actix_web::cookie::Cookie;
 use serde_json::json;
 use cult_common::UserSessionRequest;
-use crate::api::session;
+use crate::api::{get_session, session, set_session_cookies};
 use crate::data::extract_value;
-use crate::server;
+use crate::{api, server};
 
 #[get("/game/{lobby_id}")]
 async fn game(req: HttpRequest, lobby_id: web::Path<(Option<String>,)>, srv: web::Data<Addr<server::GameServer>>) -> Result<HttpResponse, actix_web::Error> {
     //TODO HACKY!!
     println!("{:?}", req.cookies());
-    let user_session_id = match req.cookie("user_session_id") {
-        Some(c) => c.value().to_owned(),
-        None => "NO SET".to_owned(),
-    };
-
+    let user_session_id = get_session(&req, &srv).await;
 
     let lobby_id = match lobby_id.into_inner() {
         (None,) => return Ok(HttpResponse::from(HttpResponse::InternalServerError())),
@@ -44,9 +40,11 @@ async fn game(req: HttpRequest, lobby_id: web::Path<(Option<String>,)>, srv: web
             "Users": user
         }
     );
-
-    Ok(HttpResponse::from(HttpResponse::Ok().json(users)))
+    let mut response = HttpResponse::from(HttpResponse::Ok().json(users));
+    set_session_cookies(&mut response, "user_session_id", &user_session_id.to_string());
+    Ok(response)
 }
+
 
 
 
@@ -61,17 +59,12 @@ async fn index(req: HttpRequest, srv: web::Data<Addr<server::GameServer>>) -> ac
     let named_file = NamedFile::open(final_path).expect("File not found");
 
     //TODO HACKY!!
-    let id = srv.send(server::UserSession{user_session_request: None}).await.expect("No User Session can be created");
 
-    let cookie = Cookie::build("user_session_id", id.to_string())
-        .path("/")
-        .finish();
-
+    let user_session_id = get_session(&req, &srv).await;
 
 
     let mut response = named_file.into_response(&req);
-    response.add_cookie(&cookie).expect("Can´t add cookies to the Response");
-
+    set_session_cookies(&mut response, "user_session_id", &user_session_id.to_string());
     Ok(response)
 }
 
@@ -79,7 +72,7 @@ async fn index(req: HttpRequest, srv: web::Data<Addr<server::GameServer>>) -> ac
 
 
 #[get("/file/{filename:.*}")]
-async fn file(req: HttpRequest) -> actix_web::Result<HttpResponse> {
+async fn file(req: HttpRequest, srv: web::Data<Addr<server::GameServer>>) -> actix_web::Result<HttpResponse> {
     let path: PathBuf = req.match_info().query("filename").parse().unwrap();
     let mut cexe = env::current_exe().unwrap();
     cexe.pop();
@@ -87,5 +80,10 @@ async fn file(req: HttpRequest) -> actix_web::Result<HttpResponse> {
     cexe.push(path);
     let final_path = cexe.into_os_string().into_string().unwrap();
     let named_file = NamedFile::open(final_path).expect("File not found");
-    Ok(named_file.into_response(&req))
+
+    let user_session_id = get_session(&req, &srv).await;
+
+    let mut response = named_file.into_response(&req);
+    set_session_cookies(&mut response, "user_session_id", &user_session_id.to_string());
+    Ok(response)
 }

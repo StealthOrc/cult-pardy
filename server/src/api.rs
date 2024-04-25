@@ -1,11 +1,15 @@
 
 use std::env;
+use std::num::ParseIntError;
 use std::path::PathBuf;
+use std::time::{Duration, SystemTime};
 use actix::Addr;
 
 use actix_files::NamedFile;
 use actix_web::{get, HttpRequest, HttpResponse, patch, post, web};
-use actix_web::web::Json;
+use actix_web::cookie::{Cookie, Expiration};
+use actix_web::cookie::time::OffsetDateTime;
+use actix_web::web::{get, Json};
 use serde_json::json;
 use cult_common::{UserSessionRequest};
 use crate::data::{extract_header_string, extract_value};
@@ -36,15 +40,39 @@ async fn game_info(req: HttpRequest, srv: web::Data<Addr<server::GameServer>>) -
 
 
 #[post("/api/session")]
-async fn session(req: HttpRequest, session_request: Option<web::Json<UserSessionRequest>>, srv: web::Data<Addr<server::GameServer>>) -> Result<HttpResponse, actix_web::Error> {
-    let session = match session_request {
-        None =>  srv.send(server::UserSession{user_session_request: None}),
-        Some(json) => {
-            println!("{:?}", json.0);
-            srv.send(server::UserSession{user_session_request:Some(json.0)})
-        },
-    }.await.expect("No User Session can be created");
+async fn session(session_request: Option<web::Json<UserSessionRequest>>, srv: web::Data<Addr<server::GameServer>>) -> Result<HttpResponse, actix_web::Error> {
+    let user_session = match session_request {
+        None => server::UserSession { user_session_request: None },
+        Some(json) => server::UserSession { user_session_request: Some(json.0) },
+    };
+    let session = srv.send(user_session).await.expect("No User Session Found");
     Ok(HttpResponse::from(HttpResponse::Ok().json(UserSessionRequest{session_id:session})))
+}
+
+
+
+pub async fn get_session(req: &HttpRequest, srv: &web::Data<Addr<server::GameServer>>) -> usize {
+    let user_req = match req.cookie("user_session_id") {
+        None => UserSessionRequest::default(),
+        Some(cookie) => match cookie.value().parse::<usize>() {
+            Err(_) => UserSessionRequest::default(),
+            Ok(id) => UserSessionRequest{session_id: id},
+        }
+    };
+    srv.send(server::UserSession{user_session_request:Some(user_req)}).await.expect("Somethings wrong with sessions")
+}
+
+
+
+pub fn set_session_cookies(res: &mut HttpResponse, cookie_name: &str, cookie: &str){
+   //let expiration_time = SystemTime::now() + Duration::from_secs(60);
+    let cookie = Cookie::build(cookie_name, cookie)
+        .path("/")
+        .secure(true)
+        //TODO Do we need this?
+        //.expires(Expiration::DateTime(OffsetDateTime::from(expiration_time)))
+        .finish();
+    res.add_cookie(&cookie).expect("Can´t add cookies to the Response");
 }
 
 

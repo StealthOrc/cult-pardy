@@ -7,10 +7,12 @@ use std::{
 };
 
 use actix::prelude::*;
+use oauth2::basic::BasicTokenResponse;
 use rand::{rngs::ThreadRng, Rng};
 use rand::distributions::Alphanumeric;
 use serde::{Deserialize, Serialize};
 use cult_common::{UserSessionRequest};
+use crate::auth::DiscordME;
 use crate::session::PlayerData;
 
 /// Chat server sends this messages to session
@@ -82,6 +84,16 @@ impl actix::Message for UserSession {
 }
 
 
+pub struct DiscordAuth {
+    pub token: BasicTokenResponse,
+
+}
+impl actix::Message for DiscordAuth {
+    type Result = DiscordME;
+}
+
+
+
 
 /// `ChatServer` manages chat rooms and responsible for coordinating chat session.
 ///
@@ -91,7 +103,8 @@ pub struct GameServer {
     wb_sessions: HashMap<usize, Recipient<SessionDataType>>,
     lobby: HashMap<String, HashSet<usize>>,
     rng: ThreadRng,
-    user_session: HashSet<usize>
+    user_session: HashSet<usize>,
+    discord_auth: HashMap<usize, BasicTokenResponse>
 }
 
 impl GameServer {
@@ -109,6 +122,7 @@ impl GameServer {
             lobby: rooms,
             rng: rand::thread_rng(),
             user_session: HashSet::new(),
+            discord_auth: HashMap::new(),
         }
     }
 }
