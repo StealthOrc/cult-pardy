@@ -7,8 +7,12 @@ pub struct WebsocketService {
 }
 impl WebsocketService {
     // add code here
-    pub fn new(addr: &str) -> Self {
-        let ws = WebSocket::open(format!("ws://{}/ws", addr).as_str()).unwrap();
+    pub fn new(addr: &str, lobby_id: &str, user_session_token: &str) -> Self {
+        let ws = WebSocket::open(
+            format!("ws://{addr}/ws?lobby-id={lobby_id}&session-token={user_session_token}")
+                .as_str(),
+        )
+        .unwrap();
         let (mut write, mut read) = ws.split();
 
         let (tunnel_send, mut tunnel_receive) = futures::channel::mpsc::channel::<String>(1000);
