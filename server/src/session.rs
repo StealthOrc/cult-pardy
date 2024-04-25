@@ -4,8 +4,7 @@ use std::time::{Duration, Instant};
 use actix::prelude::*;
 use actix_web::web;
 use actix_web_actors::ws;
-
-
+use actix_web_actors::ws::WebsocketContext;
 
 
 use crate::server;
@@ -89,10 +88,6 @@ impl Actor for WsSession {
                         println!("RES!? id: {}", act.player.id.unwrap());
                     },
 
-                    // something is wrong with chat server
-
-
-
                     _ => ctx.stop(),
                 }
                 fut::ready(())
@@ -148,63 +143,17 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                 self.hb = Instant::now();
             }
             ws::Message::Text(text) => {
-                let m = text.trim();
-                // we check for /sss type of messages
-                if m.starts_with('/') {
-                    let v: Vec<&str> = m.splitn(2, ' ').collect();
+                let text = text.trim();
+                if text.starts_with('/') {
+                    let v: Vec<&str> = text.splitn(2, ' ').collect();
                     match v[0] {
-                        "/list" => {
-                            // Send ListRooms message to chat server and wait for
-                            // response
-                            println!("List rooms");
-                            self.handler
-                                .send(server::ListRooms)
-                                .into_actor(self)
-                                .then(|res, _, ctx| {
-                                    match res {
-                                        Ok(rooms) => {
-                                            for room in rooms {
-                                                ctx.text(room);
-                                            }
-                                        }
-                                        _ => println!("Something is wrong"),
-                                    }
-                                    fut::ready(())
-                                })
-                                .wait(ctx)
-                            // .wait(ctx) pauses all events in context,
-                            // so actor wont receive any new messages until it get list
-                            // of rooms back
-                        }
-                        "/join" => {
-                            if v.len() == 2 {
-                                self.player.lobby = v[1].to_owned();
-                                self.handler.do_send(server::Join { playerdata: self.player.clone() });
-                                ctx.text("joined");
-                            } else {
-                                ctx.text("!!! room name is required");
-                            }
-                        }
-                        "/name" => {
-                            if v.len() == 2 {
-                                self.player.name = v[1].to_owned();
-                            } else {
-                                ctx.text("!!! name is required");
-                            }
-                        }
-                        _ => ctx.text(format!("!!! unknown command: {m:?}")),
+                        "/list" => handle_list_command(self, ctx),
+                        "/join" => handle_join_command(self, v, ctx),
+                        "/name" => handle_name_command(self, v, ctx),
+                        _ => {}
                     }
                 } else {
-                    let _msg = if let Some(ref name) = self.player.id {
-                        format!("{name}: {m}");
-                    } else {
-                        let _ = m.to_owned();
-                    };
-                    // send message to chat server
-                    self.handler.do_send(server::ClientMessage {
-                        player_data: self.player.clone(),
-                        msg: "".to_string(),
-                    })
+                    send_chat_message(self, text)
                 }
             }
             ws::Message::Binary(_) => println!("Unexpected binary"),
@@ -219,9 +168,50 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
         }
     }
 
-    
-
-
 }
 
 
+fn handle_list_command(handler: &mut WsSession, ctx: &mut WebsocketContext<WsSession>) {
+    println!("Listing rooms...");
+    // Send ListRooms message to chat server and handle response asynchronously
+    let fut = handler.handler.send(server::ListRooms)
+        .into_actor(handler)
+        .then(|res, _, ctx| {
+            match res {
+                Ok(rooms) => {
+                    for room in rooms {
+                        ctx.text(room);
+                    }
+                }
+                Err(_) => println!("Failed to list rooms"),
+            }
+            fut::ready(())
+        });
+    ctx.wait(fut);
+}
+
+fn handle_join_command(handler: &mut WsSession, room_name: Vec<&str>, ctx: &mut WebsocketContext<WsSession>) {
+    if room_name.len() != 2 {
+        ctx.text("!!! room name is required");
+    } else {
+        handler.player.lobby =  room_name[1].to_owned();
+        handler.handler.do_send(server::Join { playerdata: handler.player.clone() });
+        ctx.text("Joined");
+    }
+}
+
+fn handle_name_command(handler: &mut WsSession, new_name: Vec<&str>, ctx: &mut WebsocketContext<WsSession>) {
+    if new_name.len() != 2 {
+        ctx.text("!!! name is required");
+    } else {
+        handler.player.name = new_name[1].to_owned()
+    }
+}
+
+fn send_chat_message(handler: &mut WsSession, msg: &str) {
+    // Send message to chat server
+    handler.handler.do_send(server::ClientMessage {
+        player_data: handler.player.clone(),
+        msg: msg.to_owned(),
+    });
+}
