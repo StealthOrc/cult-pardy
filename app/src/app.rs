@@ -1,6 +1,6 @@
-use std::net::SocketAddr;
-use yew::prelude::*;
 use cult_common::parse_addr_str;
+use gloo_storage::Storage;
+use yew::prelude::*;
 
 use crate::websocket::WebsocketService;
 
@@ -18,7 +18,14 @@ impl Component for App {
     type Properties = ();
 
     fn create(_ctx: &Context<Self>) -> Self {
-        let wss = WebsocketService::new(parse_addr_str("127.0.0.1", 8000).to_string().as_str());
+        let usr_session_token: String =
+            gloo_storage::SessionStorage::get("user_session_id").unwrap_or_default();
+        let lobby_id = "main";
+        let wss = WebsocketService::new(
+            parse_addr_str("127.0.0.1", 8000).to_string().as_str(),
+            lobby_id,
+            usr_session_token.as_str(),
+        );
         App {
             test_data: String::from("Test"),
             ws_service: wss,
