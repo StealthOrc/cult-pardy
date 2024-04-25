@@ -1,9 +1,10 @@
 mod api;
 mod gamewebsocket;
 mod error;
-mod lib;
+mod data;
 mod server;
 mod session;
+mod frontend;
 
 use actix::Actor;
 
@@ -25,7 +26,10 @@ async fn main() -> Result<()> {
                 .app_data(web::Data::new(server.clone()))
                 .route("/ws", web::get().to(gamewebsocket::start_ws))
                 .service(api::game_info)
+                .service(frontend::file)
+                .service(frontend::index)
                 .service(api::session)
+                .service(frontend::game)
 
     })
     .bind(addr)?

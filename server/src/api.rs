@@ -8,11 +8,11 @@ use actix_web::{get, HttpRequest, HttpResponse, patch, post, web};
 use actix_web::web::Json;
 use serde_json::json;
 use cult_common::{UserSessionRequest};
-use crate::lib::{extract_header_string, extract_value};
+use crate::data::{extract_header_string, extract_value};
 use crate::server;
 use crate::server::UserSession;
 
-#[get("/info")]
+#[get("/api/info")]
 async fn game_info(req: HttpRequest, srv: web::Data<Addr<server::GameServer>>) -> Result<HttpResponse, actix_web::Error> {
     println!("{:?}", extract_value(&req, "key"));
 
@@ -35,7 +35,7 @@ async fn game_info(req: HttpRequest, srv: web::Data<Addr<server::GameServer>>) -
 }
 
 
-#[post("/session")]
+#[post("/api/session")]
 async fn session(req: HttpRequest, session_request: Option<web::Json<UserSessionRequest>>, srv: web::Data<Addr<server::GameServer>>) -> Result<HttpResponse, actix_web::Error> {
     let session = match session_request {
         None =>  srv.send(server::UserSession{user_session_request: None}),
@@ -49,41 +49,26 @@ async fn session(req: HttpRequest, session_request: Option<web::Json<UserSession
 
 
 
-#[get("/authorization")]
+#[get("/api/authorization")]
 async fn has_authorization(_req: HttpRequest) -> HttpResponse {
     HttpResponse::Ok().body("true")
 }
 
-#[post("/create")]
+#[post("/api/create")]
 async fn create_game_lobby(_req: HttpRequest) -> HttpResponse {
     HttpResponse::Ok().body("true")
 }
 
 
-#[post("/join")]
+#[post("/api/join")]
 async fn join_game(_req: HttpRequest) -> HttpResponse {
     HttpResponse::Ok().body("true")
 }
 
 
-#[patch("/update-authorization")]
+#[patch("/api/update-authorization")]
 async fn update_authorization(_req: HttpRequest) -> HttpResponse {
     HttpResponse::Ok().body("true")
 }
 
 
-
-
-
-#[get("/file/{filename:.*}")]
-async fn index(req: HttpRequest) -> actix_web::Result<NamedFile> {
-    let path: PathBuf = req.match_info().query("filename").parse().unwrap();
-    let mut cexe = env::current_exe().unwrap();
-    cexe.pop();
-    cexe.push("www");
-    cexe.push(path);
-    let final_path = cexe.into_os_string().into_string().unwrap();
-
-    println!("path:{}", final_path);
-    Ok(NamedFile::open(final_path)?)
-}

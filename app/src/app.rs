@@ -18,7 +18,7 @@ impl Component for App {
     type Properties = ();
 
     fn create(_ctx: &Context<Self>) -> Self {
-        let wss = WebsocketService::new(parse_addr_str("127.0.0.1", 8081).to_string().as_str());
+        let wss = WebsocketService::new(parse_addr_str("127.0.0.1", 8000).to_string().as_str());
         App {
             test_data: String::from("Test"),
             ws_service: wss,
