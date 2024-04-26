@@ -3,9 +3,12 @@ name = "app"
 version = "0.1.0"
 edition = "2021"
 
+[build]
+target = "wasm32-unknown-unknown"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+web-sys = { version = "0.3.69", features = ["Window", "HtmlDocument"] }
 cult-common = { path = "../cult-common/" }
 anyhow = "1.0.82"
 futures = "0.3.30"
@@ -16,3 +19,6 @@ wasm-bindgen-futures = "0.4.42"
 yew = { version = "0.21.0", features = ["csr"] }
 gloo-storage = "0.3.0"
 yew-router = "0.18.0"
+wasm-bindgen = "0.2.92"
+gloo-console = "0.3.0"
+wasm-cookies = "0.2.1"

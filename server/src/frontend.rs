@@ -48,7 +48,7 @@ async fn game(
     let users = json!(
         {
             "Lobby": lobby_id,
-            "User_session_id": user_session_id,
+            "User-session-id": user_session_id,
             "Users": user.len(),
             "Users": user
         }
@@ -62,7 +62,7 @@ async fn game(
     let mut response = named_file.into_response(&req);
     set_session_cookies(
         &mut response,
-        "user_session_id",
+        "user-session-id",
         &user_session_id.to_string(),
     );
     Ok(response)
@@ -88,7 +88,7 @@ async fn index(
     let mut response = named_file.into_response(&req);
     set_session_cookies(
         &mut response,
-        "user_session_id",
+        "user-session-id",
         &user_session_id.to_string(),
     );
     Ok(response)
@@ -117,7 +117,7 @@ async fn assets(
     let mut response = named_file.into_response(&req);
     set_session_cookies(
         &mut response,
-        "user_session_id",
+        "user-session-id",
         &user_session_id.to_string(),
     );
     Ok(response)

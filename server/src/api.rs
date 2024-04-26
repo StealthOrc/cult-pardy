@@ -52,7 +52,7 @@ async fn session(session_request: Option<web::Json<UserSessionRequest>>, srv: we
 
 
 pub async fn get_session(req: &HttpRequest, srv: &web::Data<Addr<server::GameServer>>) -> usize {
-    let user_req = match req.cookie("user_session_id") {
+    let user_req = match req.cookie("user-session-id") {
         None => UserSessionRequest::default(),
         Some(cookie) => match cookie.value().parse::<usize>() {
             Err(_) => UserSessionRequest::default(),

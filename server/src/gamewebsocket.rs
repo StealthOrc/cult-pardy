@@ -11,7 +11,7 @@ use crate::session::WsSession;
 pub async fn start_ws(req: HttpRequest, stream: web::Payload,  srv: web::Data<Addr<server::GameServer>>) -> Result<HttpResponse, actix_web::Error> {
     //TODO MAKE MATCHES GREAT AGAIN!user_session_id
 
-    let session_token = match extract_value(&req, "user_session_id") {
+    let session_token = match extract_value(&req, "user-session-id") {
         Ok(data) => data,
         Err(error) => return Ok(error),
     };
