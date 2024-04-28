@@ -1,4 +1,3 @@
-#![feature(async_closure)]
 mod apis;
 mod frontend;
 mod ws;
