@@ -5,10 +5,9 @@ use actix::prelude::*;
 use actix_web::web;
 use actix_web_actors::ws;
 use actix_web_actors::ws::WebsocketContext;
+use crate::servers::game;
+use crate::servers::game::SessionDataType;
 
-
-use crate::server;
-use crate::server::SessionDataType;
 
 /// How often heartbeat pings are sent
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
@@ -21,7 +20,7 @@ const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
 pub struct WsSession {
     pub player: PlayerData,
     pub hb: Instant,
-    pub handler: Addr<server::GameServer>,
+    pub handler: Addr<game::GameServer>,
 }
 
 #[derive(Debug, Clone)]
@@ -47,7 +46,7 @@ impl PlayerData {
 
 impl WsSession {
 
-    pub fn default(lobby:String, name: String, srv: web::Data<Addr<server::GameServer>>) -> Self{
+    pub fn default(lobby:String, name: String, srv: web::Data<Addr<game::GameServer>>) -> Self{
         WsSession{
             player: PlayerData::default(lobby, name),
             hb: Instant::now(),
@@ -59,7 +58,7 @@ impl WsSession {
         ctx.run_interval(HEARTBEAT_INTERVAL, |act, ctx| {
             if Instant::now().duration_since(act.hb) > CLIENT_TIMEOUT {
                 println!("Websocket Client heartbeat failed, disconnecting!");
-                act.handler.do_send(server::Disconnect { id: act.player.id.unwrap() });
+                act.handler.do_send(game::Disconnect { id: act.player.id.unwrap() });
                 ctx.stop();
                 return;
             }
@@ -79,7 +78,7 @@ impl Actor for WsSession {
 
         let addr = ctx.address();
         self.handler
-            .send(server::Connect { addr: addr.recipient(), })
+            .send(game::Connect { addr: addr.recipient(), })
             .into_actor(self)
             .then(|res, act, ctx| {
                 match res {
@@ -98,16 +97,16 @@ impl Actor for WsSession {
     fn stopping(&mut self, _: &mut Self::Context) -> Running {
         // notify chat server
         println!("STOP!? id: {}", self.player.id.unwrap());
-        self.handler.do_send(server::Disconnect { id: self.player.id.unwrap() });
+        self.handler.do_send(game::Disconnect { id: self.player.id.unwrap() });
         Running::Stop
     }
 }
 
 /// Handle messages from chat server, we simply send it to peer websocket
-impl Handler<server::SessionDataType> for WsSession {
+impl Handler<game::SessionDataType> for WsSession {
     type Result = ();
 
-    fn handle(&mut self, msg: server::SessionDataType, ctx: &mut Self::Context) {
+    fn handle(&mut self, msg: game::SessionDataType, ctx: &mut Self::Context) {
         match msg {
             SessionDataType::MText(text) => {
                 ctx.text(text)}
@@ -174,7 +173,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
 fn handle_list_command(handler: &mut WsSession, ctx: &mut WebsocketContext<WsSession>) {
     println!("Listing rooms...");
     // Send ListRooms message to chat server and handle response asynchronously
-    let fut = handler.handler.send(server::ListRooms)
+    let fut = handler.handler.send(game::ListRooms)
         .into_actor(handler)
         .then(|res, _, ctx| {
             match res {
@@ -195,7 +194,7 @@ fn handle_join_command(handler: &mut WsSession, room_name: Vec<&str>, ctx: &mut 
         ctx.text("!!! room name is required");
     } else {
         handler.player.lobby =  room_name[1].to_owned();
-        handler.handler.do_send(server::Join { playerdata: handler.player.clone() });
+        handler.handler.do_send(game::Join { playerdata: handler.player.clone() });
         ctx.text("Joined");
     }
 }
@@ -210,7 +209,7 @@ fn handle_name_command(handler: &mut WsSession, new_name: Vec<&str>, ctx: &mut W
 
 fn send_chat_message(handler: &mut WsSession, msg: &str) {
     // Send message to chat server
-    handler.handler.do_send(server::ClientMessage {
+    handler.handler.do_send(game::ClientMessage {
         player_data: handler.player.clone(),
         msg: msg.to_owned(),
     });

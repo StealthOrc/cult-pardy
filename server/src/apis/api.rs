@@ -1,30 +1,22 @@
 
-use std::env;
-use std::num::ParseIntError;
-use std::path::PathBuf;
-use std::time::{Duration, SystemTime};
 use actix::Addr;
 
-use actix_files::NamedFile;
 use actix_web::{get, HttpRequest, HttpResponse, patch, post, web};
-use actix_web::cookie::{Cookie, Expiration};
-use actix_web::cookie::time::OffsetDateTime;
-use actix_web::web::{get, Json};
+use actix_web::cookie::{Cookie};
 use serde_json::json;
 use cult_common::{UserSessionRequest};
-use crate::data::{extract_header_string, extract_value};
-use crate::server;
-use crate::server::UserSession;
+use crate::apis::data::{extract_header_string, extract_value};
+use crate::servers::game;
 
-#[get("/api/info")]
-async fn game_info(req: HttpRequest, srv: web::Data<Addr<server::GameServer>>) -> Result<HttpResponse, actix_web::Error> {
+#[get("/apis/info")]
+async fn game_info(req: HttpRequest, srv: web::Data<Addr<game::GameServer>>) -> Result<HttpResponse, actix_web::Error> {
     println!("{:?}", extract_value(&req, "key"));
 
     let lobby_id = match extract_header_string(&req, "lobby-id") {
         Ok(data) => data,
         Err(error) => return Ok(error),
     };
-    let lobby = srv.send(server::Lobby{lobby_id: lobby_id.clone()}).await.expect("No Lobby found!");
+    let lobby = srv.send(game::Lobby{lobby_id: lobby_id.clone()}).await.expect("No Lobby found!");
     let error = json!(
         {
             "Error": "Lobby not found",
@@ -39,11 +31,11 @@ async fn game_info(req: HttpRequest, srv: web::Data<Addr<server::GameServer>>) -
 }
 
 
-#[post("/api/session")]
-async fn session(session_request: Option<web::Json<UserSessionRequest>>, srv: web::Data<Addr<server::GameServer>>) -> Result<HttpResponse, actix_web::Error> {
+#[post("/apis/session")]
+async fn session(session_request: Option<web::Json<UserSessionRequest>>, srv: web::Data<Addr<game::GameServer>>) -> Result<HttpResponse, actix_web::Error> {
     let user_session = match session_request {
-        None => server::UserSession { user_session_request: None },
-        Some(json) => server::UserSession { user_session_request: Some(json.0) },
+        None => game::UserSession { user_session_request: None },
+        Some(json) => game::UserSession { user_session_request: Some(json.0) },
     };
     let session = srv.send(user_session).await.expect("No User Session Found");
     Ok(HttpResponse::from(HttpResponse::Ok().json(UserSessionRequest{session_id:session})))
@@ -51,7 +43,7 @@ async fn session(session_request: Option<web::Json<UserSessionRequest>>, srv: we
 
 
 
-pub async fn get_session(req: &HttpRequest, srv: &web::Data<Addr<server::GameServer>>) -> usize {
+pub async fn get_session(req: &HttpRequest, srv: &web::Data<Addr<game::GameServer>>) -> usize {
     let user_req = match req.cookie("user-session-id") {
         None => UserSessionRequest::default(),
         Some(cookie) => match cookie.value().parse::<usize>() {
@@ -59,7 +51,7 @@ pub async fn get_session(req: &HttpRequest, srv: &web::Data<Addr<server::GameSer
             Ok(id) => UserSessionRequest{session_id: id},
         }
     };
-    srv.send(server::UserSession{user_session_request:Some(user_req)}).await.expect("Somethings wrong with sessions")
+    srv.send(game::UserSession{user_session_request:Some(user_req)}).await.expect("Somethings wrong with sessions")
 }
 
 
@@ -77,24 +69,24 @@ pub fn set_session_cookies(res: &mut HttpResponse, cookie_name: &str, cookie: &s
 
 
 
-#[get("/api/authorization")]
+#[get("/apis/authorization")]
 async fn has_authorization(_req: HttpRequest) -> HttpResponse {
     HttpResponse::Ok().body("true")
 }
 
-#[post("/api/create")]
+#[post("/apis/create")]
 async fn create_game_lobby(_req: HttpRequest) -> HttpResponse {
     HttpResponse::Ok().body("true")
 }
 
 
-#[post("/api/join")]
+#[post("/apis/join")]
 async fn join_game(_req: HttpRequest) -> HttpResponse {
     HttpResponse::Ok().body("true")
 }
 
 
-#[patch("/api/update-authorization")]
+#[patch("/apis/update-authorization")]
 async fn update_authorization(_req: HttpRequest) -> HttpResponse {
     HttpResponse::Ok().body("true")
 }

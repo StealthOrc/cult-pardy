@@ -1,5 +1,6 @@
 mod app;
 mod websocket;
+mod service;
 
 use app::App;
 use yew::prelude::*;
@@ -29,7 +30,7 @@ fn switch(routes: Route) -> Html {
     match routes {
         Route::Home => html! { <h1> { "Home" } </h1> },
         Route::Game => html! { <App/> },
-        Route::NotFound => html! { <h1>{ "404" }</h1> },
+        _ => html! { <h1>{ "404" }</h1> },
     }
 }
 

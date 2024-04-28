@@ -27,7 +27,7 @@ impl StreamHandler<anyhow::Result<Message, ws::ProtocolError>> for GameWS {
                 let s = text.to_string();
                 let dto : Dto = serde_json::from_str(s.as_str()).expect("Test");
                 println!("{:?}", dto);
-                ctx.text(GameState::new().get_gameState(),);
+                ctx.text(GameState::new().get_game_state());
             },
             Ok(Binary(bin)) => {
                 println!("Binary");
@@ -106,10 +106,10 @@ impl GameState {
     }
 
 
-    fn get_gameState(&self) -> String {
+    fn get_game_state(&self) -> String {
         serde_json::to_string(&self).expect("TODO: panic message")
     }
-
+    #[allow(dead_code)]
     fn get_question(&self, category: &str, value: i32) -> Option<&Question> {
         if let Some(questions) = self.categories.get(category) {
             for question in questions {

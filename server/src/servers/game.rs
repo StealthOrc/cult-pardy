@@ -2,18 +2,18 @@
 //! And manages available rooms. Peers send messages to other peers in same
 //! room through `ChatServer`.
 
-use std::{
-    collections::{HashMap, HashSet},
-};
-
+use std::{collections::{HashMap, HashSet}, process};
 use actix::prelude::*;
+use futures::stream::IntoAsyncRead;
 use oauth2::basic::BasicTokenResponse;
 use rand::{rngs::ThreadRng, Rng};
 use rand::distributions::Alphanumeric;
 use serde::{Deserialize, Serialize};
+use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::runtime::Runtime;
 use cult_common::{UserSessionRequest};
 use crate::auth::DiscordME;
-use crate::session::PlayerData;
+use crate::ws::session::PlayerData;
 
 /// Chat server sends this messages to session
 #[derive(Message,Serialize, Deserialize, Debug)]
@@ -83,7 +83,7 @@ impl actix::Message for UserSession {
     type Result = usize;
 }
 
-
+#[allow(dead_code)]
 pub struct DiscordAuth {
     pub token: BasicTokenResponse,
 
@@ -91,6 +91,16 @@ pub struct DiscordAuth {
 impl actix::Message for DiscordAuth {
     type Result = DiscordME;
 }
+
+#[allow(dead_code)]
+pub struct GrandAdminAccess {
+    pub discord_id: String,
+
+}
+impl actix::Message for GrandAdminAccess {
+    type Result = bool;
+}
+
 
 
 
@@ -104,8 +114,13 @@ pub struct GameServer {
     lobby: HashMap<String, HashSet<usize>>,
     rng: ThreadRng,
     user_session: HashSet<usize>,
+    #[allow(dead_code)]
     discord_auth: HashMap<usize, BasicTokenResponse>
 }
+
+
+use tokio::io;
+
 
 impl GameServer {
     pub fn new() -> GameServer {
@@ -114,7 +129,7 @@ impl GameServer {
         rooms.insert("main".to_owned(), HashSet::new());
         let random_id = rand::thread_rng().sample_iter(&Alphanumeric)
             .take(5)
-            .map(char::from).collect();;
+            .map(char::from).collect();
         rooms.insert(random_id, HashSet::new());
         println!("{:?}", rooms);
         GameServer {
@@ -140,7 +155,7 @@ impl GameServer {
             }
         }
     }
-
+    #[allow(dead_code)]
     fn disconnect(&mut self, id:usize) {
         match self.wb_sessions.get(&id) {
             Some(addr) => {
@@ -162,6 +177,10 @@ impl Actor for GameServer {
     /// We are going to use simple Context, we just need ability to communicate
     /// with other actors.
     type Context = Context<Self>;
+
+    fn start(self) -> Addr<Self> where Self: Actor<Context = Context<Self>> {
+        Context::new().run(self)
+    }
 }
 
 /// Handler for Connect message.
@@ -271,7 +290,7 @@ impl Handler<Lobby> for GameServer {
 impl Handler<UserSession> for GameServer {
     type Result = usize;
 
-    fn handle(&mut self, msg: UserSession, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: UserSession, _ctx: &mut Self::Context) -> Self::Result {
         match msg.user_session_request {
             None => {
                 let id =  self.rng.gen::<usize>();
