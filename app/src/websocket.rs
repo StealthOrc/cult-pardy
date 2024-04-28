@@ -3,7 +3,7 @@ use gloo_net::websocket::{futures::WebSocket, Message};
 use wasm_bindgen_futures::spawn_local;
 
 pub struct WebsocketService {
-    pub send_tunnel: Sender<String>,
+    pub send_tunnel: Sender<Message>,
 }
 impl WebsocketService {
     // add code here
@@ -13,14 +13,23 @@ impl WebsocketService {
                 .as_str(),
         )
         .unwrap();
+
         let (mut write, mut read) = ws.split();
 
-        let (tunnel_send, mut tunnel_receive) = futures::channel::mpsc::channel::<String>(1000);
+        let (tunnel_send, mut tunnel_receive) = futures::channel::mpsc::channel::<Message>(1000);
 
         spawn_local(async move {
-            while let Some(s) = tunnel_receive.next().await {
-                println!("message from channel {}", s);
-                write.send(Message::Text(s)).await.unwrap();
+            while let Some(msg) = tunnel_receive.next().await {
+                match msg {
+                    Message::Text(data) => {
+                        println!("sending Text:{:?}", data);
+                        write.send(Message::Text(data)).await.unwrap();
+                    }
+                    Message::Bytes(b) => {
+                        println!("sending Bytes:{:?}", b);
+                        write.send(Message::Bytes(b)).await.unwrap();
+                    }
+                }
             }
         });
 

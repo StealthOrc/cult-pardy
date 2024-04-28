@@ -1,20 +1,16 @@
-#![feature(const_trait_impl)]
-#![feature(const_trait_impl)]
-
 use std::env;
-use std::env::VarError;
 use actix_web::{HttpResponse, web};
-use oauth2::basic::{BasicClient, BasicErrorResponse, BasicTokenResponse};
-use oauth2::{AuthorizationCode, AuthUrl, ClientId, ClientSecret, CsrfToken, ErrorResponse, RedirectUrl, RequestTokenError, reqwest, Scope, TokenResponse, TokenUrl};
-use oauth2::reqwest::{async_http_client, Error, http_client};
-use oauth2::url::Url;
-use serde::de::Unexpected::Option;
+use attohttpc::Method;
+use oauth2::basic::{BasicClient, BasicTokenResponse};
+use oauth2::{AuthorizationCode, AuthUrl, ClientId, ClientSecret, CsrfToken, RedirectUrl, Scope, TokenResponse, TokenUrl};
+use oauth2::reqwest::{async_http_client};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 pub fn create_oauth_client() -> BasicClient {
 
-    println!("{:?}", env::var("CULT_PARDY_CLIENT_ID"));
+    println!("CULT_PARDY_CLIENT_ID is? {:?}", env::var("CULT_PARDY_CLIENT_ID"));
+    println!("CULT_PARDY_CLIENT_SECRET is? {:?}", env::var("CULT_PARDY_CLIENT_SECRET"));
 
     let client_id: String = env::var("CULT_PARDY_CLIENT_ID").unwrap_or_else(|_| "NOT SET".to_string());
 
@@ -45,7 +41,7 @@ pub async fn discord_oauth(
         .append_header(("Location", authorize_url.to_string()))
         .finish())
 }
-
+#[allow(dead_code)]
 struct OAuthCallback {
     code: String,
     state: String,
@@ -96,4 +92,45 @@ pub struct DiscordME {
     pub premium_type: i64,
     pub email: String,
     pub verified: bool,
+}
+
+impl DiscordME {
+    async fn get(token: BasicTokenResponse) -> std::option::Option<Self> {
+        let request_url = "https://discord.com/api/users/@me";
+
+        let request = attohttpc::RequestBuilder::new(Method::GET, request_url).bearer_auth(token.access_token().secret());
+        let respone = match request.send() {
+            Ok(resonse) => resonse,
+            Err(error) => {
+                println!("Something wrong: {:?}", error);
+                return None
+            }
+        };
+        let discord_me = match respone.json() {
+            Ok(me) => me,
+            Err(_) => return None,
+        };
+        println!("Created {:?}", discord_me);
+        Some(discord_me)
+    }
+}
+
+pub async fn callback(
+    code: web::Query<Code>,
+    oauth_client: web::Data<BasicClient>,
+) -> anyhow::Result<HttpResponse, actix_web::Error> {
+    let token_result = oauth_client
+        .exchange_code(code.into_inner().to_authorization_code())
+        .request_async(async_http_client)
+        .await;
+    match token_result {
+        Ok(token) => {
+            println!("{:?}", token.access_token().secret());
+            match DiscordME::get(token).await {
+                None => Ok(HttpResponse::InternalServerError().body(format!("Error"))),
+                Some(discord) => Ok(HttpResponse::Found().json(discord)),
+            }
+        }
+        Err(e) => Ok(HttpResponse::InternalServerError().body(format!("Error: {:?}", e))),
+    }
 }

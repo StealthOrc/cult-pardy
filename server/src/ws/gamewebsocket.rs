@@ -4,11 +4,11 @@ use actix::Addr;
 use actix_web::{HttpRequest, HttpResponse, web};
 use actix_web_actors::ws;
 use serde_json::json;
-use crate::data::{extract_value, get_internal_server_error_json};
-use crate::server;
-use crate::session::WsSession;
+use crate::apis::data::{extract_value, get_internal_server_error_json};
+use crate::servers::game;
+use crate::ws::session::WsSession;
 
-pub async fn start_ws(req: HttpRequest, stream: web::Payload,  srv: web::Data<Addr<server::GameServer>>) -> Result<HttpResponse, actix_web::Error> {
+pub async fn start_ws(req: HttpRequest, stream: web::Payload, srv: web::Data<Addr<game::GameServer>>) -> Result<HttpResponse, actix_web::Error> {
     //TODO MAKE MATCHES GREAT AGAIN!user_session_id
 
     let session_token = match extract_value(&req, "user-session-id") {
@@ -22,7 +22,7 @@ pub async fn start_ws(req: HttpRequest, stream: web::Payload,  srv: web::Data<Ad
     };
 
 
-    let lobbies = srv.send(server::Lobbies).await.expect("No Lobbies found");
+    let lobbies = srv.send(game::Lobbies).await.expect("No Lobbies found");
 
 
     let error = json!(

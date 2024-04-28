@@ -1,9 +1,13 @@
+use futures::channel::mpsc::TrySendError;
+use futures::SinkExt;
 use cult_common::parse_addr_str;
-use gloo_console::log;
+use gloo_console::{info, log};
+use gloo_net::websocket::Message;
 use wasm_bindgen::JsValue;
 use wasm_cookies::cookies::*;
 use web_sys::HtmlDocument;
 use yew::prelude::*;
+use crate::service::FrontendService;
 
 use crate::websocket::WebsocketService;
 // testing purposes
@@ -34,7 +38,7 @@ impl Component for App {
     type Message = Msg;
     type Properties = ();
 
-    fn create(_ctx: &Context<Self>) -> Self {
+    fn create(_ctx: &Context<Self>) ->  Self {
         let usr_session_id: String = get(&cookie_string(), "user-session-id")
             .expect("could not get cookie")
             .expect("could not get cookie from user");
@@ -49,6 +53,16 @@ impl Component for App {
     }
 
     fn update(&mut self, _ctx: &Context<Self>, msg: Self::Message) -> bool {
+        let ws = self.ws_service.send_tunnel.try_send(Message::Text("Test".parse().unwrap()));
+         match ws {
+            Ok(e) => {
+                info!("OK SEND")
+            },
+            Err(e) =>  {
+                log!("Hello", e.to_string())
+            }
+        };
+
         match msg {
             Msg::TestMessage(test) => todo!("TestMessage: not implemented"),
         };

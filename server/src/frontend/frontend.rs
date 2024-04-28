@@ -1,20 +1,20 @@
-use crate::api::{get_session, session, set_session_cookies};
-use crate::data::extract_value;
-use crate::{api, server};
+
 use actix::Addr;
 use actix_files::NamedFile;
-use actix_web::cookie::Cookie;
 use actix_web::{get, web, HttpRequest, HttpResponse};
-use cult_common::UserSessionRequest;
 use serde_json::json;
 use std::env;
 use std::path::PathBuf;
+use crate::apis::api::{get_session, set_session_cookies};
+use crate::servers::authentication::AuthenticationServer;
+use crate::servers::{authentication, game};
+use crate::servers::game::GameServer;
 
 #[get("/game/{lobby_id}")]
-async fn game(
+async fn find_game(
     req: HttpRequest,
     lobby_id: web::Path<(Option<String>,)>,
-    srv: web::Data<Addr<server::GameServer>>,
+    srv: web::Data<Addr<GameServer>>,
 ) -> Result<HttpResponse, actix_web::Error> {
     //TODO HACKY!!
     println!("{:?}", req.cookies());
@@ -26,7 +26,7 @@ async fn game(
     };
 
     let lobby = srv
-        .send(server::Lobby {
+        .send(game::Lobby {
             lobby_id: lobby_id.clone(),
         })
         .await
@@ -45,7 +45,7 @@ async fn game(
         }
         Some(users) => users,
     };
-    let users = json!(
+    let _users = json!(
         {
             "Lobby": lobby_id,
             "User-session-id": user_session_id,
@@ -58,7 +58,8 @@ async fn game(
     cexe.push("www");
     cexe.push("index.html");
     let final_path = cexe.into_os_string().into_string().unwrap();
-    let named_file = NamedFile::open(final_path).expect("File not found");
+    println!("{}",final_path);
+    let named_file = NamedFile::open(final_path).expect("{:?}File not found");
     let mut response = named_file.into_response(&req);
     set_session_cookies(
         &mut response,
@@ -68,10 +69,30 @@ async fn game(
     Ok(response)
 }
 
+
+#[get("/grant/{grand_id}")]
+async fn grant_admin_access(
+    req: HttpRequest,
+    grand_id: web::Path<(usize)>,
+    srv: web::Data<Addr<GameServer>>,
+    auth: web::Data<Addr<AuthenticationServer>>,
+) -> Result<HttpResponse, actix_web::Error> {
+    print!("?");
+    //let user_session_id = get_session(&req, &srv).await;
+
+
+    let lobby = auth.send(authentication::CheckAdminAccessToken { token: grand_id.clone(), })
+        .await
+        .expect("No Lobby found!");
+    print!("{lobby}");
+
+    Ok(HttpResponse::Ok().json(lobby))
+}
+
 #[get("/")]
 async fn index(
     req: HttpRequest,
-    srv: web::Data<Addr<server::GameServer>>,
+    srv: web::Data<Addr<GameServer>>,
 ) -> actix_web::Result<HttpResponse> {
     let mut cexe = env::current_exe().unwrap();
     cexe.pop();
@@ -97,7 +118,7 @@ async fn index(
 #[get("/assets/{filename:.*}")]
 async fn assets(
     req: HttpRequest,
-    srv: web::Data<Addr<server::GameServer>>,
+    srv: web::Data<Addr<GameServer>>,
 ) -> actix_web::Result<HttpResponse> {
     let path: PathBuf = req
         .match_info()
@@ -122,3 +143,31 @@ async fn assets(
     );
     Ok(response)
 }
+
+
+#[get("/*")]
+async fn test(
+    req: HttpRequest,
+    srv: web::Data<Addr<GameServer>>,
+) -> actix_web::Result<HttpResponse> {
+    let mut cexe = env::current_exe().unwrap();
+    cexe.pop();
+    cexe.push("www");
+    cexe.push("index.html");
+    let final_path = cexe.into_os_string().into_string().unwrap();
+    println!("path:{}", final_path);
+    let named_file = NamedFile::open(final_path).expect("File not found");
+
+    //TODO HACKY!!
+
+    let user_session_id = get_session(&req, &srv).await;
+
+    let mut response = named_file.into_response(&req);
+    set_session_cookies(
+        &mut response,
+        "user-session-id",
+        &user_session_id.to_string(),
+    );
+    Ok(response)
+}
+
