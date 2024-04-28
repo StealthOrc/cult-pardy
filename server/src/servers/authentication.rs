@@ -46,7 +46,7 @@ impl AdminAccessTokenResponse {
     fn random() -> Self {
         AdminAccessTokenResponse {
             token: random::<usize>(),
-            lifetime: Duration::from_days(1),
+            lifetime: Duration::from_secs(24*60*60),
         }
     }
 
