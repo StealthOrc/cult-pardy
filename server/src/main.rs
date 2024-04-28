@@ -1,4 +1,3 @@
-#![feature(duration_constructors)]
 #![feature(async_closure)]
 mod apis;
 mod frontend;
