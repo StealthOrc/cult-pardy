@@ -58,7 +58,6 @@ async fn find_game(
     cexe.push("www");
     cexe.push("index.html");
     let final_path = cexe.into_os_string().into_string().unwrap();
-    println!("{}",final_path);
     let named_file = NamedFile::open(final_path).expect("{:?}File not found");
     let mut response = named_file.into_response(&req);
     set_session_cookies(
@@ -77,16 +76,20 @@ async fn grant_admin_access(
     srv: web::Data<Addr<GameServer>>,
     auth: web::Data<Addr<AuthenticationServer>>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    print!("?");
-    //let user_session_id = get_session(&req, &srv).await;
+    let user_session_id = get_session(&req, &srv).await;
 
 
     let lobby = auth.send(authentication::CheckAdminAccessToken { token: grand_id.clone(), })
         .await
         .expect("No Lobby found!");
-    print!("{lobby}");
-
-    Ok(HttpResponse::Ok().json(lobby))
+    println!("{lobby}");
+    let mut response = HttpResponse::Ok().json(lobby);
+    set_session_cookies(
+        &mut response,
+        "user-session-id",
+        &user_session_id.to_string(),
+    );
+    Ok(response)
 }
 
 #[get("/")]
@@ -99,7 +102,6 @@ async fn index(
     cexe.push("www");
     cexe.push("index.html");
     let final_path = cexe.into_os_string().into_string().unwrap();
-    println!("path:{}", final_path);
     let named_file = NamedFile::open(final_path).expect("File not found");
 
     //TODO HACKY!!
@@ -155,7 +157,6 @@ async fn test(
     cexe.push("www");
     cexe.push("index.html");
     let final_path = cexe.into_os_string().into_string().unwrap();
-    println!("path:{}", final_path);
     let named_file = NamedFile::open(final_path).expect("File not found");
 
     //TODO HACKY!!

@@ -95,11 +95,7 @@ impl InputServer {
         println!("Server started. Enter '/stop' to stop the server.");
 
         // Spawn a separate task to handle printing lines while waiting for input
-        let printing_task = tokio::task::spawn_blocking(|| {
-            loop {
-                std::thread::sleep(std::time::Duration::from_secs(5));
-            }
-        });
+
 
         loop {
             let mut input = String::new();
@@ -116,8 +112,6 @@ impl InputServer {
             }
         }
 
-        // Wait for the printing task to complete before exiting
-        printing_task.await.expect("Printing task panicked");
 
         Ok(())
     }

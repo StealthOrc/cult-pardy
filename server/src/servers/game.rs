@@ -131,7 +131,7 @@ impl GameServer {
             .take(5)
             .map(char::from).collect();
         rooms.insert(random_id, HashSet::new());
-        println!("{:?}", rooms);
+        println!("Game lobby's: {:?}", rooms);
         GameServer {
             wb_sessions: HashMap::new(),
             lobby: rooms,

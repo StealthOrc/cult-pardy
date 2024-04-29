@@ -1,12 +1,14 @@
 use std::collections::HashSet;
 use std::env;
 use std::fs::{File, OpenOptions};
-use std::io::{BufReader, BufWriter};
+use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::Path;
 use std::time::Duration;
 use actix::{Actor, Addr, Context, Handler, Message, MessageResult};
+use futures::AsyncWriteExt;
 use rand::{random, Rng};
 use serde::{Deserialize, Serialize};
+use tokio::fs::read_to_string;
 use crate::servers::game::{Disconnect, GameServer};
 
 #[derive(Serialize,Deserialize, Debug, Eq, PartialEq,Hash)]
@@ -55,13 +57,19 @@ impl AdminAccessTokenResponse {
 
 
 fn get_file_reader(file_path: &str) -> BufReader<File> {
-    let file = OpenOptions::new()
-        .read(true)
-        .write(true)
-        .create(true)
-        .open(file_path).expect("Something happens by open the file");
+    let path = Path::new(file_path);
+    let is_file = match path.exists() {
+        true => File::open(path),
+        false => File::create(file_path).and_then(|mut file| {
+            file.write_all(b"[]").expect("Can´t write on file");
+            file.flush().expect("Failed to flush file");
+            File::open(file_path)
+        }),
+    };
 
-    BufReader::new(file)
+    let file = is_file.expect("Failed to open file");
+    let buf_reader = BufReader::new(file);
+    buf_reader
 }
 
 
@@ -75,7 +83,7 @@ fn read_structs_from_file(file_path: &str) -> Result<Vec<Admin>, ()> {
 }
 
 fn append_structs_to_file(file_path: &str, structs_to_append: Vec<Admin>) -> Result<(), ()> {
-    let mut reader =get_file_reader(file_path);
+    let mut reader = get_file_reader(file_path);
     let mut struct_list: Vec<Admin> = serde_json::from_reader(&mut reader).unwrap_or_else(|_| Vec::new());
     struct_list.extend(structs_to_append);
     let file = File::create(file_path).expect("Somethings wrong");

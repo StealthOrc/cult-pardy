@@ -8,7 +8,7 @@ use cult_common::{UserSessionRequest};
 use crate::apis::data::{extract_header_string, extract_value};
 use crate::servers::game;
 
-#[get("/apis/info")]
+#[get("/api/info")]
 async fn game_info(req: HttpRequest, srv: web::Data<Addr<game::GameServer>>) -> Result<HttpResponse, actix_web::Error> {
     println!("{:?}", extract_value(&req, "key"));
 
@@ -31,7 +31,7 @@ async fn game_info(req: HttpRequest, srv: web::Data<Addr<game::GameServer>>) -> 
 }
 
 
-#[post("/apis/session")]
+#[post("/api/session")]
 async fn session(session_request: Option<web::Json<UserSessionRequest>>, srv: web::Data<Addr<game::GameServer>>) -> Result<HttpResponse, actix_web::Error> {
     let user_session = match session_request {
         None => game::UserSession { user_session_request: None },
@@ -69,24 +69,24 @@ pub fn set_session_cookies(res: &mut HttpResponse, cookie_name: &str, cookie: &s
 
 
 
-#[get("/apis/authorization")]
+#[get("/api/authorization")]
 async fn has_authorization(_req: HttpRequest) -> HttpResponse {
     HttpResponse::Ok().body("true")
 }
 
-#[post("/apis/create")]
+#[post("/api/create")]
 async fn create_game_lobby(_req: HttpRequest) -> HttpResponse {
     HttpResponse::Ok().body("true")
 }
 
 
-#[post("/apis/join")]
+#[post("/api/join")]
 async fn join_game(_req: HttpRequest) -> HttpResponse {
     HttpResponse::Ok().body("true")
 }
 
 
-#[patch("/apis/update-authorization")]
+#[patch("/api/update-authorization")]
 async fn update_authorization(_req: HttpRequest) -> HttpResponse {
     HttpResponse::Ok().body("true")
 }
