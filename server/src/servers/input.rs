@@ -13,17 +13,33 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::runtime::Runtime;
 use crate::servers::game::GameServer;
 use anyhow::{Context, Result};
+use strum::{Display, EnumIter, EnumMessage, EnumString, IntoEnumIterator};
 use crate::servers::authentication::{AuthenticationServer, NewAdminAccessToken};
+use crate::servers::input::Commands::HELP;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, EnumIter, Display)]
 enum Commands{
     STOP,
     ADMINCODE,
-    PERMIT(String)
+    PERMIT(String),
+    HELP,
 }
 
 
 impl Commands {
+
+    fn to_help(self) -> &'static str {
+        match self {
+            Commands::STOP => "Stopping the server",
+            Commands::ADMINCODE => "Generate a Admin Access Code",
+            Commands::PERMIT(_) => "Give the the input Discord id admin right",
+            Commands::HELP => "Show the helping information",
+        }
+
+
+    }
+
+
 
     async fn run(self, game_server: &Addr<AuthenticationServer>) {
         match self {
@@ -43,6 +59,11 @@ impl Commands {
             },
             Commands::PERMIT(discord_id) => {
                 println!("ID:{}",discord_id);
+            },
+            Commands::HELP => {
+                for command in Commands::iter() {
+                    println!("/{} : {}",command.to_string(), command.to_help())
+                }
             }
         }
     }
@@ -61,6 +82,12 @@ impl FromStr for Commands {
             None => return Err(()),
             Some(word ) => word.to_uppercase()
         };
+
+
+
+
+
+
         match first_word.as_str() {
             "/STOP"  => Ok(Commands::STOP),
             "/ADMINCODE"  => Ok(Commands::ADMINCODE),
@@ -72,6 +99,7 @@ impl FromStr for Commands {
                 };
                 Ok(Commands::PERMIT(second_word.into()))
             },
+            "/HELP" => Ok(HELP),
             _input => return Err(()),
         }
     }

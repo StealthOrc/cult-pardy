@@ -11,10 +11,10 @@ use oauth2::{AuthorizationCode, AuthUrl, ClientId, ClientSecret, CsrfToken, Http
 use oauth2::reqwest::{async_http_client};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tokio_tungstenite::tungstenite::client;
+use strum::{Display, EnumString};
 use crate::apis::data::{extract_header_string, extract_value};
 use crate::authentication::auth::DiscordRedirectURL::{Grant, Login};
-#[derive(Clone)]
+#[derive(Clone, Display)]
 enum DiscordRedirectURL{
     Grant,
     Login
@@ -56,16 +56,6 @@ impl FromStr for DiscordRedirectURL{
              "LOGIN" => Ok(Login),
             _ => Err(()),
         }
-    }
-}
-
-impl Display for DiscordRedirectURL{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let str = match self {
-            Grant => "grant".to_owned(),
-            Login => "login".to_owned(),
-        };
-        write!(f, "{}", str)
     }
 }
 

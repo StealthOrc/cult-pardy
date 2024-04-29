@@ -26,7 +26,7 @@ use crate::ws::gamewebsocket;
 #[actix_web::main]
 async fn main() -> Result<()> {
 
-    let addr = "127.0.0.1";
+    let addr = "0.0.0.0";
     let port = 8000;
     let addr = parse_addr_str(addr, port);
     let grant_client = GrantDiscordAuth::init();
