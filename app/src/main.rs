@@ -1,5 +1,3 @@
-#![feature(async_iterator)]
-
 mod app;
 mod websocket;
 mod service;
@@ -48,5 +46,5 @@ fn main_comp() -> Html {
 }
 
 fn main() {
-    yew::Renderer::<Main>::new().render();
+    yew::Renderer::<Model>::new().render();
 }

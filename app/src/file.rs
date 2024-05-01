@@ -1,4 +1,4 @@
-use std::async_iter::AsyncIterator;
+
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use yew::{html, Component, Html, Context};
