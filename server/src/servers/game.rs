@@ -5,46 +5,52 @@
 use std::{collections::{HashMap, HashSet}, process};
 use actix::prelude::*;
 use futures::stream::IntoAsyncRead;
-use oauth2::basic::BasicTokenResponse;
-use rand::{rngs::ThreadRng, Rng};
+use oauth2::basic::{BasicClient, BasicTokenResponse};
+use oauth2::reqwest::{async_http_client, http_client};
+use oauth2::TokenResponse;
+use rand::{rngs::ThreadRng, Rng, random};
 use rand::distributions::Alphanumeric;
 use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::runtime::Runtime;
 use cult_common::{UserSessionRequest};
+use crate::apis::api::session;
 use crate::auth::DiscordME;
-use crate::ws::session::PlayerData;
+use crate::authentication::auth::LoginDiscordAuth;
+use crate::ws::custom_ws::GameState as OtherGameState;
+use crate::ws::session::UserData;
 
 /// Chat server sends this messages to session
 #[derive(Message,Serialize, Deserialize, Debug)]
 #[rtype(result = "()")]
-pub enum SessionDataType {
+pub enum SessionMessageType {
     MText(String),
     MData(usize),
     Disconnect,
 }
+#[derive(Debug,Clone)]
+pub struct Connect{
+    pub lobby_id: LobbyId,
+    pub user_session_id:UserSessionId,
+    pub addr: Recipient<SessionMessageType>,
+}
 
-/// Message for chat server communications
-
-/// New chat session is created
-#[derive(Message)]
-#[rtype(usize)]
-pub struct Connect {
-    pub addr: Recipient<SessionDataType>,
+impl Message for Connect{
+    type Result = Option<WebsocketSessionId>;
 }
 
 /// Session is disconnected
-#[derive(Message)]
+#[derive(Message, Debug, Clone)]
 #[rtype(result = "()")]
-pub struct Disconnect {
-    pub id: usize,
+pub struct SessionDisconnect{
+    pub user_data: UserData,
 }
 
 /// Send message to specific room
 #[derive(Message)]
 #[rtype(result = "()")]
-pub struct ClientMessage {
-    pub player_data: PlayerData,
+pub struct ClientMessage{
+    pub player_data: UserData,
     pub msg: String,
 }
 
@@ -58,28 +64,28 @@ impl actix::Message for ListRooms {
 /// Join room, if room does not exists create new one.
 #[derive(Message)]
 #[rtype(result = "()")]
-pub struct Join {
+pub struct Join{
     /// Client ID
-    pub playerdata: PlayerData
+    pub playerdata: UserData
 }
 
 #[derive(Message)]
 #[rtype(result = "HashSet<String>")]
 pub struct Lobbies;
 
-pub struct Lobby{
-    pub lobby_id: String,
+pub struct HasLobby{
+    pub lobby_id:LobbyId,
 
 }
-impl actix::Message for Lobby {
-    type Result = Option<HashSet<usize>>;
+impl actix::Message for HasLobby {
+    type Result = bool;
 }
 
-pub struct UserSession {
+pub struct HasUserSession {
     pub user_session_request: Option<UserSessionRequest>,
 
 }
-impl actix::Message for UserSession {
+impl actix::Message for HasUserSession {
     type Result = usize;
 }
 
@@ -108,67 +114,201 @@ impl actix::Message for GrandAdminAccess {
 /// `ChatServer` manages chat rooms and responsible for coordinating chat session.
 ///
 /// Implementation is very naïve.
-#[derive(Debug)]
-pub struct GameServer {
-    wb_sessions: HashMap<usize, Recipient<SessionDataType>>,
-    lobby: HashMap<String, HashSet<usize>>,
+pub struct GameServer{
+    login_discord_auth: LoginDiscordAuth,
     rng: ThreadRng,
-    user_session: HashSet<usize>,
-    #[allow(dead_code)]
-    discord_auth: HashMap<usize, BasicTokenResponse>
+    user_sessions: HashMap<UserSessionId, UserSession>,
+    lobbies: HashMap<LobbyId, Lobby>
+
+}
+#[derive(Debug, Clone,Copy, Serialize, Deserialize, Hash, Eq, PartialEq)]
+pub struct UserSessionId {
+    pub id:usize,
+}
+
+impl UserSessionId{
+    pub fn of(id:usize) -> Self{
+        UserSessionId{
+            id
+        }
+    }
+    pub fn from_string(id:String) -> Self{
+        let id=  id.parse::<usize>().expect("Can´t convert String to usize");
+        UserSessionId{
+            id
+        }
+    }
+    pub fn from_str(id:&str) -> Self{
+        let id=  id.parse::<usize>().expect("Can´t convert String to usize");
+        UserSessionId{
+            id
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq, Copy)]
+pub struct WebsocketSessionId {
+    pub id:usize,
+}
+impl WebsocketSessionId{
+
+    pub fn random() ->Self  {
+        WebsocketSessionId{
+            id: random::<usize>()
+        }
+    }
+    pub fn of(id:usize) -> Self{
+        WebsocketSessionId{
+            id
+        }
+    }
+    pub fn from_string(id:String) -> Self{
+        let id=  id.parse::<usize>().expect("Can´t convert String to usize");
+        WebsocketSessionId{
+            id
+        }
+    }
+    pub fn from_str(id:&str) -> Self{
+        let id=  id.parse::<usize>().expect("Can´t convert String to usize");
+        WebsocketSessionId{
+            id
+        }
+    }
 }
 
 
-use tokio::io;
+#[derive(Debug, Clone)]
+pub struct UserSession {
+    user_session_id:UserSessionId,
+    discord_auth: Option<BasicTokenResponse>,
+    websocket_connections: HashMap<WebsocketSessionId,Recipient<SessionMessageType>>,
+}
+
+impl UserSession {
+    pub async fn update_discord_auth(mut self, client: BasicClient) {
+        if let Some(token) =  self.discord_auth {
+            if let Some(token) =  token.refresh_token() {
+                match client.exchange_refresh_token(token).request_async(async_http_client).await{
+                    Ok(new_token) => self.discord_auth = Some(new_token),
+                    Err(error) => {
+                        println!("Something happing by requesting new Code {}", error);
+                        self.discord_auth = None;
+                    }
+                }
+                return;
+            }
+        }
+    }
+}
+
+
+
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
+pub struct LobbyId{
+    pub id: String,
+}
+impl LobbyId{
+    pub fn of(id:String) -> Self{
+        LobbyId{
+            id,
+        }
+    }
+
+    pub fn from_str(id:&str) -> Self{
+        LobbyId{
+            id:id.to_string(),
+        }
+    }
+}
+
+
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+pub struct Lobby{
+    lobby_id: LobbyId,
+    user_session: HashSet<UserSessionId>,
+    websocket_session_id: HashSet<WebsocketSessionId>,
+    game_state: GameState
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+enum GameState{
+    Waiting,
+    Starting,
+    Playing
+}
+
+
+
+
+
+
 
 
 impl GameServer {
-    pub fn new() -> GameServer {
+    pub fn new(login_discord_auth: LoginDiscordAuth) -> GameServer{
         // default room
-        let mut rooms = HashMap::new();
-        rooms.insert("main".to_owned(), HashSet::new());
-        let random_id = rand::thread_rng().sample_iter(&Alphanumeric)
+        /*let random_id = rand::thread_rng().sample_iter(&Alphanumeric)
             .take(5)
             .map(char::from).collect();
-        rooms.insert(random_id, HashSet::new());
-        println!("Game lobby's: {:?}", rooms);
-        GameServer {
-            wb_sessions: HashMap::new(),
-            lobby: rooms,
-            rng: rand::thread_rng(),
+        */
+
+
+        let name =  LobbyId::from_str("main");
+        let main = Lobby{
+            lobby_id: name.clone(),
             user_session: HashSet::new(),
-            discord_auth: HashMap::new(),
+            websocket_session_id: HashSet::new(),
+            game_state: GameState::Waiting,
+        };
+
+
+        let mut lobbies = HashMap::new();
+        lobbies.insert(name.clone(), main);
+
+
+        println!("Game lobby's: {:?}", lobbies);
+        GameServer {
+            login_discord_auth,
+            rng: rand::thread_rng(),
+            user_sessions: HashMap::new(),
+            lobbies,
         }
     }
 }
-
 impl GameServer {
+
+
+
+
+
+
+
     /// Send message to all users in the room
-    fn send_message(&self, room: &str, message: &str, skip_id: usize) {
-        if let Some(sessions) = self.lobby.get(room) {
-            for id in sessions {
-                if *id != skip_id {
-                    if let Some(addr) = self.wb_sessions.get(id) {
-                        addr.do_send(SessionDataType::MText(message.to_owned()));
+    fn send_message(&self, lobby_id: &LobbyId, message: &str) {
+        if let Some(lobby) = self.lobbies.get(lobby_id) {
+            for user_id in lobby.websocket_session_id.iter() {
+                for user_session in self.user_sessions.values() {
+                    if let Some(addr) = user_session.websocket_connections.get(user_id) {
+                        addr.do_send(SessionMessageType::MText(message.to_owned()));
                     }
                 }
             }
         }
     }
     #[allow(dead_code)]
-    fn disconnect(&mut self, id:usize) {
-        match self.wb_sessions.get(&id) {
-            Some(addr) => {
-                for (_, sessions) in &mut self.lobby {
-                    if let Some(_session) = sessions.get(&id) {
-                        sessions.remove(&id);
+    fn disconnect(&mut self, user_id:&UserSessionId, lobby_id:&LobbyId) {
+        if let Some(mut lobby) = self.lobbies.get(lobby_id) {
+            if let Some(user_session) = lobby.user_session.get(user_id) {
+                if let Some(user_session) = self.user_sessions.get(user_session) {
+                    for websockets in &lobby.websocket_session_id {
+                        if let Some(addr) = user_session.websocket_connections.get(&websockets) {
+                            addr.do_send(SessionMessageType::Disconnect);
+                        }
                     }
                 }
-                addr.do_send(SessionDataType::Disconnect);
             }
-            _ => {}
         }
-
     }
 }
 
@@ -187,54 +327,64 @@ impl Actor for GameServer {
 ///
 /// Register new session and assign unique id to this session
 impl Handler<Connect> for GameServer {
-    type Result = usize;
+    type Result = Option<WebsocketSessionId>;
 
     fn handle(&mut self, msg: Connect, _: &mut Context<Self>) -> Self::Result {
-        println!("Someone joined");
-
-
-
         // notify all users in same room
-        self.send_message("main", "Someone joined", 0);
+        self.send_message(&msg.lobby_id, "Someone joined");
 
-        // register session with random id
-        let id = self.rng.gen::<usize>();
-        self.wb_sessions.insert(id, msg.addr.clone());
-        msg.addr.do_send(SessionDataType::MData(1));
+        println!("->{:?}", msg.user_session_id);
+        println!("->{:?}", self.user_sessions);
+
+        let mut user_session = match self.user_sessions.get_mut(&msg.user_session_id) {
+            None => return {
+                println!("Something happens");
+                None
+            },
+            Some(user_session) => user_session
+        };
+
+        let websocket_session_id = WebsocketSessionId::random();
+
+        &user_session.websocket_connections.insert(websocket_session_id, msg.addr.clone());
 
 
-
-        // auto join session to main room
-        self.lobby.entry("main".to_owned()).or_default().insert(id);
-
-        // send id back
-        id
+        match self.lobbies.get_mut(&msg.lobby_id){
+            None =>{
+                println!("Something happens2");
+                user_session.websocket_connections.remove(&websocket_session_id);
+                return None
+            }
+            Some(lobby) => {
+                lobby.user_session.insert(msg.clone().user_session_id);
+                lobby.websocket_session_id.insert(websocket_session_id);
+            }
+        }
+        println!("Someone joined :  {:?}{:?}", &msg, &websocket_session_id);
+        Some(websocket_session_id)
     }
 }
 
 /// Handler for Disconnect message.
-impl Handler<Disconnect> for GameServer {
+impl Handler<SessionDisconnect> for GameServer {
     type Result = ();
 
-    fn handle(&mut self, msg: Disconnect, _: &mut Context<Self>) {
-        println!("Someone disconnected id: {}", msg.id);
+    fn handle(&mut self, msg: SessionDisconnect, _: &mut Context<Self>) {
+        println!("Someone disconnected id: {:?}", msg);
+        println!("BEFORE: {:?}", self.user_sessions);
+        println!("BEFORE: {:?}", self.lobbies);
 
-        let mut rooms: Vec<String> = Vec::new();
-
-
-        // remove address
-        if self.wb_sessions.remove(&msg.id).is_some() {
-            // remove session from all rooms
-            for (name, sessions) in &mut self.lobby {
-                if sessions.remove(&msg.id) {
-                    rooms.push(name.to_owned());
+        if let Some(mut user_session) = self.user_sessions.get_mut(&msg.user_data.user_session_id) {
+            if let Some(websocket_session_id) = msg.user_data.websocket_session_id  {
+                if let Some(lobby) = self.lobbies.get_mut(&msg.user_data.lobby) {
+                    lobby.websocket_session_id.remove(&websocket_session_id);
+                    lobby.user_session.remove(&msg.user_data.user_session_id);
                 }
+                user_session.websocket_connections.remove(&websocket_session_id);
             }
         }
-        // send message to other users
-        for room in rooms {
-            self.send_message(&room, "Someone disconnected", 0);
-        }
+        println!("AFTER: {:?}", self.user_sessions);
+        println!("AFTER: {:?}", self.lobbies);
     }
 }
 
@@ -243,7 +393,7 @@ impl Handler<ClientMessage> for GameServer {
     type Result = ();
 
     fn handle(&mut self, msg: ClientMessage, _: &mut Context<Self>) {
-        self.send_message(&msg.player_data.lobby, msg.msg.as_str(), msg.player_data.id.unwrap());
+        self.send_message(&msg.player_data.lobby, msg.msg.as_str());
     }
 }
 
@@ -254,9 +404,9 @@ impl Handler<ListRooms> for GameServer {
     fn handle(&mut self, _: ListRooms, _: &mut Context<Self>) -> Self::Result {
         let mut rooms = Vec::new();
 
-        for key in self.lobby.keys() {
-            rooms.push(key.to_owned())
-        }
+       for key in self.lobbies.keys() {
+           rooms.push(key.id.to_owned())
+       }
 
         MessageResult(rooms)
     }
@@ -269,43 +419,58 @@ impl Handler<Lobbies> for GameServer {
     fn handle(&mut self, _msg: Lobbies, _ctx: &mut Context<Self>) -> Self::Result {
         let mut rooms = HashSet::new();
 
-        for key in self.lobby.keys() {
-            rooms.insert(key.to_owned());
-        }
+       for key in self.lobbies.keys() {
+           rooms.insert(key.id.to_owned());
+       }
         return MessageResult(rooms);
     }
 }
 
-impl Handler<Lobby> for GameServer {
-    type Result = Option<HashSet<usize>>;
+impl Handler<HasLobby> for GameServer {
+    type Result = bool;
 
-    fn handle(&mut self, msg: Lobby, _ctx: &mut Context<Self>) -> Self::Result {
-        match self.lobby.get(&msg.lobby_id){
-            None => None,
-            Some(sessions) => Some(sessions.clone())
+    fn handle(&mut self, msg: HasLobby, _ctx: &mut Context<Self>) -> Self::Result {
+        match self.lobbies.get(&msg.lobby_id) {
+            None => false,
+            Some(sessions) => true
         }
     }
 }
 
-impl Handler<UserSession> for GameServer {
+impl Handler<HasUserSession> for GameServer {
     type Result = usize;
 
-    fn handle(&mut self, msg: UserSession, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: HasUserSession, _ctx: &mut Self::Context) -> Self::Result {
+
+
+
         match msg.user_session_request {
             None => {
-                let id =  self.rng.gen::<usize>();
-                self.user_session.insert(id);
-                println!("{:?}", self.user_session);
-                id
+                let id =  UserSessionId::of(self.rng.gen::<usize>());
+                let user_session = UserSession {
+                    user_session_id: id.clone(),
+                    discord_auth: None,
+                    websocket_connections: HashMap::new(),
+                };
+                self.user_sessions.insert(id.clone(), user_session.clone());
+                println!("HIER1{:?}", user_session);
+                id.id
             },
             Some(req) => {
-                if let Some(id) = self.user_session.get(&req.session_id) {
-                    *id
+                println!("1{:?}", req);
+
+                if let Some(id) = self.user_sessions.get(&UserSessionId::of(req.session_id)) {
+                    id.user_session_id.id
                 } else {
-                    let id =  self.rng.gen::<usize>();
-                    self.user_session.insert(id);
-                    println!("{:?}", self.user_session);
-                    id
+                    let id =  UserSessionId::of(self.rng.gen::<usize>());
+                    let user_session = UserSession {
+                        user_session_id: id.clone(),
+                        discord_auth: None,
+                        websocket_connections: HashMap::new(),
+                    };
+                    self.user_sessions.insert(id.clone(), user_session.clone());
+                    println!("HIER2{:?}", user_session);
+                    id.id
                 }
             }
         }
@@ -313,35 +478,3 @@ impl Handler<UserSession> for GameServer {
 }
 
 
-
-
-/// Join room, send disconnect message to old room
-/// send join message to new room
-impl Handler<Join> for GameServer {
-    type Result = ();
-
-    fn handle(&mut self, msg: Join, _: &mut Context<Self>) {
-        let mut rooms = Vec::new();
-
-        let id = msg.playerdata.id.unwrap();
-
-
-
-
-
-        // remove session from all rooms
-        for (n, sessions) in &mut self.lobby {
-            if sessions.remove(&id) {
-                rooms.push(n.to_owned());
-            }
-        }
-        // send message to other users
-        for room in rooms {
-            self.send_message(&room, "Someone disconnected", 0);
-        }
-
-        self.lobby.entry(msg.playerdata.name.clone()).or_default().insert(id);
-
-        self.send_message(&msg.playerdata.name, "Someone connected",id);
-    }
-}

@@ -8,6 +8,7 @@ use std::str::{FromStr, SplitWhitespace};
 use std::sync::Arc;
 use std::time::Duration;
 use actix::{Actor, Addr, MailboxError};
+use actix_web::HttpServer;
 use tokio::{io, spawn};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::runtime::Runtime;
@@ -43,7 +44,9 @@ impl Commands {
 
     async fn run(self, game_server: &Addr<AuthenticationServer>) {
         match self {
-            Commands::STOP =>  process::exit(0),
+            Commands::STOP =>  {
+                process::exit(0);
+            },
             Commands::ADMINCODE => {
                 println!("Request for and Admin code");
                 let request_token = game_server.send(NewAdminAccessToken);

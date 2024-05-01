@@ -4,6 +4,7 @@ use std::borrow::ToOwned;
 use std::env;
 use std::fmt::Display;
 use std::str::FromStr;
+use actix::Addr;
 use actix_web::{get, HttpResponse, web};
 use attohttpc::Method;
 use oauth2::basic::{BasicClient, BasicTokenResponse};
@@ -12,20 +13,23 @@ use oauth2::reqwest::{async_http_client};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use strum::{Display, EnumString};
+use crate::apis::api::{get_session, set_session_cookies};
 use crate::apis::data::{extract_header_string, extract_value};
 use crate::authentication::auth::DiscordRedirectURL::{Grant, Login};
-#[derive(Clone, Display)]
+use crate::servers::game::GameServer;
+
+#[derive(Clone, Display,Debug)]
 enum DiscordRedirectURL{
     Grant,
     Login
 }
 
 
-#[derive(Clone)]
+#[derive(Clone,Debug)]
 pub struct LoginDiscordAuth {
     client: BasicClient,
 }
-#[derive(Clone)]
+#[derive(Clone,Debug)]
 pub struct GrantDiscordAuth {
     client: BasicClient,
 }
@@ -75,13 +79,12 @@ trait DiscordAuth{
         println!("CULT_PARDY_CLIENT_ID = {:?}", env::var("CULT_PARDY_CLIENT_ID"));
         println!("CULT_PARDY_CLIENT_SECRET = {:?}", env::var("CULT_PARDY_CLIENT_SECRET"));
 
-
         BasicClient::new(
             ClientId::new(env::var("CULT_PARDY_CLIENT_ID").unwrap_or_else(|_| "NOT SET".to_string())),
             Some(ClientSecret::new(env::var("CULT_PARDY_CLIENT_SECRET").unwrap_or_else(|_| "NOT SET".to_string()))),
             AuthUrl::new(Self::AUTHORIZATION_URL.to_owned()).expect("AuthUrl"),
             Some(TokenUrl::new(Self::TOKEN_URL.to_owned()).expect("TokenUrl"))
-        ).set_redirect_uri(RedirectUrl::new(format!("http://localhost:8000/{}",Self::REDIRECT_URL.to_string())).expect("Invalid redirect URL"))
+        ).set_redirect_uri(RedirectUrl::new(format!("http://localhost:8000/{}",Self::REDIRECT_URL.to_string().to_lowercase())).expect("Invalid redirect URL"))
     }
 
 }
@@ -106,7 +109,10 @@ pub async fn discord_oauth(
     req: actix_web::HttpRequest,
     grant:web::Data<GrantDiscordAuth>,
     login: web::Data<LoginDiscordAuth>,
+    srv: web::Data<Addr<GameServer>>,
 ) -> anyhow::Result<HttpResponse, actix_web::Error> {
+
+    let user_session_id = get_session(&req, &srv).await;
 
     let typ = match extract_value(&req, "type") {
         Ok(data) => {
@@ -127,9 +133,16 @@ pub async fn discord_oauth(
         .add_scope(Scope::new("email".to_string()))
         .url();
 
-    Ok(HttpResponse::Found()
+    let mut response = HttpResponse::Found()
         .append_header(("Location", authorize_url.to_string()))
-        .finish())
+        .finish();
+
+    set_session_cookies(
+        &mut response,
+        "user-session-id",
+        &user_session_id.to_string(),
+    );
+    Ok(response)
 }
 #[allow(dead_code)]
 struct OAuthCallback {
@@ -215,6 +228,10 @@ pub async fn login_only(
         .await;
     match token_result {
         Ok(token) => {
+
+
+
+
             println!("{:?}", token.access_token().secret());
             match DiscordME::get(token).await {
                 None => Ok(HttpResponse::InternalServerError().body(format!("Error"))),
