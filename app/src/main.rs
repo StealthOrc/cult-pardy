@@ -48,5 +48,5 @@ fn main_comp() -> Html {
 }
 
 fn main() {
-    yew::Renderer::<Main>::new().render();
+    yew::Renderer::<Model>::new().render();
 }
