@@ -1,5 +1,10 @@
+use std::collections::HashMap;
+use std::fmt::Arguments;
 use std::net::SocketAddr;
-use serde::{Deserialize, Serialize};
+use std::thread::Thread;
+use std::time::Duration;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use rand::{rngs::ThreadRng, Rng, random};
 
 pub fn parse_addr_str(domain: &str, port: usize) -> SocketAddr {
     let addr = format!("{}:{}", domain, port);
@@ -7,10 +12,25 @@ pub fn parse_addr_str(domain: &str, port: usize) -> SocketAddr {
     addr
 }
 
-#[derive(Serialize, Deserialize, Default, Debug)]
-pub struct UserSessionRequest{
-    pub session_id : usize
+
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DiscordUser {
+    pub id: String,
+    pub username: String,
+    pub avatar_id: String,
+    pub discriminator: String,
+    pub global_name: String,
 }
+
+impl DiscordUser {
+    fn avatar_image_url(self) -> String {
+        format!("https://cdn.discordapp.com/avatars/{}/{}.jpg",self.id,self.avatar_id)
+    }
+}
+
+
+
 
 
 
@@ -57,6 +77,82 @@ impl Category {
 
 }
 
+#[derive(Debug, Clone,Copy, Hash, Eq, PartialEq, Default)]
+pub struct UserSessionId {
+    pub id:usize,
+}
+
+
+impl Serialize for UserSessionId {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+    {
+        serializer.serialize_u64(self.id as u64)
+    }
+}
+
+impl<'de> Deserialize<'de> for UserSessionId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+    {
+        let id_str: String = Deserialize::deserialize(deserializer)?;
+        let id = id_str.parse().map_err(serde::de::Error::custom)?;
+        println!("test?");
+        Ok(UserSessionId { id })
+    }
+}
+#[derive(Debug, Clone,Serialize,Deserialize, Eq, PartialEq, Default)]
+pub struct JsonPrinter{
+    pub results: HashMap<String, bool>
+}
+
+impl JsonPrinter {
+    pub fn new() -> Self {
+        JsonPrinter{
+            results: HashMap::new(),
+        }
+    }
+
+    pub fn add_string(&mut self, text:String, result:bool) {
+        self.results.insert(text, result);
+    }
+
+    pub fn add(&mut self, text:&str, result:bool) {
+        self.results.insert(text.to_string(), result);
+    }
+
+}
+
+
+impl UserSessionId{
+    pub fn of(id:usize) -> Self{
+        UserSessionId{
+            id
+        }
+    }
+    pub fn from_string(id:String) -> Self{
+        let id=  id.parse::<usize>().expect("Can´t convert String to usize");
+        UserSessionId{
+            id
+        }
+    }
+    pub fn from_str(id:&str) -> Self{
+        let id=  id.parse::<usize>().expect("Can´t convert String to usize");
+        UserSessionId{
+            id
+        }
+    }
+
+    pub fn random() -> Self {
+        UserSessionId {
+            id: random::<usize>(),
+        }
+    }
+}
+
+
 
 
 
@@ -91,4 +187,12 @@ impl JeopardyBoard {
         }
     }
 
+}
+
+pub fn get_false() -> bool {
+    false
+}
+
+pub fn get_true() -> bool {
+    true
 }

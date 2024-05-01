@@ -4,23 +4,17 @@ mod ws;
 mod authentication;
 mod servers;
 
-use std::any::Any;
-use std::sync::Arc;
-use actix::{Actor};
+use crate::apis::api::has_authorization;
+use crate::apis::api::session_request;
 
-use actix_web::{web, App, HttpServer, HttpRequest, HttpResponse, post, get};
+use actix_web::{web, App, HttpServer, HttpRequest, HttpResponse, get};
 use anyhow::Result;
-use tokio::io;
 use tokio::runtime::Runtime;
 use cult_common::*;
 use cult_common::JeopardyMode::NORMAL;
-use crate::apis::api::{create_game_lobby,  has_authorization, session};
-use crate::authentication::auth;
-use crate::authentication::auth::{GrantDiscordAuth, LoginDiscordAuth};
+use crate::authentication::discord;
 use crate::frontend::frontend::{assets, find_game, grant_admin_access, index, test};
-use crate::servers::authentication::AuthenticationServer;
 use crate::servers::input::{InputServer};
-use crate::servers::game::{GameServer};
 use crate::servers::Services;
 use crate::ws::gamewebsocket;
 
@@ -48,14 +42,14 @@ async fn main() -> Result<()> {
             .app_data(web::Data::new(services.game_server.clone()))
             .app_data(web::Data::new(services.authentication_server.clone()))
             .route("/ws", web::get().to(gamewebsocket::start_ws))
-            .service(auth::discord_oauth)
-            .service(auth::grant_access)
-            .service(auth::login_only)
+            .service(discord::discord_oauth)
+            .service(discord::grant_access)
+            .service(discord::login_only)
             .service(index)
             .service(find_game)
             .service(assets)
             .service(test)
-            .service(session)
+            .service(session_request)
             .service(grant_admin_access)
             .service(has_authorization)
             .service(download)
@@ -63,7 +57,8 @@ async fn main() -> Result<()> {
     .bind(addr)?
     .run();
     println!("Started {} HttpServer! ", addr);
-    server.await.expect("Server has crashed!");
+    server.await?;
+    rt.shutdown_background();
     Ok(())
 }
 

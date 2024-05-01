@@ -1,14 +1,19 @@
 
+use crate::servers::game::{LobbyId};
 use actix::Addr;
 
-use actix_web::{get, HttpRequest, HttpResponse, patch, post, web};
 use actix_web::cookie::{Cookie};
+use actix_web::{get, HttpRequest, HttpResponse, patch, post, web};
+use serde::Serialize;
 use serde_json::json;
-use cult_common::{JeopardyBoard, UserSessionRequest};
+use cult_common::{JeopardyBoard, UserSessionId};
 use cult_common::JeopardyMode::NORMAL;
 use crate::apis::data::{extract_header_string, extract_value};
+use crate::authentication::discord::is_admin;
+use crate::servers::authentication::AuthenticationServer;
 use crate::servers::game;
-use crate::servers::game::LobbyId;
+use crate::servers::game::UserSession;
+
 
 #[get("/api/info")]
 async fn game_info(req: HttpRequest, srv: web::Data<Addr<game::GameServer>>) -> Result<HttpResponse, actix_web::Error> {
@@ -32,49 +37,53 @@ async fn game_info(req: HttpRequest, srv: web::Data<Addr<game::GameServer>>) -> 
     Ok(HttpResponse::from(HttpResponse::Ok().json(user)))
 }
 
-
-#[post("/api/session")]
-async fn session(session_request: Option<web::Json<UserSessionRequest>>, srv: web::Data<Addr<game::GameServer>>) -> Result<HttpResponse, actix_web::Error> {
-    let user_session = match session_request {
-        None => game::HasUserSession { user_session_request: None },
-        Some(json) => game::HasUserSession { user_session_request: Some(json.0) },
-    };
-    let session = srv.send(user_session).await.expect("No User Session Found");
-    Ok(HttpResponse::from(HttpResponse::Ok().json(UserSessionRequest{session_id:session})))
+#[derive(Debug, Clone,Serialize)]
+struct UserSessionWithAdmin{
+    user_session:UserSession,
+    is_admin:bool
 }
 
+#[get("/api/session")]
+async fn session_request(req: HttpRequest, srv: web::Data<Addr<game::GameServer>>, auth: web::Data<Addr<AuthenticationServer>>) -> Result<HttpResponse, actix_web::Error> {
+    let user_session = get_session(&req, &srv).await;
+    let mut response = HttpResponse::from(HttpResponse::Ok().json(UserSessionWithAdmin{user_session:user_session.clone(), is_admin:is_admin(user_session.clone(), auth).await}));
+    set_cookie(
+        &mut response,
+        "user-session-id",
+        &user_session.user_session_id.id.to_string(),
+    );
+    Ok(response)
+}
 
-
-pub async fn get_session(req: &HttpRequest, srv: &web::Data<Addr<game::GameServer>>) -> usize {
+pub async fn get_session(req: &HttpRequest, srv: &web::Data<Addr<game::GameServer>>) -> UserSession {
     let user_req = match req.cookie("user-session-id") {
-        None => UserSessionRequest::default(),
+        None => None,
         Some(cookie) => match cookie.value().parse::<usize>() {
-            Err(_) => UserSessionRequest::default(),
-            Ok(id) => UserSessionRequest{session_id: id},
+            Err(_) => None,
+            Ok(id) => Some(UserSessionId{ id }),
         }
     };
 
     println!("!!{:?}", user_req);
-
-    srv.send(game::HasUserSession {user_session_request:Some(user_req)}).await.expect("Somethings wrong with sessions")
+    srv.send(game::GetUserSession {user_session_request:user_req}).await.expect("Somethings wrong with sessions")
 }
 
-pub async fn has_session(req: &HttpRequest, srv: &web::Data<Addr<game::GameServer>>) -> usize {
-    let user_req = match req.cookie("user-session-id") {
-        None => UserSessionRequest::default(),
-        Some(cookie) => match cookie.value().parse::<usize>() {
-            Err(_) => UserSessionRequest::default(),
-            Ok(id) => UserSessionRequest{session_id: id},
-        }
+pub fn get_token(req: &HttpRequest) -> Option<usize> {
+    let cookie = match req.cookie("token") {
+        None => return None,
+        Some(cookie) => cookie,
     };
-    srv.send(game::HasUserSession {user_session_request:Some(user_req)}).await.expect("Somethings wrong with sessions")
+    match cookie.value().parse::<usize>() {
+        Err(_) => None,
+        Ok(id) => Some(id),
+    }
 }
 
 
 
 
 
-pub fn set_session_cookies(res: &mut HttpResponse, cookie_name: &str, cookie: &str){
+pub fn set_cookie(res: &mut HttpResponse, cookie_name: &str, cookie: &str){
    //let expiration_time = SystemTime::now() + Duration::from_secs(60);
     let cookie = Cookie::build(cookie_name, cookie)
         .path("/")
@@ -84,6 +93,14 @@ pub fn set_session_cookies(res: &mut HttpResponse, cookie_name: &str, cookie: &s
         .finish();
     res.add_cookie(&cookie).expect("Can´t add cookies to the Response");
 }
+
+pub fn remove_cookie(res: &mut HttpResponse, req: &HttpRequest, cookie_name: &str){
+    if let Some(cookie)= req.cookie(cookie_name) {
+        res.add_removal_cookie(&cookie).expect("Can´t add cookies to the Response")
+    }
+}
+
+
 
 
 

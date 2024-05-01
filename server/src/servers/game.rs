@@ -2,22 +2,19 @@
 //! And manages available rooms. Peers send messages to other peers in same
 //! room through `ChatServer`.
 
-use std::{collections::{HashMap, HashSet}, process};
-use actix::prelude::*;
-use futures::stream::IntoAsyncRead;
+
+
+use std::collections::{HashMap, HashSet};
+use actix::{Actor, Addr, Context, Handler, Message, MessageResult, Recipient};
 use oauth2::basic::{BasicClient, BasicTokenResponse};
-use oauth2::reqwest::{async_http_client, http_client};
+use oauth2::reqwest::async_http_client;
 use oauth2::TokenResponse;
-use rand::{rngs::ThreadRng, Rng, random};
-use rand::distributions::Alphanumeric;
-use serde::{Deserialize, Serialize};
-use tokio::io::{AsyncBufReadExt, BufReader};
-use tokio::runtime::Runtime;
-use cult_common::{UserSessionRequest};
-use crate::apis::api::session;
-use crate::auth::DiscordME;
-use crate::authentication::auth::LoginDiscordAuth;
-use crate::ws::custom_ws::GameState as OtherGameState;
+use rand::random;
+use rand::rngs::ThreadRng;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use cult_common::{DiscordUser, UserSessionId};
+use crate::authentication::discord::{DiscordME, LoginDiscordAuth};
+use crate::servers::authentication::RedeemAdminAccessToken;
 use crate::ws::session::UserData;
 
 /// Chat server sends this messages to session
@@ -73,21 +70,46 @@ pub struct Join{
 #[rtype(result = "HashSet<String>")]
 pub struct Lobbies;
 
-pub struct HasLobby{
+#[derive(Message)]
+#[rtype(result = "bool")]
+pub struct HasLobby {
     pub lobby_id:LobbyId,
 
 }
-impl actix::Message for HasLobby {
+
+pub struct GetUserSession {
+    pub user_session_request: Option<UserSessionId>,
+}
+
+impl actix::Message for GetUserSession {
+    type Result = UserSession;
+}
+
+pub struct AddDiscordAccount {
+    pub user_session_id: UserSessionId,
+    pub discord_data: DiscordData,
+}
+
+impl actix::Message for AddDiscordAccount {
     type Result = bool;
 }
 
-pub struct HasUserSession {
-    pub user_session_request: Option<UserSessionRequest>,
+
+
+
+
+pub struct GetsUserSession {
+    pub user_session_request: Option<UserSessionId>,
 
 }
-impl actix::Message for HasUserSession {
+impl actix::Message for GetsUserSession {
     type Result = usize;
 }
+
+
+
+
+
 
 #[allow(dead_code)]
 pub struct DiscordAuth {
@@ -114,42 +136,40 @@ impl actix::Message for GrandAdminAccess {
 /// `ChatServer` manages chat rooms and responsible for coordinating chat session.
 ///
 /// Implementation is very naïve.
+#[derive(Debug)]
 pub struct GameServer{
-    login_discord_auth: LoginDiscordAuth,
-    rng: ThreadRng,
-    user_sessions: HashMap<UserSessionId, UserSession>,
-    lobbies: HashMap<LobbyId, Lobby>
-
-}
-#[derive(Debug, Clone,Copy, Serialize, Deserialize, Hash, Eq, PartialEq)]
-pub struct UserSessionId {
-    pub id:usize,
+    pub login_discord_auth: LoginDiscordAuth,
+    pub rng: ThreadRng,
+    pub user_sessions: HashMap<UserSessionId, UserSession>,
+    pub lobbies: HashMap<LobbyId, Lobby>
 }
 
-impl UserSessionId{
-    pub fn of(id:usize) -> Self{
-        UserSessionId{
-            id
-        }
-    }
-    pub fn from_string(id:String) -> Self{
-        let id=  id.parse::<usize>().expect("Can´t convert String to usize");
-        UserSessionId{
-            id
-        }
-    }
-    pub fn from_str(id:&str) -> Self{
-        let id=  id.parse::<usize>().expect("Can´t convert String to usize");
-        UserSessionId{
-            id
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq, Copy)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Copy)]
 pub struct WebsocketSessionId {
     pub id:usize,
 }
+
+
+impl Serialize for WebsocketSessionId {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+    {
+        serializer.serialize_u64(self.id as u64)
+    }
+}
+
+impl<'de> Deserialize<'de> for WebsocketSessionId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+    {
+        let id_str: String = Deserialize::deserialize(deserializer)?;
+        let id = id_str.parse().map_err(serde::de::Error::custom)?;
+        Ok(WebsocketSessionId { id })
+    }
+}
+
 impl WebsocketSessionId{
 
     pub fn random() ->Self  {
@@ -177,19 +197,95 @@ impl WebsocketSessionId{
 }
 
 
-#[derive(Debug, Clone)]
+
+
+
+#[derive(Debug, Clone,Serialize)]
 pub struct UserSession {
-    user_session_id:UserSessionId,
-    discord_auth: Option<BasicTokenResponse>,
-    websocket_connections: HashMap<WebsocketSessionId,Recipient<SessionMessageType>>,
+    pub user_session_id:UserSessionId,
+    pub discord_auth: Option<DiscordData>,
+    pub websocket_connections: HashMap<WebsocketSessionId,WebsocketSession>,
 }
 
+
+
+
+#[derive(Debug, Clone,Serialize)]
+pub struct SessionData{
+    user_session:UserSession,
+    websockets: Vec<WebsocketSessionId>,
+}
+
+#[derive(Debug, Clone,Serialize)]
+pub struct WebsocketSession{
+    websocket_session_id:WebsocketSessionId,
+    #[serde(skip_serializing)]
+    addr:Recipient<SessionMessageType>,
+    lobby_id:LobbyId
+}
+
+
+
+
+
+
+#[derive(Debug, Clone,Serialize)]
+pub struct DiscordData {
+    pub(crate) discord_user:Option<DiscordUser>,
+    #[serde(skip_serializing)]
+    pub(crate) basic_token_response:BasicTokenResponse
+}
+
+impl DiscordData {
+    async fn update(mut self, basic_token_response:BasicTokenResponse) {
+        match DiscordME::get(basic_token_response).await{
+            None => self.discord_user = None,
+            Some(me) => {
+                self.discord_user = Some(me.to_discord_user())
+            }
+        }
+    }
+
+    pub async fn redeem_admin_access_token(self, token:usize) -> Option<RedeemAdminAccessToken>{
+        if let Some(discord_user) = self.discord_user {
+            return Some(RedeemAdminAccessToken::new(token, discord_user.id))
+        } else if let Some(discord_me) = DiscordME::get(self.basic_token_response.clone()).await {
+            return Some(RedeemAdminAccessToken::new(token, discord_me.id))
+        }
+        None
+    }
+}
+
+
+
+
 impl UserSession {
-    pub async fn update_discord_auth(mut self, client: BasicClient) {
-        if let Some(token) =  self.discord_auth {
-            if let Some(token) =  token.refresh_token() {
+
+    pub fn random() -> Self{
+        UserSession{
+            user_session_id: UserSessionId::random(),
+            discord_auth: None,
+            websocket_connections: HashMap::new(),
+        }
+    }
+
+    pub fn to_session_data(self) -> SessionData {
+        SessionData{
+            user_session: self.clone(),
+            websockets: self.websocket_connections.clone().keys().cloned().collect::<Vec<WebsocketSessionId>>(),
+        }
+
+    }
+
+
+
+    async fn update_discord_auth(mut self, client: BasicClient) {
+        if let Some(discord_data) =  self.discord_auth {
+            if let Some(token) =  discord_data.basic_token_response.refresh_token() {
                 match client.exchange_refresh_token(token).request_async(async_http_client).await{
-                    Ok(new_token) => self.discord_auth = Some(new_token),
+                    Ok(new_token) => {
+                        discord_data.update(new_token).await;
+                    },
                     Err(error) => {
                         println!("Something happing by requesting new Code {}", error);
                         self.discord_auth = None;
@@ -203,10 +299,31 @@ impl UserSession {
 
 
 
-#[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
+#[derive(Debug, Clone,  Hash, Eq, PartialEq)]
 pub struct LobbyId{
     pub id: String,
 }
+
+impl Serialize for LobbyId {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+    {
+        serializer.serialize_str(&self.id)
+    }
+}
+
+impl<'de> Deserialize<'de> for LobbyId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+    {
+        let id: String = Deserialize::deserialize(deserializer)?;
+        Ok(LobbyId { id })
+    }
+}
+
+
 impl LobbyId{
     pub fn of(id:String) -> Self{
         LobbyId{
@@ -246,13 +363,7 @@ enum GameState{
 
 
 impl GameServer {
-    pub fn new(login_discord_auth: LoginDiscordAuth) -> GameServer{
-        // default room
-        /*let random_id = rand::thread_rng().sample_iter(&Alphanumeric)
-            .take(5)
-            .map(char::from).collect();
-        */
-
+    pub fn new(login_discord_auth: LoginDiscordAuth) -> GameServer {
 
         let name =  LobbyId::from_str("main");
         let main = Lobby{
@@ -279,7 +390,15 @@ impl GameServer {
 impl GameServer {
 
 
-
+    fn new_session(&mut self) -> UserSession {
+        let mut session= UserSession::random();
+        while self.user_sessions.contains_key(&session.user_session_id) {
+            session = UserSession::random();
+        }
+        self.user_sessions.insert(session.user_session_id, session.clone());
+        println!("Added User-session {:?}", session);
+        session
+    }
 
 
 
@@ -289,8 +408,8 @@ impl GameServer {
         if let Some(lobby) = self.lobbies.get(lobby_id) {
             for user_id in lobby.websocket_session_id.iter() {
                 for user_session in self.user_sessions.values() {
-                    if let Some(addr) = user_session.websocket_connections.get(user_id) {
-                        addr.do_send(SessionMessageType::MText(message.to_owned()));
+                    if let Some(web_socket_session) = user_session.websocket_connections.get(user_id) {
+                        web_socket_session.addr.do_send(SessionMessageType::MText(message.to_owned()));
                     }
                 }
             }
@@ -298,12 +417,12 @@ impl GameServer {
     }
     #[allow(dead_code)]
     fn disconnect(&mut self, user_id:&UserSessionId, lobby_id:&LobbyId) {
-        if let Some(mut lobby) = self.lobbies.get(lobby_id) {
+        if let Some(lobby) = self.lobbies.get(lobby_id) {
             if let Some(user_session) = lobby.user_session.get(user_id) {
                 if let Some(user_session) = self.user_sessions.get(user_session) {
                     for websockets in &lobby.websocket_session_id {
-                        if let Some(addr) = user_session.websocket_connections.get(&websockets) {
-                            addr.do_send(SessionMessageType::Disconnect);
+                        if let Some(websocket_session) = user_session.websocket_connections.get(&websockets) {
+                            websocket_session.addr.do_send(SessionMessageType::Disconnect);
                         }
                     }
                 }
@@ -336,7 +455,7 @@ impl Handler<Connect> for GameServer {
         println!("->{:?}", msg.user_session_id);
         println!("->{:?}", self.user_sessions);
 
-        let mut user_session = match self.user_sessions.get_mut(&msg.user_session_id) {
+        let user_session = match self.user_sessions.get_mut(&msg.user_session_id) {
             None => return {
                 println!("Something happens");
                 None
@@ -346,7 +465,14 @@ impl Handler<Connect> for GameServer {
 
         let websocket_session_id = WebsocketSessionId::random();
 
-        &user_session.websocket_connections.insert(websocket_session_id, msg.addr.clone());
+        let web_socket_session = WebsocketSession{
+            websocket_session_id,
+            addr: msg.addr.clone(),
+            lobby_id: msg.lobby_id.clone(),
+        };
+
+
+        &user_session.websocket_connections.insert(websocket_session_id, web_socket_session);
 
 
         match self.lobbies.get_mut(&msg.lobby_id){
@@ -370,21 +496,19 @@ impl Handler<SessionDisconnect> for GameServer {
     type Result = ();
 
     fn handle(&mut self, msg: SessionDisconnect, _: &mut Context<Self>) {
-        println!("Someone disconnected id: {:?}", msg);
-        println!("BEFORE: {:?}", self.user_sessions);
-        println!("BEFORE: {:?}", self.lobbies);
-
-        if let Some(mut user_session) = self.user_sessions.get_mut(&msg.user_data.user_session_id) {
+        if let Some(user_session) = self.user_sessions.get_mut(&msg.user_data.user_session_id) {
             if let Some(websocket_session_id) = msg.user_data.websocket_session_id  {
+                user_session.websocket_connections.remove(&websocket_session_id);
                 if let Some(lobby) = self.lobbies.get_mut(&msg.user_data.lobby) {
                     lobby.websocket_session_id.remove(&websocket_session_id);
-                    lobby.user_session.remove(&msg.user_data.user_session_id);
+                    println!("Someone disconnect: {:?}", user_session.clone().to_session_data());
+                    let multi_sessions = user_session.websocket_connections.values().any(|ws | ws.lobby_id.eq(&lobby.lobby_id));
+                    if !multi_sessions{
+                        lobby.user_session.remove(&msg.user_data.user_session_id);
+                    }
                 }
-                user_session.websocket_connections.remove(&websocket_session_id);
             }
         }
-        println!("AFTER: {:?}", self.user_sessions);
-        println!("AFTER: {:?}", self.lobbies);
     }
 }
 
@@ -404,9 +528,9 @@ impl Handler<ListRooms> for GameServer {
     fn handle(&mut self, _: ListRooms, _: &mut Context<Self>) -> Self::Result {
         let mut rooms = Vec::new();
 
-       for key in self.lobbies.keys() {
-           rooms.push(key.id.to_owned())
-       }
+        for key in self.lobbies.keys() {
+            rooms.push(key.id.to_owned())
+        }
 
         MessageResult(rooms)
     }
@@ -419,9 +543,9 @@ impl Handler<Lobbies> for GameServer {
     fn handle(&mut self, _msg: Lobbies, _ctx: &mut Context<Self>) -> Self::Result {
         let mut rooms = HashSet::new();
 
-       for key in self.lobbies.keys() {
-           rooms.insert(key.id.to_owned());
-       }
+        for key in self.lobbies.keys() {
+            rooms.insert(key.id.to_owned());
+        }
         return MessageResult(rooms);
     }
 }
@@ -437,43 +561,34 @@ impl Handler<HasLobby> for GameServer {
     }
 }
 
-impl Handler<HasUserSession> for GameServer {
-    type Result = usize;
+impl Handler<GetUserSession> for GameServer {
+    type Result = MessageResult<GetUserSession>;
 
-    fn handle(&mut self, msg: HasUserSession, _ctx: &mut Self::Context) -> Self::Result {
-
-
-
-        match msg.user_session_request {
-            None => {
-                let id =  UserSessionId::of(self.rng.gen::<usize>());
-                let user_session = UserSession {
-                    user_session_id: id.clone(),
-                    discord_auth: None,
-                    websocket_connections: HashMap::new(),
-                };
-                self.user_sessions.insert(id.clone(), user_session.clone());
-                println!("HIER1{:?}", user_session);
-                id.id
-            },
-            Some(req) => {
-                println!("1{:?}", req);
-
-                if let Some(id) = self.user_sessions.get(&UserSessionId::of(req.session_id)) {
-                    id.user_session_id.id
+    fn handle(&mut self, msg: GetUserSession, _ctx: &mut Self::Context) -> Self::Result {
+        let id = match msg.user_session_request {
+            None => self.new_session(),
+            Some(id) => {
+                if let Some(session) = self.user_sessions.get(&id) {
+                    session.clone()
                 } else {
-                    let id =  UserSessionId::of(self.rng.gen::<usize>());
-                    let user_session = UserSession {
-                        user_session_id: id.clone(),
-                        discord_auth: None,
-                        websocket_connections: HashMap::new(),
-                    };
-                    self.user_sessions.insert(id.clone(), user_session.clone());
-                    println!("HIER2{:?}", user_session);
-                    id.id
+                    self.new_session()
                 }
             }
+        };
+
+        return MessageResult(id)
+    }
+}
+
+impl Handler<AddDiscordAccount> for GameServer {
+    type Result = bool;
+
+    fn handle(&mut self, msg: AddDiscordAccount, ctx: &mut Self::Context) -> Self::Result {
+        if let Some(user_session) = self.user_sessions.get_mut(&msg.user_session_id) {
+            user_session.discord_auth = Some(msg.discord_data);
+            return true
         }
+        return false
     }
 }
 

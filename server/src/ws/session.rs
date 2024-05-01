@@ -1,14 +1,12 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use actix::prelude::*;
 use actix_web::web;
 use actix_web_actors::ws;
 use actix_web_actors::ws::WebsocketContext;
+use cult_common::UserSessionId;
 use crate::servers::game;
-use crate::servers::game::{LobbyId, SessionDisconnect, SessionMessageType, UserSessionId, WebsocketSessionId};
+use crate::servers::game::{LobbyId, SessionDisconnect, SessionMessageType, WebsocketSessionId};
 
 
 /// How often heartbeat pings are sent
@@ -145,10 +143,10 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
         match msg {
             ws::Message::Ping(msg) => {
                 self.hb = Instant::now();
-              //  ctx.pong(&msg);
+               ctx.pong(&msg);
             }
             ws::Message::Pong(_) => {
-              //  self.hb = Instant::now();
+                self.hb = Instant::now();
             }
             ws::Message::Text(text) => {
                 let text = text.trim();

@@ -1,6 +1,5 @@
 use actix::{Actor, Addr};
-use serde::Serialize;
-use crate::authentication::auth::{GrantDiscordAuth, LoginDiscordAuth};
+use crate::authentication::discord::{GrantDiscordAuth, LoginDiscordAuth};
 use crate::servers::authentication::AuthenticationServer;
 use crate::servers::game::GameServer;
 

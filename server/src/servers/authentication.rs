@@ -1,20 +1,16 @@
 use std::collections::HashSet;
-use std::env;
-use std::fs::{File, OpenOptions};
-use std::io::{BufReader, BufWriter, Read, Write};
+use std::fs::{File};
+use std::io::{BufReader, BufWriter, Write};
 use std::path::Path;
 use std::time::Duration;
 use actix::{Actor, Addr, Context, Handler, Message, MessageResult};
 use futures::AsyncWriteExt;
-use rand::{random, Rng};
+use rand::{random};
 use serde::{Deserialize, Serialize};
-use tokio::fs::read_to_string;
-use crate::servers::game::{GameServer};
 
-#[derive(Serialize,Deserialize, Debug, Eq, PartialEq,Hash)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Hash, Clone)]
 struct Admin{
     discord_id:String,
-    name:String
 }
 
 
@@ -35,11 +31,50 @@ impl Message for NewAdminAccessToken {
     type Result = AdminAccessTokenResponse;
 }
 
+
+pub struct AddAdminAccess {
+    pub discord_id: String,
+
+}
+impl actix::Message for AddAdminAccess {
+    type Result = bool;
+}
+
+
 pub struct CheckAdminAccessToken{
     pub token: usize,
 
 }
 impl actix::Message for CheckAdminAccessToken {
+    type Result = bool;
+}
+
+
+pub struct RedeemAdminAccessToken{
+    pub token: usize,
+    pub discord_id: String,
+}
+
+impl RedeemAdminAccessToken{
+    pub fn new(token: usize, discord_id: String) -> Self{
+        RedeemAdminAccessToken{
+            token,
+            discord_id,
+        }
+    }
+}
+
+
+impl actix::Message for RedeemAdminAccessToken {
+    type Result = bool;
+}
+
+
+pub struct CheckAdminAccess{
+    pub discord_id: String,
+
+}
+impl actix::Message for CheckAdminAccess {
     type Result = bool;
 }
 
@@ -82,10 +117,10 @@ fn read_structs_from_file(file_path: &str) -> Result<Vec<Admin>, ()> {
     Ok(struct_list)
 }
 
-fn append_structs_to_file(file_path: &str, structs_to_append: Vec<Admin>) -> Result<(), ()> {
+fn append_structs_to_file(file_path: &str, structs_to_append: Admin) -> Result<(), ()> {
     let mut reader = get_file_reader(file_path);
     let mut struct_list: Vec<Admin> = serde_json::from_reader(&mut reader).unwrap_or_else(|_| Vec::new());
-    struct_list.extend(structs_to_append);
+    struct_list.push(structs_to_append);
     let file = File::create(file_path).expect("Somethings wrong");
     let writer = BufWriter::new(file);
     serde_json::to_writer_pretty(writer, &struct_list).expect("Somethings wrong");
@@ -118,6 +153,18 @@ impl AuthenticationServer {
             admin: admins,
         }
     }
+
+    fn add_admin_access(&mut self, admin: Admin) -> bool{
+        if self.admin.contains(&admin) {
+            return true
+        } else {
+            append_structs_to_file(&"Admin.json", admin.clone()).expect("Somethings wrong");
+            self.admin.insert(admin)
+        }
+
+    }
+
+
 }
 
 
@@ -139,6 +186,44 @@ impl Handler<NewAdminAccessToken> for AuthenticationServer {
         }
         self.admin_token.insert(token);
         return MessageResult(token)
+    }
+}
+
+impl Handler<AddAdminAccess> for AuthenticationServer {
+    type Result = bool;
+
+    fn handle(&mut self, msg: AddAdminAccess, _ctx: &mut Self::Context) -> Self::Result {
+        let admin = Admin{ discord_id:msg.discord_id };
+        self.add_admin_access(admin)
+    }
+}
+
+
+
+impl Handler<RedeemAdminAccessToken> for AuthenticationServer {
+    type Result = bool;
+
+    fn handle(&mut self, msg: RedeemAdminAccessToken, _ctx: &mut Self::Context) -> Self::Result {
+        let original_len = self.admin_token.len().clone();
+        self.admin_token.retain(|token| token.token != msg.token);
+        let token_removed = self.admin_token.len() < original_len;
+
+        if token_removed {
+            let admin = Admin { discord_id: msg.discord_id };
+            self.add_admin_access(admin);
+            true
+        } else {
+            false
+        }
+    }
+}
+
+impl Handler<CheckAdminAccess> for AuthenticationServer {
+    type Result = bool;
+
+    fn handle(&mut self, msg: CheckAdminAccess, _ctx: &mut Self::Context) -> Self::Result {
+        let admin = Admin{ discord_id:msg.discord_id };
+        self.admin.contains(&admin)
     }
 }
 
