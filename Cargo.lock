@@ -350,6 +350,8 @@ dependencies = [
  "json",
  "patternfly-yew",
  "serde",
+ "serde_json",
+ "tokio",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-cookies",

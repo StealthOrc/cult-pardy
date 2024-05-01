@@ -1,6 +1,9 @@
+#![feature(async_iterator)]
+
 mod app;
 mod websocket;
 mod service;
+mod file;
 
 use app::App;
 use yew::prelude::*;
@@ -9,6 +12,7 @@ use yew_router::prelude::*;
 use gloo_console::log;
 use gloo_storage::Storage;
 use wasm_bindgen::JsValue;
+use crate::file::Model;
 
 #[derive(Clone, Routable, PartialEq)]
 enum Route {

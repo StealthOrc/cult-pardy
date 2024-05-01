@@ -9,7 +9,7 @@ use futures::AsyncWriteExt;
 use rand::{random, Rng};
 use serde::{Deserialize, Serialize};
 use tokio::fs::read_to_string;
-use crate::servers::game::{Disconnect, GameServer};
+use crate::servers::game::{GameServer};
 
 #[derive(Serialize,Deserialize, Debug, Eq, PartialEq,Hash)]
 struct Admin{

@@ -4,12 +4,15 @@ use actix::Addr;
 use actix_web::{HttpRequest, HttpResponse, web};
 use actix_web_actors::ws;
 use serde_json::json;
+use crate::apis::api::get_session;
 use crate::apis::data::{extract_value, get_internal_server_error_json};
 use crate::servers::game;
+use crate::servers::game::{LobbyId, UserSessionId};
 use crate::ws::session::WsSession;
 
 pub async fn start_ws(req: HttpRequest, stream: web::Payload, srv: web::Data<Addr<game::GameServer>>) -> Result<HttpResponse, actix_web::Error> {
     //TODO MAKE MATCHES GREAT AGAIN!user_session_id
+    println!("TEST?");
 
     let session_token = match extract_value(&req, "user-session-id") {
         Ok(data) => data,
@@ -35,7 +38,7 @@ pub async fn start_ws(req: HttpRequest, stream: web::Payload, srv: web::Data<Add
 
     println!("{} - {}", lobby_id, session_token);
     ws::start(
-        WsSession::default(lobby_id, session_token,srv),
+        WsSession::default(UserSessionId::from_string(session_token), LobbyId::of(lobby_id), srv),
         &req,
         stream,)
 

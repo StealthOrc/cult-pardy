@@ -1,56 +1,41 @@
 
 use actix::Addr;
 use actix_files::NamedFile;
-use actix_web::{get, web, HttpRequest, HttpResponse};
+use actix_web::{get, web, HttpRequest, HttpResponse, post};
 use serde_json::json;
 use std::env;
 use std::path::PathBuf;
 use crate::apis::api::{get_session, set_session_cookies};
 use crate::servers::authentication::AuthenticationServer;
 use crate::servers::{authentication, game};
-use crate::servers::game::GameServer;
+use crate::servers::game::{GameServer, LobbyId};
 
 #[get("/game/{lobby_id}")]
 async fn find_game(
     req: HttpRequest,
-    lobby_id: web::Path<(Option<String>,)>,
+    lobby_id: web::Path<(String)>,
     srv: web::Data<Addr<GameServer>>,
 ) -> Result<HttpResponse, actix_web::Error> {
     //TODO HACKY!!
     println!("{:?}", req.cookies());
     let user_session_id = get_session(&req, &srv).await;
 
-    let lobby_id = match lobby_id.into_inner() {
-        (None,) => return Ok(HttpResponse::from(HttpResponse::InternalServerError())),
-        (Some(id),) => id,
-    };
+    let lobby_id = lobby_id.into_inner();
 
-    let lobby = srv
-        .send(game::Lobby {
-            lobby_id: lobby_id.clone(),
-        })
-        .await
-        .expect("No Lobby found!");
+    println!("{}", lobby_id.clone());
+
+    let haslobby = srv.send(game::HasLobby { lobby_id: LobbyId::of(lobby_id.clone()), }).await.expect("No Lobby found!");
     let error = json!(
         {
             "Error": "Lobby not found",
             "Lobby": lobby_id
         }
     );
-    let user = match lobby {
-        None => {
-            return Ok(HttpResponse::from(
-                HttpResponse::InternalServerError().json(error),
-            ))
-        }
-        Some(users) => users,
-    };
     let _users = json!(
         {
             "Lobby": lobby_id,
             "User-session-id": user_session_id,
-            "Users": user.len(),
-            "Users": user
+            "Users": haslobby,
         }
     );
     let mut cexe = env::current_exe().unwrap();
@@ -67,6 +52,8 @@ async fn find_game(
     );
     Ok(response)
 }
+
+
 
 
 #[get("/grant/{grand_id}")]
