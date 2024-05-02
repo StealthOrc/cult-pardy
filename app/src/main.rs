@@ -2,7 +2,6 @@ mod app;
 mod websocket;
 mod service;
 mod file;
-
 use app::App;
 use yew::prelude::*;
 use yew_router::prelude::*;
@@ -46,5 +45,5 @@ fn main_comp() -> Html {
 }
 
 fn main() {
-    yew::Renderer::<Model>::new().render();
+    yew::Renderer::<Main>::new().render();
 }

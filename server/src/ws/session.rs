@@ -73,7 +73,6 @@ impl Actor for WsSession {
     /// We register ws session with ChatServer
     fn started(&mut self, ctx: &mut Self::Context) {
         // we'll start heartbeat process on session start.
-        println!("STARTING WS?");
         self.hb(ctx);
         let addr = ctx.address();
         self.handler.send(game::Connect { lobby_id: self.player.lobby.clone(), user_session_id: self.player.user_session_id.clone(), addr: addr.recipient(), })

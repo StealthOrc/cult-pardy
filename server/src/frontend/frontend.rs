@@ -17,12 +17,8 @@ async fn find_game(
     lobby_id: web::Path<String>,
     srv: web::Data<Addr<GameServer>>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    //TODO HACKY!!
-    println!("{:?}", req.cookies());
-    let user_session_id = get_session(&req, &srv).await;
-
+    let user_session = get_session(&req, &srv).await;
     let lobby_id = lobby_id.into_inner();
-    println!("{}", lobby_id.clone());
 
     let haslobby = srv.send(game::HasLobby { lobby_id: LobbyId::of(lobby_id.clone()) }).await.expect("No Lobby found!");
     let error = json!(
@@ -34,7 +30,7 @@ async fn find_game(
     let _users = json!(
         {
             "Lobby": lobby_id,
-            "User-session-id":user_session_id.user_session_id.id,
+            "User-session-id":user_session.user_session_id.id,
             "Users": haslobby,
         }
     );
@@ -45,11 +41,8 @@ async fn find_game(
     let final_path = cexe.into_os_string().into_string().unwrap();
     let named_file = NamedFile::open(final_path).expect("{:?}File not found");
     let mut response = named_file.into_response(&req);
-    set_cookie(
-        &mut response,
-        "user-session-id",
-        &user_session_id.user_session_id.id.to_string(),
-    );
+    set_cookie(&mut response, &req,"user-session-id", &user_session.user_session_id.id.to_string());
+    set_cookie(&mut response, &req,"session-token", &user_session.session_token.token);
     Ok(response)
 }
 
@@ -68,24 +61,25 @@ async fn grant_admin_access(
     let mut response = HttpResponse::InternalServerError().finish();
 
     if (is_admin(user_session.clone(), auth.clone()).await) {
-        return to_main_page(&user_session);
+        return to_main_page(&user_session,&req);
     }
 
     match auth.send(CheckAdminAccessToken{ token: grand_id.clone()}).await {
         Ok(valid) => {
             if(!valid){
-                return to_main_page(&user_session)
+                return to_main_page(&user_session,&req)
             }
         }
-        Err(_) =>  return to_main_page(&user_session)
+        Err(_) =>  return to_main_page(&user_session,&req)
     }
 
 
     if let Some(discord_data) = user_session.clone().discord_auth {
         if discord_data.discord_user.is_some() {
             response = HttpResponse::Found().append_header(("Location", "http://localhost:8000/grant")).finish();
-            set_cookie(&mut response, "user-session-id", &user_session.user_session_id.id.to_string());
-            set_cookie(&mut response, "token", &grand_id.to_string());
+            set_cookie(&mut response, &req,"user-session-id", &user_session.user_session_id.id.to_string());
+            set_cookie(&mut response, &req,"session-token", &user_session.session_token.token);
+            set_cookie(&mut response, &req,"token", &grand_id.to_string());
             return Ok(response)
         }
     }
@@ -94,9 +88,9 @@ async fn grant_admin_access(
         .append_header(("Location", "http://localhost:8000/discord?type=grant"))
         .finish();
 
-
-    set_cookie(&mut response, "user-session-id", &user_session.user_session_id.id.to_string());
-    set_cookie(&mut response, "token", &grand_id.to_string());
+    set_cookie(&mut response, &req,"user-session-id", &user_session.user_session_id.id.to_string());
+    set_cookie(&mut response, &req,"session-token", &user_session.session_token.token);
+    set_cookie(&mut response, &req,"token", &grand_id.to_string());
     Ok(response)
 }
 
@@ -117,8 +111,9 @@ async fn index(
     let user_session = get_session(&req, &srv).await;
 
     let mut response = named_file.into_response(&req);
-    set_cookie(&mut response, "user-session-id", &user_session.user_session_id.id.to_string());
     remove_cookie(&mut response, &req, "token");
+    set_cookie(&mut response, &req,"user-session-id", &user_session.user_session_id.id.to_string());
+    set_cookie(&mut response, &req,"session-token", &user_session.session_token.token);
     Ok(response)
 }
 
@@ -136,18 +131,14 @@ async fn assets(
     cexe.pop();
     cexe.push("www");
     cexe.push(path);
-    println!("cexe: {:?}", cexe);
     let final_path = cexe.into_os_string().into_string().unwrap();
     let named_file = NamedFile::open(final_path).expect("File not found");
 
-    let user_session_id = get_session(&req, &srv).await;
+    let user_session = get_session(&req, &srv).await;
 
     let mut response = named_file.into_response(&req);
-    set_cookie(
-        &mut response,
-        "user-session-id",
-        &user_session_id.user_session_id.id.to_string(),
-    );
+    set_cookie(&mut response, &req,"user-session-id", &user_session.user_session_id.id.to_string());
+    set_cookie(&mut response, &req,"session-token", &user_session.session_token.token);
     Ok(response)
 }
 
@@ -166,14 +157,11 @@ async fn test(
 
     //TODO HACKY!!
 
-    let user_session_id = get_session(&req, &srv).await;
+    let user_session = get_session(&req, &srv).await;
 
     let mut response = named_file.into_response(&req);
-    set_cookie(
-        &mut response,
-        "user-session-id",
-        &user_session_id.user_session_id.id.to_string(),
-    );
+    set_cookie(&mut response, &req,"user-session-id", &user_session.user_session_id.id.to_string());
+    set_cookie(&mut response, &req,"session-token", &user_session.session_token.token);
     Ok(response)
 }
 

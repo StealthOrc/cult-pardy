@@ -25,7 +25,7 @@ impl Services {
             grant_client : GrantDiscordAuth::init(),
             login_client: login_client.clone(),
             authentication_server:AuthenticationServer::new().start(),
-            game_server :GameServer::new(login_client).start(),
+            game_server : GameServer::new(login_client).start(),
         }
     }
 

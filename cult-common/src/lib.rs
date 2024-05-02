@@ -2,9 +2,13 @@ use std::collections::HashMap;
 use std::fmt::Arguments;
 use std::net::SocketAddr;
 use std::thread::Thread;
-use std::time::Duration;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::time::{Duration, Instant, SystemTime};
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use rand::{rngs::ThreadRng, Rng, random};
+use rand::distributions::Alphanumeric;
+use serde::de::Visitor;
+use chrono::{DateTime, Local, TimeZone};
+
 
 pub fn parse_addr_str(domain: &str, port: usize) -> SocketAddr {
     let addr = format!("{}:{}", domain, port);
@@ -77,32 +81,46 @@ impl Category {
 
 }
 
-#[derive(Debug, Clone,Copy, Hash, Eq, PartialEq, Default)]
+#[derive(Debug, Clone,Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct UserSessionId {
     pub id:usize,
 }
-
-
-impl Serialize for UserSessionId {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer,
-    {
-        serializer.serialize_u64(self.id as u64)
-    }
+#[derive(Debug, Clone,Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub struct SessionToken {
+    pub token: String,
+    pub create: DateTime<Local>,
 }
 
-impl<'de> Deserialize<'de> for UserSessionId {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: Deserializer<'de>,
-    {
-        let id_str: String = Deserialize::deserialize(deserializer)?;
-        let id = id_str.parse().map_err(serde::de::Error::custom)?;
-        println!("test?");
-        Ok(UserSessionId { id })
+impl SessionToken {
+    pub fn new() -> SessionToken {
+       let token=  Self::new_token();
+        SessionToken {
+            token,
+            create: Local::now(),
+        }
     }
+
+    pub fn random() -> SessionToken {
+        let token=  Self::new_token();
+        SessionToken {
+            token,
+            create: Local::now(),
+        }
+    }
+
+    pub fn update(&mut self) {
+        self.create = Local::now();
+        self.token = Self::new_token();
+    }
+    fn new_token() -> String {
+        rand::thread_rng().sample_iter(&Alphanumeric)
+            .take(30)
+            .map(char::from).collect()
+    }
+
 }
+
+
 #[derive(Debug, Clone,Serialize,Deserialize, Eq, PartialEq, Default)]
 pub struct JsonPrinter{
     pub results: HashMap<String, bool>
@@ -129,19 +147,19 @@ impl JsonPrinter {
 impl UserSessionId{
     pub fn of(id:usize) -> Self{
         UserSessionId{
-            id
+            id,
         }
     }
     pub fn from_string(id:String) -> Self{
         let id=  id.parse::<usize>().expect("Can´t convert String to usize");
         UserSessionId{
-            id
+            id,
         }
     }
     pub fn from_str(id:&str) -> Self{
         let id=  id.parse::<usize>().expect("Can´t convert String to usize");
         UserSessionId{
-            id
+            id,
         }
     }
 

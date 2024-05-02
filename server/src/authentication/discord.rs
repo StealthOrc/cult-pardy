@@ -9,7 +9,7 @@ use actix_web::{get, HttpResponse, web};
 use actix_web::error::HttpError;
 use attohttpc::Method;
 use oauth2::basic::{BasicClient, BasicTokenResponse};
-use oauth2::{AuthorizationCode, AuthUrl, ClientId, ClientSecret, CsrfToken, RedirectUrl, Scope, TokenResponse, TokenUrl};
+use oauth2::{AuthorizationCode, AuthUrl, ClientId, ClientSecret, CsrfToken, HttpRequest, RedirectUrl, Scope, TokenResponse, TokenUrl};
 use oauth2::reqwest::{async_http_client};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -116,10 +116,9 @@ pub async fn discord_oauth(
 ) -> anyhow::Result<HttpResponse, actix_web::Error> {
     let user_session = get_session(&req, &srv).await;
 
-
     if let Some(discord_data) = user_session.clone().discord_auth {
         if discord_data.discord_user.is_some() {
-            return to_main_page(&user_session)
+            return to_main_page(&user_session,&req)
         }
     }
 
@@ -146,11 +145,8 @@ pub async fn discord_oauth(
         .append_header(("Location", authorize_url.to_string()))
         .finish();
 
-    set_cookie(
-        &mut response,
-        "user-session-id",
-        &user_session.user_session_id.id.to_string(),
-    );
+    set_cookie(&mut response, &req,"user-session-id", &user_session.user_session_id.id.to_string());
+    set_cookie(&mut response, &req,"session-token", &user_session.session_token.token);
     Ok(response)
 }
 #[allow(dead_code)]
@@ -249,18 +245,17 @@ impl DiscordME {
             Ok(me) => me,
             Err(_) => return None,
         };
-        println!("Created {:?}", discord_me);
         Some(discord_me)
     }
 }
 
 
 
-async fn add_discord_account(srv:web::Data<Addr<GameServer>>, user_session:UserSession, discord:DiscordME, token: BasicTokenResponse  ) -> bool{
+async fn add_discord_account(srv:web::Data<Addr<GameServer>>, user_session:UserSession, discord:DiscordUser, token: BasicTokenResponse  ) -> bool{
     let test = srv.send(AddDiscordAccount{
         user_session_id: user_session.user_session_id,
         discord_data: DiscordData{
-            discord_user: Some(discord.to_discord_user()),
+            discord_user: Some(discord),
             basic_token_response: token
         },
     }).await;
@@ -303,36 +298,39 @@ pub async fn login_only(
 
     if let Some(discord_data) = user_session.clone().discord_auth {
         if discord_data.discord_user.is_some() {
-            return to_main_page(&user_session)
+            return to_main_page(&user_session,&req)
         }
     }
 
 
     if let Some(discord_token) = get_discord_token(&oauth_client.client, code.into_inner()).await {
         if let Some(discord_me) = DiscordME::get(discord_token.clone()).await {
-            let added = add_discord_account(srv, user_session.clone(), discord_me, discord_token).await;
+            let added = add_discord_account(srv, user_session.clone(), discord_me.to_discord_user(), discord_token).await;
             printer.add("Added Discord Account to session", added);
             response = HttpResponse::Found().json(&printer)
         }
     }
 
 
-
-    set_cookie(&mut response, "user-session-id", &user_session.user_session_id.id.to_string());
+    set_cookie(&mut response, &req,"user-session-id", &user_session.user_session_id.id.to_string());
+    set_cookie(&mut response, &req,"session-token", &user_session.session_token.token);
     Ok(response)
 }
 
 
-fn to_response(mut response: HttpResponse, user_session: &UserSession) -> anyhow::Result<HttpResponse, actix_web::Error> {
-    set_cookie(&mut response, "user-session-id", &user_session.user_session_id.id.to_string());
+fn to_response(mut response: HttpResponse, req: &actix_web::HttpRequest, user_session: &UserSession) -> anyhow::Result<HttpResponse, actix_web::Error> {
+    set_cookie(&mut response, &req,"user-session-id", &user_session.user_session_id.id.to_string());
+    set_cookie(&mut response, &req,"session-token", &user_session.session_token.token);
     Ok(response)
 }
 
-pub fn to_main_page(user_session: &UserSession) -> anyhow::Result<HttpResponse, actix_web::Error> {
+pub fn to_main_page(user_session: &UserSession, req:&actix_web::HttpRequest) -> anyhow::Result<HttpResponse, actix_web::Error> {
+    println!("TO MAIN PAGE");
     let mut response = HttpResponse::Found()
         .append_header(("Location", "http://localhost:8000/"))
         .finish();
-    set_cookie(&mut response, "user-session-id", &user_session.user_session_id.id.to_string());
+    set_cookie(&mut response,&req, "user-session-id", &user_session.user_session_id.id.to_string());
+    set_cookie(&mut response, &req,"session-token", &user_session.session_token.token);
     Ok(response)
 }
 
@@ -352,7 +350,7 @@ pub async fn grant_access(
     let mut printer = JsonPrinter::new();
 
     let token = match get_token(&req){
-        None => return to_main_page(&user_session),
+        None => return to_main_page(&user_session,&req),
         Some(token) => token
 
     };
@@ -360,22 +358,28 @@ pub async fn grant_access(
     printer.add("Has grant Token:", get_true());
 
     if is_admin(user_session.clone(), auth.clone()).await {
-        return to_main_page(&user_session);
+        return to_main_page(&user_session,&req);
     }
 
-    if let Some(discord_data) = user_session.discord_auth {
-        if let Some(access_token) = discord_data.redeem_admin_access_token(token).await {
+    if let Some(discord_data) = user_session.clone().discord_auth {
+        if let Some(access_token) = discord_data.clone().redeem_admin_access_token(token).await {
             let result = redeem_admin_access_token(auth, access_token).await;
             printer.add("Found discord session:", get_true());
             printer.add("New discord session:", get_false());
             printer.add("Used Redeem Admin Access Token:", result);
+            if let Some(discord_user) = discord_data.clone().discord_user{
+                let added = add_discord_account(srv, user_session.clone(), discord_user, discord_data.basic_token_response).await;
+                printer.add("Added Discord Account to session", added);
+            }
             response = HttpResponse::Found().json(&printer);
         }
     } else if let Some(discord_token) = get_discord_token(&oauth_client.client, code.into_inner()).await {
         if let Some(discord_me) = DiscordME::get(discord_token.clone()).await {
-            printer.add("Found discord session:", get_false());
+            printer.add("Found discord session:", get_true());
             printer.add("New discord session:", get_true());
-            let result = redeem_admin_access_token(auth, discord_me.redeem_admin_access_token(token)).await;
+            let result = redeem_admin_access_token(auth, discord_me.clone().redeem_admin_access_token(token)).await;
+            let added = add_discord_account(srv, user_session.clone(), discord_me.to_discord_user(), discord_token).await;
+            printer.add("Added Discord Account to session", added);
             printer.add("Used Redeem Admin Access Token:", result);
             response = HttpResponse::Found().json(&printer);
         }
@@ -383,7 +387,8 @@ pub async fn grant_access(
 
 
 
-    set_cookie(&mut response, "user-session-id", &user_session.user_session_id.id.to_string());
+    set_cookie(&mut response,&req, "user-session-id", &user_session.user_session_id.id.to_string());
+    set_cookie(&mut response,&req, "session-token", &user_session.session_token.token);
     remove_cookie(&mut response, &req, "token");
     Ok(response)
 }

@@ -42,12 +42,16 @@ impl Component for App {
         let usr_session_id: String = get(&cookie_string(), "user-session-id")
             .expect("could not get cookie")
             .expect("could not get cookie from user");
+        let session_token: String = get(&cookie_string(), "session-token")
+            .expect("could not get cookie")
+            .expect("could not get cookie from user");
 
         let lobby_id = "main";
         let wss = WebsocketService::new(
             parse_addr_str("127.0.0.1", 8000).to_string().as_str(),
             lobby_id,
             usr_session_id.as_str(),
+            session_token.as_str()
         );
         App { ws_service: wss }
     }

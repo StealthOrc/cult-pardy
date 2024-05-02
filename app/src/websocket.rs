@@ -7,9 +7,9 @@ pub struct WebsocketService {
 }
 impl WebsocketService {
     // add code here
-    pub fn new(addr: &str, lobby_id: &str, user_session_id: &str) -> Self {
+    pub fn new(addr: &str, lobby_id: &str, user_session_id: &str, session_token: &str) -> Self {
         let ws = WebSocket::open(
-            format!("ws://{addr}/ws?lobby-id={lobby_id}&user-session-id={user_session_id}")
+            format!("ws://{addr}/ws?lobby-id={lobby_id}&user-session-id={user_session_id}&session-token={session_token}")
                 .as_str(),
         )
         .unwrap();
