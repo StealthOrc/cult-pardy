@@ -512,7 +512,7 @@ impl Handler<Connect> for GameServer {
         println!("Someone joined :  {:?}{:?}", &msg, &websocket_session_id);
 
 
-        self.send_websocket_session_message(&msg.lobby_id, &websocket_session_id, serde_json::to_string_pretty(&JeopardyBoard::default(NORMAL)).expect("Something wrong").as_str());
+        self.send_websocket_session_message(&msg.lobby_id, &websocket_session_id, serde_json::to_string_pretty(&JeopardyBoard::default(NORMAL).dto()).expect("Something wrong").as_str());
         Some(websocket_session_id)
     }
 }

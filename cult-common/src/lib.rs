@@ -61,9 +61,47 @@ impl JeopardyMode {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct JeopardyBoard {
-    pub categories: Vec<Category>
+    pub categories: Vec<Category>,
+    #[serde(skip_serializing)]
+    pub current: Option<Question>
+}
+
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DtoJeopardyBoard {
+    pub categories: Vec<DtoCategory>,
+
+    pub current: Option<DtoQuestion>
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DtoCategory {
+    pub title: String,
+    pub questions: Vec<DtoQuestion>
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DtoQuestion {
+    pub value: Option<i32>,
+    pub question_text: String,
+    pub answer: Option<String>,
+    pub open: bool,
+    pub won_user_id: Option<UserSessionId>,
+}
+
+
+
+impl crate::DtoCategory {
+    pub fn new(title:String, questions:Vec<DtoQuestion>) -> Self{
+        crate::DtoCategory {
+            title,
+            questions,
+        }
+    }
 
 }
+
+
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Category {
@@ -79,6 +117,12 @@ impl Category {
         }
     }
 
+    pub fn dto(self) -> DtoCategory {
+        DtoCategory {
+            title: self.title,
+            questions: self.questions.into_iter().map(|question| question.dto()).collect(),
+        }
+    }
 }
 
 #[derive(Debug, Clone,Hash, Eq, PartialEq, Serialize, Deserialize)]
@@ -177,10 +221,46 @@ impl UserSessionId{
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Question {
-    value: i32,
-    question_text: String,
-    answer: String,
+    pub value: i32,
+    pub question_text: String,
+    pub answer: String,
+    #[serde(skip_serializing)]
+    pub open: bool,
+    #[serde(skip_serializing)]
+    pub won_user_id: Option<UserSessionId>
 }
+
+
+impl Question {
+    pub fn dto(self) -> DtoQuestion{
+        let value=  match self.open {
+            true => Some(self.value),
+            false => None
+        };
+        let answer=  match self.open {
+            true => Some(self.answer),
+            false => None
+        };
+        DtoQuestion{
+            value,
+            question_text: self.question_text,
+            answer,
+            open: false,
+            won_user_id: self.won_user_id,
+        }
+
+    }
+
+}
+
+
+
+
+
+
+
+
+
 impl JeopardyBoard {
     pub fn default(mode: JeopardyMode) -> Self {
         let mut categories:Vec<Category > = Vec::new();
@@ -194,6 +274,8 @@ impl JeopardyBoard {
                     value: 0,
                     question_text: question_name,
                     answer: answer_name,
+                    open: false,
+                    won_user_id: None,
                 };
                 questions.push(question)
             }
@@ -202,7 +284,20 @@ impl JeopardyBoard {
         }
         JeopardyBoard{
             categories,
+            current: None,
         }
+    }
+
+    pub fn dto(mut self) -> DtoJeopardyBoard {
+        let current = match self.current {
+            None => None,
+            Some(question) => Some(question.dto())
+        };
+        DtoJeopardyBoard{
+            categories: self.categories.into_iter().map(|category| category.dto()).collect(),
+            current,
+        }
+
     }
 
 }
