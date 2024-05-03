@@ -13,7 +13,95 @@ use tokio::process::Command;
 #[tokio::main]
 async fn main() -> Result<()> {
 
+    let args: Vec<String> = env::args().collect();
+    println!("{:?}", args);
 
+    if(args.contains(&"--build".to_string())){
+        buildApp().await?;
+        if(args.contains(&"--run".to_string())){
+            start_server().await?;
+        } else {
+            build_Server().await?;
+        }
+
+    } else if(args.contains(&"--run".to_string())){
+        buildApp().await?;
+        run_server().await?;
+
+    } else {
+        buildApp().await?;
+        build_Server().await?;
+    }
+    println!("{:?}", args);
+    Ok(())
+}
+
+
+async fn start_server() -> anyhow::Result<()>{
+    println!("Starting server!");
+    let mut current_dir = env::current_dir()?;
+    current_dir = PathBuf::from(current_dir.parent().expect("?"));
+    current_dir.push("target");
+    current_dir.push("release");
+    env::set_current_dir(current_dir.clone())?;
+    let mut shell = Command::new("powershell")
+        .arg("./server.exe")
+        .current_dir(current_dir)
+        .spawn()?;
+    shell.wait().await?;
+    println!("Server started!");
+    Ok(())
+}
+
+
+
+async fn build_Server() -> anyhow::Result<()>{
+    println!("Building server!");
+    let binding = env::current_dir()?;
+    let parent_dir = binding.parent().expect("?");
+    env::set_current_dir(parent_dir)?;
+
+    let current_dir = env::current_dir()?;
+    let mut shell = Command::new("powershell")
+        .arg("cargo")
+        .arg("build")
+        .arg("--bin")//
+        .arg("server")//
+        .arg("--release")//
+        .current_dir(current_dir)
+        .spawn()?;
+    shell.wait().await?;
+    println!("Server build!");
+    Ok(())
+}
+
+async fn run_server() -> anyhow::Result<()>{
+    println!("Run server!");
+    let binding = env::current_dir()?;
+    let parent_dir = binding.parent().expect("?");
+    env::set_current_dir(parent_dir)?;
+
+    let current_dir = env::current_dir()?;
+    let mut shell = Command::new("powershell")
+        .arg("cargo")
+        .arg("run")
+        .arg("--bin")
+        .arg("server")//
+        .arg("--release")//
+        .current_dir(current_dir)
+        .spawn()?;
+    println!("Server running!");
+    shell.wait().await?;
+    Ok(())
+}
+
+
+
+
+
+
+async fn buildApp() -> anyhow::Result<()>{
+    println!("Build app!");
     if let Ok(current_dir) = env::current_dir() {
         if let Some(file_name) = current_dir.file_name() {
             if let Some(dir_name) = file_name.to_str() {
@@ -38,12 +126,12 @@ async fn main() -> Result<()> {
 
 
     let current_dir = env::current_dir()?;
-        let mut shell = Command::new("powershell")
-            .arg("trunk")
-            .arg("build")
-            .arg("--release")//
-            .current_dir(current_dir)
-            .spawn()?;
+    let mut shell = Command::new("powershell")
+        .arg("trunk")
+        .arg("build")
+        .arg("--release")//
+        .current_dir(current_dir)
+        .spawn()?;
     shell.wait().await?;
 
     let source_dir = "./dist/";
@@ -88,26 +176,11 @@ async fn main() -> Result<()> {
 
     println!("Folder copied successfully!");
     println!("Shell opened successfully!");
-
-    let binding = env::current_dir()?;
-    let parent_dir = binding.parent().expect("?");
-    env::set_current_dir(parent_dir)?;
-
-    let current_dir = env::current_dir()?;
-    let mut shell = Command::new("powershell")
-        .arg("cargo")
-        .arg("build")
-        .arg("--bin")//
-        .arg("server")//
-        .arg("--release")//
-        .current_dir(current_dir)
-        .spawn()?;
-    shell.wait().await?;
-
-
-
+    println!("App build!");
     Ok(())
 }
+
+
 
 fn create_directory_if_not_exists(dir_path: &str) -> Result<(), Box<dyn std::error::Error>> {
     if !Path::new(dir_path).exists() {
