@@ -1,9 +1,10 @@
 use crate::service::FrontendService;
-use cult_common::parse_addr_str;
+use cult_common::{parse_addr_str, DtoJeopardyBoard, JeopardyBoard};
 use futures::channel::mpsc::TrySendError;
 use futures::SinkExt;
 use gloo_console::{info, log};
 use gloo_net::websocket::Message;
+use serde_json::Value;
 use wasm_bindgen::JsValue;
 use wasm_cookies::cookies::*;
 use web_sys::HtmlDocument;
@@ -47,11 +48,28 @@ impl Component for App {
             .expect("could not get cookie from user");
 
         let lobby_id = "main";
+
+        let on_read = |data: String| {
+            log!(format!("onread: {data}"));
+            let v: DtoJeopardyBoard = serde_json::from_str(data.as_str())
+                .expect("could not convert Websocket data to Json!");
+            log!(format!(
+                "Question 1/Value {}/{}",
+                v.categories[0].questions[0].question_text,
+                match v.categories[0].questions[0].value {
+                    Some(value) => value,
+                    None => 0,
+                }
+                .to_string()
+            ))
+        };
+
         let wss = WebsocketService::new(
             parse_addr_str("127.0.0.1", 8000).to_string().as_str(),
             lobby_id,
             usr_session_id.as_str(),
-            session_token.as_str()
+            session_token.as_str(),
+            on_read,
         );
         App { ws_service: wss }
     }
@@ -63,7 +81,7 @@ impl Component for App {
             .send_tunnel
             .try_send(Message::Text("Test".parse().unwrap()));
         match ws {
-            Ok(e) => {
+            Ok(_) => {
                 info!("OK SEND")
             }
             Err(e) => {

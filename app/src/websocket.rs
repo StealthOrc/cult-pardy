@@ -7,7 +7,16 @@ pub struct WebsocketService {
 }
 impl WebsocketService {
     // add code here
-    pub fn new(addr: &str, lobby_id: &str, user_session_id: &str, session_token: &str) -> Self {
+    pub fn new<F>(
+        addr: &str,
+        lobby_id: &str,
+        user_session_id: &str,
+        session_token: &str,
+        on_read: F,
+    ) -> Self
+    where
+        F: Fn(String) + 'static,
+    {
         let ws = WebSocket::open(
             format!("ws://{addr}/ws?lobby-id={lobby_id}&user-session-id={user_session_id}&session-token={session_token}")
                 .as_str(),
@@ -38,6 +47,7 @@ impl WebsocketService {
                 match msg {
                     Ok(Message::Text(data)) => {
                         println!("from websocket {}", data);
+                        on_read(data);
                     }
                     Ok(Message::Bytes(b)) => {
                         let decoded = std::str::from_utf8(&b);
