@@ -8,6 +8,7 @@ use rand::{rngs::ThreadRng, Rng, random};
 use rand::distributions::Alphanumeric;
 use serde::de::Visitor;
 use chrono::{DateTime, Local, TimeZone};
+use rand::seq::index::IndexVec;
 
 
 pub fn parse_addr_str(domain: &str, port: usize) -> SocketAddr {
@@ -63,24 +64,33 @@ impl JeopardyMode {
 pub struct JeopardyBoard {
     pub categories: Vec<Category>,
     #[serde(skip_serializing)]
-    pub current: Option<Question>
+    pub current: Option<Vector2D>
 }
 
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DtoJeopardyBoard {
     pub categories: Vec<DtoCategory>,
-
-    pub current: Option<DtoQuestion>
+    pub current: Option<Vector2D>
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+
+#[derive(Debug,Clone, Serialize, Deserialize)]
+pub struct Vector2D {
+    pub x: u8,
+    pub y: u8,
+}
+
+
+
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DtoCategory {
     pub title: String,
     pub questions: Vec<DtoQuestion>
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DtoQuestion {
     pub value: i32,
     pub question_text: Option<String>,
@@ -252,7 +262,13 @@ impl Question {
 }
 
 
-
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum WebsocketData{
+    CurrentBoard(DtoJeopardyBoard),
+    SessionJoin(UserSessionId),
+    SessionDisconnected(UserSessionId),
+    Text(String)
+}
 
 
 
@@ -291,7 +307,7 @@ impl JeopardyBoard {
     pub fn dto(mut self) -> DtoJeopardyBoard {
         let current = match self.current {
             None => None,
-            Some(question) => Some(question.dto())
+            Some(question) => Some(question)
         };
         DtoJeopardyBoard{
             categories: self.categories.into_iter().map(|category| category.dto()).collect(),

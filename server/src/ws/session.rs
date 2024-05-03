@@ -120,8 +120,11 @@ impl Handler<game::SessionMessageType> for WsSession {
                 let json = serde_json::to_vec(&data).expect("Can´t convert to vec");
                 ctx.binary(json)}
             SessionMessageType::Disconnect => {
-                println!("STOPED!");
                 ctx.stop()
+            }
+            SessionMessageType::Data(data) => {
+                let json = serde_json::to_vec(&data).expect("Can´t convert to vec");
+                ctx.binary(json)
             }
         }
     }

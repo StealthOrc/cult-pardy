@@ -17,12 +17,10 @@ async fn main() -> Result<()> {
 
     if(args.contains(&"--build".to_string())){
         buildApp().await?;
+        build_Server().await?;
         if(args.contains(&"--run".to_string())){
             start_server().await?;
-        } else {
-            build_Server().await?;
         }
-
     } else if(args.contains(&"--run".to_string())){
         buildApp().await?;
         run_server().await?;
@@ -39,9 +37,10 @@ async fn main() -> Result<()> {
 async fn start_server() -> anyhow::Result<()>{
     println!("Starting server!");
     let mut current_dir = env::current_dir()?;
-    current_dir = PathBuf::from(current_dir.parent().expect("?"));
+    current_dir = PathBuf::from(current_dir);
     current_dir.push("target");
     current_dir.push("release");
+    println!("{:?}", current_dir.clone());
     env::set_current_dir(current_dir.clone())?;
     let mut shell = Command::new("powershell")
         .arg("./server.exe")

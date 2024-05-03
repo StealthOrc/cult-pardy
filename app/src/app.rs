@@ -1,10 +1,11 @@
 use crate::service::FrontendService;
 use cult_common::parse_addr_str;
 use futures::channel::mpsc::TrySendError;
-use futures::SinkExt;
+use futures::{SinkExt, StreamExt};
 use gloo_console::{info, log};
 use gloo_net::websocket::Message;
 use wasm_bindgen::JsValue;
+use wasm_bindgen_futures::spawn_local;
 use wasm_cookies::cookies::*;
 use web_sys::HtmlDocument;
 use yew::prelude::*;
@@ -47,12 +48,15 @@ impl Component for App {
             .expect("could not get cookie from user");
 
         let lobby_id = "main";
-        let wss = WebsocketService::new(
+        let mut wss = WebsocketService::new(
             parse_addr_str("127.0.0.1", 8000).to_string().as_str(),
             lobby_id,
             usr_session_id.as_str(),
             session_token.as_str()
         );
+
+
+
         App { ws_service: wss }
     }
 

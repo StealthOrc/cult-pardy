@@ -1,7 +1,13 @@
+use std::io::Read;
 use futures::{channel::mpsc::Sender, SinkExt, StreamExt};
+use futures::channel::mpsc::Receiver;
+use gloo_console::log;
 use gloo_net::websocket::{futures::WebSocket, Message};
+use gloo_net::websocket::Message::Text;
+use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::spawn_local;
 
+#[derive(Clone)]
 pub struct WebsocketService {
     pub send_tunnel: Sender<Message>,
 }
@@ -22,11 +28,13 @@ impl WebsocketService {
             while let Some(msg) = tunnel_receive.next().await {
                 match msg {
                     Message::Text(data) => {
-                        println!("sending Text:{:?}", data);
+                        log!("sending Text:{:?}", JsValue::from(data.clone()));
                         write.send(Message::Text(data)).await.unwrap();
                     }
                     Message::Bytes(b) => {
-                        println!("sending Bytes:{:?}", b);
+                        let mut test = "".to_string();
+                        b.as_slice().read_to_string(&mut test).expect("TODO: panic message");
+                        log!("sending Bytes:{:?}",JsValue::from(test));
                         write.send(Message::Bytes(b)).await.unwrap();
                     }
                 }
@@ -37,16 +45,16 @@ impl WebsocketService {
             while let Some(msg) = read.next().await {
                 match msg {
                     Ok(Message::Text(data)) => {
-                        println!("from websocket {}", data);
+                        log!("from websocket {}",JsValue::from(data.clone()));
                     }
                     Ok(Message::Bytes(b)) => {
                         let decoded = std::str::from_utf8(&b);
                         if let Ok(val) = decoded {
-                            println!("from websocket (bin){}", val);
+                            log!("from websocket (bin){}",JsValue::from(val.clone()));
                         }
                     }
                     Err(e) => {
-                        println!("ws error:{}", e);
+                        log!("ws error:{}", JsValue::from(e.to_string()));
                     }
                 }
             }

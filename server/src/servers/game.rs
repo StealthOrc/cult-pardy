@@ -14,7 +14,7 @@ use oauth2::TokenResponse;
 use rand::random;
 use rand::rngs::ThreadRng;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use cult_common::{DiscordUser, JeopardyBoard, SessionToken, UserSessionId};
+use cult_common::{DiscordUser, JeopardyBoard, SessionToken, UserSessionId, WebsocketData};
 use cult_common::JeopardyMode::NORMAL;
 use crate::authentication::discord::{DiscordME, LoginDiscordAuth};
 use crate::servers::authentication::RedeemAdminAccessToken;
@@ -24,6 +24,7 @@ use crate::ws::session::UserData;
 #[derive(Message,Serialize, Deserialize, Debug)]
 #[rtype(result = "()")]
 pub enum SessionMessageType {
+    Data(WebsocketData),
     MText(String),
     MData(usize),
     Disconnect,
@@ -404,33 +405,33 @@ impl GameServer {
 
 
     /// Send message to all users in the room
-    fn send_lobby_message(&self, lobby_id: &LobbyId, message: &str) {
+    fn send_lobby_message(&self, lobby_id: &LobbyId, message: WebsocketData) {
         if let Some(lobby) = self.lobbies.get(lobby_id) {
             for user_id in lobby.websocket_session_id.iter() {
                 for user_session in self.user_sessions.values() {
                     if let Some(web_socket_session) = user_session.websocket_connections.get(user_id) {
-                        web_socket_session.addr.do_send(SessionMessageType::MText(message.to_owned()));
+                        web_socket_session.addr.do_send(SessionMessageType::Data(message.clone()));
                     }
                 }
             }
         }
     }
 
-    fn send_session_message(&self, lobby_id: &LobbyId, user_session_id: &UserSessionId, message: &str) {
+    fn send_session_message(&self, lobby_id: &LobbyId, user_session_id: &UserSessionId, message: WebsocketData) {
         if let Some(user_session) = self.user_sessions.get(&user_session_id) {
             for websocket_session in user_session.websocket_connections.values() {
                if websocket_session.lobby_id.eq(lobby_id){
-                   websocket_session.addr.do_send(SessionMessageType::MText(message.to_owned()));
+                   websocket_session.addr.do_send(SessionMessageType::Data(message.clone()));
                }
             }
         }
     }
-    fn send_websocket_session_message(&self, lobby_id: &LobbyId, websocket_session_id: &WebsocketSessionId, message: &str) {
+    fn send_websocket_session_message(&self, lobby_id: &LobbyId, websocket_session_id: &WebsocketSessionId,message: WebsocketData) {
         if let Some(lobby) = self.lobbies.get(lobby_id) {
             for user_session_id in  lobby.user_session.clone() {
                 if let Some(user_session) = self.user_sessions.get(&user_session_id){
                     if let Some(web_socket_session) = user_session.websocket_connections.get(websocket_session_id) {
-                    web_socket_session.addr.do_send(SessionMessageType::MText(message.to_owned()));
+                    web_socket_session.addr.do_send(SessionMessageType::Data(message));
                     return;
                 }
             }
@@ -476,8 +477,6 @@ impl Handler<Connect> for GameServer {
 
     fn handle(&mut self, msg: Connect, _: &mut Context<Self>) -> Self::Result {
         // notify all users in same room
-        self.send_lobby_message(&msg.lobby_id, "Someone joined");
-
         let user_session = match self.user_sessions.get_mut(&msg.user_session_id) {
             None => return {
                 println!("Something happens");
@@ -512,7 +511,8 @@ impl Handler<Connect> for GameServer {
         println!("Someone joined :  {:?}{:?}", &msg, &websocket_session_id);
 
 
-        self.send_websocket_session_message(&msg.lobby_id, &websocket_session_id, serde_json::to_string_pretty(&JeopardyBoard::default(NORMAL).dto()).expect("Something wrong").as_str());
+        self.send_lobby_message(&msg.lobby_id, WebsocketData::Text("Someone joined".to_string()));
+        self.send_websocket_session_message(&msg.lobby_id, &websocket_session_id, WebsocketData::CurrentBoard(JeopardyBoard::default(NORMAL).dto()));
         Some(websocket_session_id)
     }
 }
@@ -543,7 +543,7 @@ impl Handler<ClientMessage> for GameServer {
     type Result = ();
 
     fn handle(&mut self, msg: ClientMessage, _: &mut Context<Self>) {
-        self.send_lobby_message(&msg.player_data.lobby, msg.msg.as_str());
+        self.send_lobby_message(&msg.player_data.lobby, WebsocketData::Text(msg.msg));
     }
 }
 
