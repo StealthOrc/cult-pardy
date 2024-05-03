@@ -82,10 +82,9 @@ pub struct DtoCategory {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DtoQuestion {
-    pub value: Option<i32>,
-    pub question_text: String,
+    pub value: i32,
+    pub question_text: Option<String>,
     pub answer: Option<String>,
-    pub open: bool,
     pub won_user_id: Option<UserSessionId>,
 }
 
@@ -233,8 +232,8 @@ pub struct Question {
 
 impl Question {
     pub fn dto(self) -> DtoQuestion{
-        let value=  match self.open {
-            true => Some(self.value),
+        let question_text=  match self.open {
+            true => Some(self.question_text),
             false => None
         };
         let answer=  match self.open {
@@ -242,10 +241,9 @@ impl Question {
             false => None
         };
         DtoQuestion{
-            value,
-            question_text: self.question_text,
+            value: self.value,
+            question_text,
             answer,
-            open: false,
             won_user_id: self.won_user_id,
         }
 
@@ -267,16 +265,18 @@ impl JeopardyBoard {
         for category in 0..mode.field_size() {
             let category_name = format!("Category_{}", category);
             let mut questions: Vec<Question> = Vec::new();
+            let mut value = 100;
             for question in 0..mode.field_size() {
                 let question_name = format!("question_{}", question);
                 let answer_name = format!("answer{}", question);
                 let question = Question{
-                    value: 0,
+                    value,
                     question_text: question_name,
                     answer: answer_name,
                     open: false,
                     won_user_id: None,
                 };
+                value = value*2;
                 questions.push(question)
             }
 
