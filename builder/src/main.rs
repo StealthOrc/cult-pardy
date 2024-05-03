@@ -104,6 +104,10 @@ async fn buildApp() -> anyhow::Result<()>{
                     "release" => {
                         let parent_dir = current_dir.parent().expect("?");
                         env::set_current_dir(parent_dir.parent().expect("?"))?;
+                    },
+                     "debug" => {
+                        let parent_dir = current_dir.parent().expect("?");
+                        env::set_current_dir(parent_dir.parent().expect("?"))?;
                     }
                     _ => {}
                 }
