@@ -1,22 +1,19 @@
+use chrono::{DateTime, Local, TimeZone};
+use rand::distributions::Alphanumeric;
+use rand::{random, rngs::ThreadRng, Rng};
+use serde::de::Visitor;
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::HashMap;
 use std::fmt::Arguments;
 use std::net::SocketAddr;
 use std::thread::Thread;
 use std::time::{Duration, Instant, SystemTime};
-use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
-use rand::{rngs::ThreadRng, Rng, random};
-use rand::distributions::Alphanumeric;
-use serde::de::Visitor;
-use chrono::{DateTime, Local, TimeZone};
-
 
 pub fn parse_addr_str(domain: &str, port: usize) -> SocketAddr {
     let addr = format!("{}:{}", domain, port);
     let addr = addr.parse::<SocketAddr>().expect("Failed to parse address");
     addr
 }
-
-
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DiscordUser {
@@ -29,55 +26,50 @@ pub struct DiscordUser {
 
 impl DiscordUser {
     fn avatar_image_url(self) -> String {
-        format!("https://cdn.discordapp.com/avatars/{}/{}.jpg",self.id,self.avatar_id)
+        format!(
+            "https://cdn.discordapp.com/avatars/{}/{}.jpg",
+            self.id, self.avatar_id
+        )
     }
 }
 
-
-
-
-
-
 #[derive(Clone, Copy)]
-pub enum JeopardyMode{
+pub enum JeopardyMode {
     //3x3
     SHORT,
     //5x5
     NORMAL,
     //7x7
-    LONG
+    LONG,
 }
 impl JeopardyMode {
     pub fn field_size(self) -> usize {
         match self {
             JeopardyMode::SHORT => 3,
             JeopardyMode::NORMAL => 5,
-            JeopardyMode::LONG => 7
+            JeopardyMode::LONG => 7,
         }
     }
 }
-
-
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct JeopardyBoard {
     pub categories: Vec<Category>,
     #[serde(skip_serializing)]
-    pub current: Option<Question>
+    pub current: Option<Question>,
 }
-
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DtoJeopardyBoard {
     pub categories: Vec<DtoCategory>,
 
-    pub current: Option<DtoQuestion>
+    pub current: Option<DtoQuestion>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DtoCategory {
     pub title: String,
-    pub questions: Vec<DtoQuestion>
+    pub questions: Vec<DtoQuestion>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -88,47 +80,40 @@ pub struct DtoQuestion {
     pub won_user_id: Option<UserSessionId>,
 }
 
-
-
 impl crate::DtoCategory {
-    pub fn new(title:String, questions:Vec<DtoQuestion>) -> Self{
-        crate::DtoCategory {
-            title,
-            questions,
-        }
+    pub fn new(title: String, questions: Vec<DtoQuestion>) -> Self {
+        crate::DtoCategory { title, questions }
     }
-
 }
-
-
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Category {
     pub title: String,
-    pub questions: Vec<Question>
+    pub questions: Vec<Question>,
 }
 
 impl Category {
-    pub fn new(title:String, questions:Vec<Question>) -> Self{
-        Category{
-            title,
-            questions,
-        }
+    pub fn new(title: String, questions: Vec<Question>) -> Self {
+        Category { title, questions }
     }
 
     pub fn dto(self) -> DtoCategory {
         DtoCategory {
             title: self.title,
-            questions: self.questions.into_iter().map(|question| question.dto()).collect(),
+            questions: self
+                .questions
+                .into_iter()
+                .map(|question| question.dto())
+                .collect(),
         }
     }
 }
 
-#[derive(Debug, Clone,Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct UserSessionId {
-    pub id:usize,
+    pub id: usize,
 }
-#[derive(Debug, Clone,Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct SessionToken {
     pub token: String,
     pub create: DateTime<Local>,
@@ -136,7 +121,7 @@ pub struct SessionToken {
 
 impl SessionToken {
     pub fn new() -> SessionToken {
-       let token=  Self::new_token();
+        let token = Self::new_token();
         SessionToken {
             token,
             create: Local::now(),
@@ -144,7 +129,7 @@ impl SessionToken {
     }
 
     pub fn random() -> SessionToken {
-        let token=  Self::new_token();
+        let token = Self::new_token();
         SessionToken {
             token,
             create: Local::now(),
@@ -156,54 +141,46 @@ impl SessionToken {
         self.token = Self::new_token();
     }
     fn new_token() -> String {
-        rand::thread_rng().sample_iter(&Alphanumeric)
+        rand::thread_rng()
+            .sample_iter(&Alphanumeric)
             .take(30)
-            .map(char::from).collect()
+            .map(char::from)
+            .collect()
     }
-
 }
 
-
-#[derive(Debug, Clone,Serialize,Deserialize, Eq, PartialEq, Default)]
-pub struct JsonPrinter{
-    pub results: HashMap<String, bool>
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Default)]
+pub struct JsonPrinter {
+    pub results: HashMap<String, bool>,
 }
 
 impl JsonPrinter {
     pub fn new() -> Self {
-        JsonPrinter{
+        JsonPrinter {
             results: HashMap::new(),
         }
     }
 
-    pub fn add_string(&mut self, text:String, result:bool) {
+    pub fn add_string(&mut self, text: String, result: bool) {
         self.results.insert(text, result);
     }
 
-    pub fn add(&mut self, text:&str, result:bool) {
+    pub fn add(&mut self, text: &str, result: bool) {
         self.results.insert(text.to_string(), result);
     }
-
 }
 
-
-impl UserSessionId{
-    pub fn of(id:usize) -> Self{
-        UserSessionId{
-            id,
-        }
+impl UserSessionId {
+    pub fn of(id: usize) -> Self {
+        UserSessionId { id }
     }
-    pub fn from_string(id:String) -> Self{
-        let id=  id.parse::<usize>().expect("Can´t convert String to usize");
-        UserSessionId{
-            id,
-        }
+    pub fn from_string(id: String) -> Self {
+        let id = id.parse::<usize>().expect("Can´t convert String to usize");
+        UserSessionId { id }
     }
-    pub fn from_str(id:&str) -> Self{
-        let id=  id.parse::<usize>().expect("Can´t convert String to usize");
-        UserSessionId{
-            id,
-        }
+    pub fn from_str(id: &str) -> Self {
+        let id = id.parse::<usize>().expect("Can´t convert String to usize");
+        UserSessionId { id }
     }
 
     pub fn random() -> Self {
@@ -213,11 +190,6 @@ impl UserSessionId{
     }
 }
 
-
-
-
-
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Question {
     pub value: i32,
@@ -226,42 +198,31 @@ pub struct Question {
     #[serde(skip_serializing)]
     pub open: bool,
     #[serde(skip_serializing)]
-    pub won_user_id: Option<UserSessionId>
+    pub won_user_id: Option<UserSessionId>,
 }
 
-
 impl Question {
-    pub fn dto(self) -> DtoQuestion{
-        let question_text=  match self.open {
+    pub fn dto(self) -> DtoQuestion {
+        let question_text = match self.open {
             true => Some(self.question_text),
-            false => None
+            false => None,
         };
-        let answer=  match self.open {
+        let answer = match self.open {
             true => Some(self.answer),
-            false => None
+            false => None,
         };
-        DtoQuestion{
+        DtoQuestion {
             value: self.value,
             question_text,
             answer,
             won_user_id: self.won_user_id,
         }
-
     }
-
 }
-
-
-
-
-
-
-
-
 
 impl JeopardyBoard {
     pub fn default(mode: JeopardyMode) -> Self {
-        let mut categories:Vec<Category > = Vec::new();
+        let mut categories: Vec<Category> = Vec::new();
         for category in 0..mode.field_size() {
             let category_name = format!("Category_{}", category);
             let mut questions: Vec<Question> = Vec::new();
@@ -269,20 +230,20 @@ impl JeopardyBoard {
             for question in 0..mode.field_size() {
                 let question_name = format!("question_{}", question);
                 let answer_name = format!("answer{}", question);
-                let question = Question{
+                let question = Question {
                     value,
                     question_text: question_name,
                     answer: answer_name,
                     open: false,
                     won_user_id: None,
                 };
-                value = value*2;
+                value = value * 2;
                 questions.push(question)
             }
 
             categories.push(Category::new(category_name, questions))
         }
-        JeopardyBoard{
+        JeopardyBoard {
             categories,
             current: None,
         }
@@ -291,15 +252,17 @@ impl JeopardyBoard {
     pub fn dto(mut self) -> DtoJeopardyBoard {
         let current = match self.current {
             None => None,
-            Some(question) => Some(question.dto())
+            Some(question) => Some(question.dto()),
         };
-        DtoJeopardyBoard{
-            categories: self.categories.into_iter().map(|category| category.dto()).collect(),
+        DtoJeopardyBoard {
+            categories: self
+                .categories
+                .into_iter()
+                .map(|category| category.dto())
+                .collect(),
             current,
         }
-
     }
-
 }
 
 pub fn get_false() -> bool {
