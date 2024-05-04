@@ -1,5 +1,5 @@
 use std::time::{Duration, Instant};
-use crate::servers::game::{GetUserSession, LobbyId};
+use crate::servers::game::{GetUserSession};
 use actix::{Addr, MailboxError};
 
 use actix_web::cookie::{Cookie};
@@ -8,7 +8,7 @@ use chrono::Local;
 use serde::Serialize;
 use serde_json::json;
 use cult_common::JeopardyMode::NORMAL;
-use cult_common::{JeopardyBoard, SessionToken, UserSessionId};
+use cult_common::{JeopardyBoard, LobbyId, SessionToken, UserSessionId};
 use crate::apis::data::{extract_header_string, extract_value};
 use crate::authentication::discord::is_admin;
 use crate::servers::authentication::AuthenticationServer;

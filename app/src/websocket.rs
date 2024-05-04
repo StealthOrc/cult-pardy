@@ -6,6 +6,7 @@ use gloo_net::websocket::{futures::WebSocket, Message};
 use gloo_net::websocket::Message::Text;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::spawn_local;
+use cult_common::{WebsocketEvent, WebsocketServerEvents};
 
 #[derive(Clone)]
 pub struct WebsocketService {
@@ -47,11 +48,16 @@ impl WebsocketService {
                     Ok(Message::Text(data)) => {
                         log!("from websocket {}",JsValue::from(data.clone()));
                     }
-                    Ok(Message::Bytes(b)) => {
-                        let decoded = std::str::from_utf8(&b);
-                        if let Ok(val) = decoded {
-                            log!("from websocket (bin){}",JsValue::from(val.clone()));
+                    Ok(Message::Bytes(bytes)) => {
+                        match serde_json::from_slice::<WebsocketServerEvents>(&bytes) {
+                                Ok(event) => {
+                                    log!("Receive an server event ", JsValue::from(event.event_name()));
+                                }
+                                Err(err) => {
+                                    log!("Error deserializing JSON data: {}", JsValue::from(err.to_string()));
+                                }
                         }
+
                     }
                     Err(e) => {
                         log!("ws error:{}", JsValue::from(e.to_string()));

@@ -4,9 +4,9 @@ use actix::prelude::*;
 use actix_web::web;
 use actix_web_actors::ws;
 use actix_web_actors::ws::WebsocketContext;
-use cult_common::UserSessionId;
+use cult_common::{LobbyId, UserSessionId, WebsocketSessionId};
 use crate::servers::game;
-use crate::servers::game::{LobbyId, SessionDisconnect, SessionMessageType, WebsocketSessionId};
+use crate::servers::game::{SessionDisconnect, SessionMessageType};
 
 
 /// How often heartbeat pings are sent
@@ -27,7 +27,7 @@ pub struct WsSession{
 pub struct UserData {
     pub websocket_session_id: Option<WebsocketSessionId>,
     pub user_session_id: UserSessionId,
-    pub lobby: LobbyId,
+    pub lobby_id: LobbyId,
 }
 
 impl UserData {
@@ -35,7 +35,7 @@ impl UserData {
         UserData {
             websocket_session_id: None,
             user_session_id,
-            lobby,
+            lobby_id: lobby,
         }
     }
 }
@@ -75,7 +75,7 @@ impl Actor for WsSession {
         // we'll start heartbeat process on session start.
         self.hb(ctx);
         let addr = ctx.address();
-        self.handler.send(game::Connect { lobby_id: self.player.lobby.clone(), user_session_id: self.player.user_session_id.clone(), addr: addr.recipient(), })
+        self.handler.send(game::Connect { lobby_id: self.player.lobby_id.clone(), user_session_id: self.player.user_session_id.clone(), addr: addr.recipient(), })
             .into_actor(self)
             .then(|res, act, ctx| {
                 match res {
@@ -114,12 +114,7 @@ impl Handler<game::SessionMessageType> for WsSession {
 
     fn handle(&mut self, msg: game::SessionMessageType, ctx: &mut Self::Context) {
         match msg {
-            SessionMessageType::MText(text) => {
-                ctx.text(text)}
-            SessionMessageType::MData(data) => {
-                let json = serde_json::to_vec(&data).expect("Can´t convert to vec");
-                ctx.binary(json)}
-            SessionMessageType::Disconnect => {
+            SessionMessageType::SelfDisconnect => {
                 ctx.stop()
             }
             SessionMessageType::Data(data) => {

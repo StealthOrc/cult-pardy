@@ -5,11 +5,12 @@ use actix_web::{get, web, HttpRequest, HttpResponse};
 use serde_json::json;
 use std::env;
 use std::path::PathBuf;
+use cult_common::LobbyId;
 use crate::apis::api::{get_session, remove_cookie, set_cookie};
 use crate::authentication::discord::{DiscordME, is_admin, to_main_page};
 use crate::servers::authentication::{AuthenticationServer, CheckAdminAccessToken};
 use crate::servers::{authentication, game};
-use crate::servers::game::{GameServer, LobbyId};
+use crate::servers::game::{GameServer};
 
 #[get("/game/{lobby_id}")]
 async fn find_game(

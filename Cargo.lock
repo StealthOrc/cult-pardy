@@ -635,6 +635,7 @@ dependencies = [
  "rand 0.9.0-alpha.1",
  "serde",
  "serde_json",
+ "strum",
 ]
 
 [[package]]

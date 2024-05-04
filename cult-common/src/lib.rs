@@ -1,5 +1,6 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Arguments;
+use std::hash::{Hash, Hasher};
 use std::net::SocketAddr;
 use std::thread::Thread;
 use std::time::{Duration, Instant, SystemTime};
@@ -9,6 +10,8 @@ use rand::distributions::Alphanumeric;
 use serde::de::Visitor;
 use chrono::{DateTime, Local, TimeZone};
 use rand::seq::index::IndexVec;
+use serde_json::from_str;
+use strum::{Display, EnumIter};
 
 
 pub fn parse_addr_str(domain: &str, port: usize) -> SocketAddr {
@@ -19,7 +22,7 @@ pub fn parse_addr_str(domain: &str, port: usize) -> SocketAddr {
 
 
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash)]
 pub struct DiscordUser {
     pub id: String,
     pub username: String,
@@ -35,7 +38,11 @@ impl DiscordUser {
 }
 
 
-
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash)]
+pub struct DTOSession{
+    pub user_session_id:UserSessionId,
+    pub discord_user:Option<DiscordUser>
+}
 
 
 
@@ -134,10 +141,14 @@ impl Category {
     }
 }
 
-#[derive(Debug, Clone,Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash)]
 pub struct UserSessionId {
-    pub id:usize,
+    pub id:String,
 }
+
+
+
+
 #[derive(Debug, Clone,Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct SessionToken {
     pub token: String,
@@ -198,27 +209,29 @@ impl JsonPrinter {
 
 
 impl UserSessionId{
+    pub fn id(self) -> usize {
+        return self.id.parse::<usize>().unwrap();
+    }
+
     pub fn of(id:usize) -> Self{
         UserSessionId{
-            id,
+            id:id.to_string(),
         }
     }
     pub fn from_string(id:String) -> Self{
-        let id=  id.parse::<usize>().expect("Can´t convert String to usize");
         UserSessionId{
             id,
         }
     }
     pub fn from_str(id:&str) -> Self{
-        let id=  id.parse::<usize>().expect("Can´t convert String to usize");
         UserSessionId{
-            id,
+            id:id.to_string(),
         }
     }
 
     pub fn random() -> Self {
         UserSessionId {
-            id: random::<usize>(),
+            id: random::<usize>().to_string(),
         }
     }
 }
@@ -262,17 +275,150 @@ impl Question {
 }
 
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum WebsocketData{
-    CurrentBoard(DtoJeopardyBoard),
-    SessionJoin(UserSessionId),
-    SessionDisconnected(UserSessionId),
+#[derive(Debug, Clone, Serialize, Deserialize, Display)]
+pub enum WebsocketServerEvents {
+    Board(BoardEvent),
+    Websocket(WebsocketEvent),
+    Session(SessionEvent),
+    Error(WebsocketError),
     Text(String)
+}
+
+impl WebsocketServerEvents{
+
+    pub fn event_name(self) -> String {
+        let wse = self.to_string();
+        let event= match self {
+            WebsocketServerEvents::Board(event) => event.to_string(),
+            WebsocketServerEvents::Websocket(event) => event.to_string(),
+            WebsocketServerEvents::Session(event) => event.to_string(),
+            WebsocketServerEvents::Error(event) => event.to_string(),
+            WebsocketServerEvents::Text(event) => event.to_string(),
+        };
+
+        format!("{} -> {} ", wse, event)
+    }
+
+
+
+}
+
+
+#[derive(Debug, Clone, Serialize, Deserialize, Display)]
+pub enum BoardEvent {
+    CurrentBoard(DtoJeopardyBoard),
+    UpdateBoard(String),
+}
+
+
+#[derive(Debug, Clone, Serialize, Deserialize, Display)]
+pub enum WebsocketEvent {
+    WebsocketJoined(WebsocketSessionId),
+    WebsocketDisconnected(WebsocketSessionId),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Display, Hash)]
+pub enum SessionEvent {
+    CurrentSessions(Vec<DTOSession>),
+    SessionJoined(UserSessionId),
+    SessionDisconnected(UserSessionId),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Display)]
+pub enum WebsocketSessionEvent {
+    Text(String),
+    Click(Vector2D),
+}
+
+
+#[derive(Debug, Clone, Serialize, Deserialize, Display)]
+pub enum WebsocketError{
+    LobbyNotFound(LobbyId),
+    SessionNotFound(UserSessionId),
+    GameStarted(LobbyId),
+    NotAuthorized,
+    WebsocketCrashed,
+    UNKNOWN(String),
+}
+
+
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize,Deserialize)]
+pub struct WebsocketSessionId {
+    id:String,
+}
+
+
+impl WebsocketSessionId{
+
+
+    pub fn id(self) -> usize {
+        return self.id.parse::<usize>().unwrap();
+    }
+
+    pub fn random() ->Self  {
+        WebsocketSessionId{
+            id: random::<usize>().to_string()
+        }
+    }
+    pub fn of(id:usize) -> Self{
+        WebsocketSessionId{
+            id:id.to_string()
+        }
+    }
+    pub fn from_string(id:String) -> Self{
+        WebsocketSessionId{
+            id: id.to_string()
+        }
+    }
+    pub fn from_str(id:&str) -> Self{
+        let id=  id.parse::<usize>().expect("Can´t convert String to usize");
+        WebsocketSessionId{
+            id:id.to_string()
+        }
+    }
 }
 
 
 
 
+#[derive(Debug, Clone,  Hash, Eq, PartialEq)]
+pub struct LobbyId{
+    pub id: String,
+}
+
+impl Serialize for LobbyId {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+    {
+        serializer.serialize_str(&self.id)
+    }
+}
+
+impl<'de> Deserialize<'de> for LobbyId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+    {
+        let id: String = Deserialize::deserialize(deserializer)?;
+        Ok(LobbyId { id })
+    }
+}
+
+
+impl LobbyId{
+    pub fn of(id:String) -> Self{
+        LobbyId{
+            id,
+        }
+    }
+
+    pub fn from_str(id:&str) -> Self{
+        LobbyId{
+            id:id.to_string(),
+        }
+    }
+}
 
 
 impl JeopardyBoard {

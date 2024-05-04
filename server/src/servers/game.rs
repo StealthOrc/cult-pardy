@@ -5,6 +5,7 @@
 
 
 use std::collections::{HashMap, HashSet};
+use std::ops::DerefMut;
 use std::time::{Duration, Instant};
 use actix::{Actor, Addr, Context, Handler, Message, MessageResult, Recipient};
 use chrono::TimeDelta;
@@ -14,20 +15,23 @@ use oauth2::TokenResponse;
 use rand::random;
 use rand::rngs::ThreadRng;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use cult_common::{DiscordUser, JeopardyBoard, SessionToken, UserSessionId, WebsocketData};
+use cult_common::{DiscordUser, DTOSession, JeopardyBoard, LobbyId, SessionEvent, SessionToken, UserSessionId, WebsocketServerEvents, WebsocketSessionId};
+use cult_common::BoardEvent::CurrentBoard;
 use cult_common::JeopardyMode::NORMAL;
+use cult_common::SessionEvent::SessionDisconnected;
+use cult_common::WebsocketError::{LobbyNotFound, SessionNotFound};
+use cult_common::WebsocketEvent::{WebsocketDisconnected, WebsocketJoined};
 use crate::authentication::discord::{DiscordME, LoginDiscordAuth};
 use crate::servers::authentication::RedeemAdminAccessToken;
+use crate::ws::session;
 use crate::ws::session::UserData;
 
 /// Chat server sends this messages to session
 #[derive(Message,Serialize, Deserialize, Debug)]
 #[rtype(result = "()")]
 pub enum SessionMessageType {
-    Data(WebsocketData),
-    MText(String),
-    MData(usize),
-    Disconnect,
+    Data(WebsocketServerEvents),
+    SelfDisconnect,
 }
 #[derive(Debug,Clone)]
 pub struct Connect{
@@ -88,7 +92,7 @@ pub struct GetUserSession {
 
 #[derive(Message)]
 #[rtype(result = "UserSession")]
-pub struct JoinWebSocket {
+pub struct HasSessionForWebSocket {
     pub user_session_id: Option<UserSessionId>,
     pub session_token: Option<SessionToken>,
 }
@@ -142,60 +146,6 @@ pub struct GameServer {
     pub user_sessions: HashMap<UserSessionId, UserSession>,
     pub lobbies: HashMap<LobbyId, Lobby>
 }
-
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Copy)]
-pub struct WebsocketSessionId {
-    pub id:usize,
-}
-
-
-impl Serialize for WebsocketSessionId {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer,
-    {
-        serializer.serialize_u64(self.id as u64)
-    }
-}
-
-impl<'de> Deserialize<'de> for WebsocketSessionId {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: Deserializer<'de>,
-    {
-        let id_str: String = Deserialize::deserialize(deserializer)?;
-        let id = id_str.parse().map_err(serde::de::Error::custom)?;
-        Ok(WebsocketSessionId { id })
-    }
-}
-
-impl WebsocketSessionId{
-
-    pub fn random() ->Self  {
-        WebsocketSessionId{
-            id: random::<usize>()
-        }
-    }
-    pub fn of(id:usize) -> Self{
-        WebsocketSessionId{
-            id
-        }
-    }
-    pub fn from_string(id:String) -> Self{
-        let id=  id.parse::<usize>().expect("Can´t convert String to usize");
-        WebsocketSessionId{
-            id
-        }
-    }
-    pub fn from_str(id:&str) -> Self{
-        let id=  id.parse::<usize>().expect("Can´t convert String to usize");
-        WebsocketSessionId{
-            id
-        }
-    }
-}
-
-
 
 
 
@@ -260,8 +210,22 @@ impl DiscordData {
 
 
 impl UserSession {
+    fn dto(self) -> DTOSession {
+        let clone = self.clone();
+        let discord_user = match clone.discord_auth {
+            None => None,
+            Some(data) =>  {
+                data.discord_user
+            }
+        };
 
-    pub fn random() -> Self{
+        DTOSession{
+            user_session_id: clone.user_session_id,
+            discord_user,
+        }
+    }
+
+    pub fn random() -> Self {
         UserSession{
             user_session_id: UserSessionId::random(),
             discord_auth: None,
@@ -300,44 +264,6 @@ impl UserSession {
 
 
 
-#[derive(Debug, Clone,  Hash, Eq, PartialEq)]
-pub struct LobbyId{
-    pub id: String,
-}
-
-impl Serialize for LobbyId {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer,
-    {
-        serializer.serialize_str(&self.id)
-    }
-}
-
-impl<'de> Deserialize<'de> for LobbyId {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: Deserializer<'de>,
-    {
-        let id: String = Deserialize::deserialize(deserializer)?;
-        Ok(LobbyId { id })
-    }
-}
-
-
-impl LobbyId{
-    pub fn of(id:String) -> Self{
-        LobbyId{
-            id,
-        }
-    }
-
-    pub fn from_str(id:&str) -> Self{
-        LobbyId{
-            id:id.to_string(),
-        }
-    }
-}
 
 
 
@@ -401,11 +327,24 @@ impl GameServer {
         session
     }
 
+    fn get_dto_sessions(&self, lobby_id: LobbyId) -> HashSet<DTOSession> {
+        let mut sessions = HashSet::new();
+        if let Some(lobby) = self.lobbies.get(&lobby_id){
+            for (session_id) in &lobby.user_session {
+                if let Some(session) = self.user_sessions.get(&session_id){
+                    sessions.insert(session.clone().dto());
+                }
+            }
+        }
+        sessions
+        }
+
 
 
 
     /// Send message to all users in the room
-    fn send_lobby_message(&self, lobby_id: &LobbyId, message: WebsocketData) {
+    ///
+    fn send_lobby_message(&self, lobby_id: &LobbyId, message: WebsocketServerEvents) {
         if let Some(lobby) = self.lobbies.get(lobby_id) {
             for user_id in lobby.websocket_session_id.iter() {
                 for user_session in self.user_sessions.values() {
@@ -417,7 +356,11 @@ impl GameServer {
         }
     }
 
-    fn send_session_message(&self, lobby_id: &LobbyId, user_session_id: &UserSessionId, message: WebsocketData) {
+    pub fn send_message(addr:&Recipient<SessionMessageType>, message: WebsocketServerEvents) {
+        addr.do_send(SessionMessageType::Data(message));
+    }
+
+    fn send_session_message(&self, lobby_id: &LobbyId, user_session_id: &UserSessionId, message: WebsocketServerEvents) {
         if let Some(user_session) = self.user_sessions.get(&user_session_id) {
             for websocket_session in user_session.websocket_connections.values() {
                if websocket_session.lobby_id.eq(lobby_id){
@@ -426,7 +369,7 @@ impl GameServer {
             }
         }
     }
-    fn send_websocket_session_message(&self, lobby_id: &LobbyId, websocket_session_id: &WebsocketSessionId,message: WebsocketData) {
+    fn send_websocket_session_message(&self, lobby_id: &LobbyId, websocket_session_id: &WebsocketSessionId,message: WebsocketServerEvents) {
         if let Some(lobby) = self.lobbies.get(lobby_id) {
             for user_session_id in  lobby.user_session.clone() {
                 if let Some(user_session) = self.user_sessions.get(&user_session_id){
@@ -449,7 +392,7 @@ impl GameServer {
                 if let Some(user_session) = self.user_sessions.get(user_session) {
                     for websockets in &lobby.websocket_session_id {
                         if let Some(websocket_session) = user_session.websocket_connections.get(&websockets) {
-                            websocket_session.addr.do_send(SessionMessageType::Disconnect);
+                            websocket_session.addr.do_send(SessionMessageType::SelfDisconnect);
                         }
                     }
                 }
@@ -476,43 +419,51 @@ impl Handler<Connect> for GameServer {
     type Result = Option<WebsocketSessionId>;
 
     fn handle(&mut self, msg: Connect, _: &mut Context<Self>) -> Self::Result {
-        // notify all users in same room
+        // Notify all users in the same room
         let user_session = match self.user_sessions.get_mut(&msg.user_session_id) {
-            None => return {
+            None => {
+                Self::send_message(&msg.addr, WebsocketServerEvents::Error(SessionNotFound(msg.user_session_id)));
                 println!("Something happens");
-                None
-            },
-            Some(user_session) => user_session
+                return None;
+            }
+            Some(user_session) => user_session,
         };
 
         let websocket_session_id = WebsocketSessionId::random();
 
-        let web_socket_session = WebsocketSession{
-            websocket_session_id,
+        let lobby = match self.lobbies.get_mut(&msg.lobby_id) {
+            None => {
+                println!("Something happens2");
+                Self::send_message(&msg.addr, WebsocketServerEvents::Error(LobbyNotFound(msg.lobby_id)));
+                return None;
+            }
+            Some(lobby) => lobby,
+        };
+        lobby.user_session.insert(msg.clone().user_session_id);
+        lobby.websocket_session_id.insert(websocket_session_id.clone());
+
+        let lobby = lobby.clone();
+
+        let new_session = !user_session.websocket_connections.values().any(|websocket_session| websocket_session.lobby_id.eq(&msg.lobby_id));
+
+        user_session.websocket_connections.insert(websocket_session_id.clone(), WebsocketSession {
+            websocket_session_id:websocket_session_id.clone(),
             addr: msg.addr.clone(),
             lobby_id: msg.lobby_id.clone(),
-        };
+        });
 
-
-        &user_session.websocket_connections.insert(websocket_session_id, web_socket_session);
-
-
-        match self.lobbies.get_mut(&msg.lobby_id){
-            None =>{
-                println!("Something happens2");
-                user_session.websocket_connections.remove(&websocket_session_id);
-                return None
-            }
-            Some(lobby) => {
-                lobby.user_session.insert(msg.clone().user_session_id);
-                lobby.websocket_session_id.insert(websocket_session_id);
-            }
+        if new_session {
+            println!("Someone joined: {:?}{:?}", &msg, &websocket_session_id.clone());
+            self.send_lobby_message(&msg.lobby_id.clone(), WebsocketServerEvents::Session(SessionEvent::SessionJoined(msg.user_session_id.clone())));
         }
-        println!("Someone joined :  {:?}{:?}", &msg, &websocket_session_id);
+        let sessions =
+
+        self.send_lobby_message(&msg.lobby_id, WebsocketServerEvents::Websocket(WebsocketJoined(websocket_session_id.clone())));
+        self.send_websocket_session_message(&msg.lobby_id, &websocket_session_id, WebsocketServerEvents::Board(CurrentBoard(JeopardyBoard::default(NORMAL).dto())));
 
 
-        self.send_lobby_message(&msg.lobby_id, WebsocketData::Text("Someone joined".to_string()));
-        self.send_websocket_session_message(&msg.lobby_id, &websocket_session_id, WebsocketData::CurrentBoard(JeopardyBoard::default(NORMAL).dto()));
+        self.send_lobby_message(&msg.lobby_id.clone(), WebsocketServerEvents::Session(SessionEvent::CurrentSessions(Vec::from_iter(self.get_dto_sessions(msg.lobby_id)))));
+
         Some(websocket_session_id)
     }
 }
@@ -522,18 +473,30 @@ impl Handler<SessionDisconnect> for GameServer {
     type Result = ();
 
     fn handle(&mut self, msg: SessionDisconnect, _: &mut Context<Self>) {
-        if let Some(user_session) = self.user_sessions.get_mut(&msg.user_data.user_session_id) {
-            if let Some(websocket_session_id) = msg.user_data.websocket_session_id  {
-                user_session.websocket_connections.remove(&websocket_session_id);
-                if let Some(lobby) = self.lobbies.get_mut(&msg.user_data.lobby) {
-                    lobby.websocket_session_id.remove(&websocket_session_id);
-                    println!("Someone disconnect: {:?}", user_session.clone().to_session_data());
-                    let multi_sessions = user_session.websocket_connections.values().any(|ws | ws.lobby_id.eq(&lobby.lobby_id));
-                    if !multi_sessions{
-                        lobby.user_session.remove(&msg.user_data.user_session_id);
-                    }
-                }
-            }
+        let user_session =  match self.user_sessions.get_mut(&msg.user_data.user_session_id) {
+            None => return,
+            Some(user_session) => user_session
+        };
+
+        let websocket_session_id =  match msg.user_data.websocket_session_id {
+            None => return,
+            Some(websocket_session_id) => websocket_session_id
+        };
+
+        user_session.websocket_connections.remove(&websocket_session_id);
+
+        let lobby =  match self.lobbies.get_mut(&msg.user_data.lobby_id) {
+            None => return,
+            Some(lobby) => lobby
+        };
+        println!("Someone disconnect: {:?}", user_session.clone().to_session_data());
+        let multi_sessions = !user_session.websocket_connections.values().any(|ws | ws.lobby_id.eq(&msg.user_data.lobby_id));
+        if multi_sessions {
+            &lobby.user_session.remove(&msg.user_data.user_session_id);
+        }
+        self.send_lobby_message(&msg.user_data.lobby_id, WebsocketServerEvents::Websocket(WebsocketDisconnected(websocket_session_id.clone())));
+        if multi_sessions {
+            self.send_lobby_message(&msg.user_data.lobby_id, WebsocketServerEvents::Session(SessionDisconnected(msg.user_data.user_session_id.clone())));
         }
     }
 }
@@ -543,7 +506,7 @@ impl Handler<ClientMessage> for GameServer {
     type Result = ();
 
     fn handle(&mut self, msg: ClientMessage, _: &mut Context<Self>) {
-        self.send_lobby_message(&msg.player_data.lobby, WebsocketData::Text(msg.msg));
+        self.send_lobby_message(&msg.player_data.lobby_id, WebsocketServerEvents::Text(msg.msg));
     }
 }
 
@@ -613,10 +576,10 @@ impl Handler<GetUserSession> for GameServer {
 
 
 
-impl Handler<JoinWebSocket> for GameServer {
-    type Result = MessageResult<JoinWebSocket>;
+impl Handler<HasSessionForWebSocket> for GameServer {
+    type Result = MessageResult<HasSessionForWebSocket>;
 
-    fn handle(&mut self, msg: JoinWebSocket, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: HasSessionForWebSocket, _ctx: &mut Self::Context) -> Self::Result {
         let user_session  = match msg.user_session_id {
             None => return MessageResult(self.new_session()),
             Some(data) => data,
