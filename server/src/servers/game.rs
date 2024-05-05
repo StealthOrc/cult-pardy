@@ -488,7 +488,7 @@ impl Handler<Connect> for GameServer {
         let sessions =
 
         self.send_lobby_message(&msg.lobby_id, WebsocketServerEvents::Websocket(WebsocketJoined(websocket_session_id.clone())));
-        self.send_websocket_session_message(&msg.lobby_id, &websocket_session_id, WebsocketServerEvents::Board(CurrentBoard(JeopardyBoard::default(NORMAL).dto())));
+        self.send_websocket_session_message(&msg.lobby_id, &websocket_session_id, WebsocketServerEvents::Board(CurrentBoard(lobby.jeopardy_board.dto())));
 
 
         self.send_lobby_message(&msg.lobby_id.clone(), WebsocketServerEvents::Session(SessionEvent::CurrentSessions(Vec::from_iter(self.get_dto_sessions(msg.lobby_id)))));
