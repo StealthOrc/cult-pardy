@@ -33,6 +33,7 @@ pub enum Msg {
 
 pub struct App {
     ws_service: WebsocketService,
+    game_id: String,
 }
 
 impl Component for App {
@@ -47,17 +48,17 @@ impl Component for App {
             .expect("could not get cookie")
             .expect("could not get cookie from user");
 
-        let lobby_id = "main";
+
+
+        let lobby_id = get_game_id_from_url().expect("SomeData?");
         let mut wss = WebsocketService::new(
             parse_addr_str("127.0.0.1", 8000).to_string().as_str(),
-            lobby_id,
+            lobby_id.as_str(),
             usr_session_id.as_str(),
             session_token.as_str()
         );
 
-
-
-        App { ws_service: wss }
+        App { ws_service: wss, game_id: lobby_id }
     }
 
     fn update(&mut self, _ctx: &Context<Self>, msg: Self::Message) -> bool {
@@ -141,4 +142,11 @@ impl Component for App {
         </main>
         }
     }
+}
+fn get_game_id_from_url() -> Option<String> {
+    let window = web_sys::window().expect("No global `window` exists.");
+    let location = window.location();
+    let pathname = location.pathname().expect("Failed to get pathname from URL");
+    let parts: Vec<&str> = pathname.split('/').collect();
+    parts.last().map(|&s| s.to_string())
 }

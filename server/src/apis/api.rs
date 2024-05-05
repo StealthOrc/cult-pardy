@@ -1,5 +1,5 @@
 use std::time::{Duration, Instant};
-use crate::servers::game::{GetUserSession};
+use crate::servers::game::{CreateLobby, DiscordData, GetUserSession};
 use actix::{Addr, MailboxError};
 
 use actix_web::cookie::{Cookie};
@@ -7,8 +7,8 @@ use actix_web::{get, HttpRequest, HttpResponse, patch, post, web};
 use chrono::Local;
 use serde::Serialize;
 use serde_json::json;
-use cult_common::JeopardyMode::NORMAL;
-use cult_common::{JeopardyBoard, LobbyId, SessionToken, UserSessionId};
+use cult_common::JeopardyMode::{NORMAL, SHORT};
+use cult_common::{JeopardyBoard, LobbyId,  SessionToken, UserSessionId};
 use crate::apis::data::{extract_header_string, extract_value};
 use crate::authentication::discord::is_admin;
 use crate::servers::authentication::AuthenticationServer;
@@ -48,8 +48,7 @@ struct UserSessionWithAdmin{
 async fn session_request(req: HttpRequest, srv: web::Data<Addr<game::GameServer>>, auth: web::Data<Addr<AuthenticationServer>>) -> Result<HttpResponse, actix_web::Error> {
     let user_session = get_session(&req, &srv).await;
     let mut response = HttpResponse::from(HttpResponse::Ok().json(UserSessionWithAdmin{user_session:user_session.clone(), is_admin:is_admin(user_session.clone(), auth).await}));
-    set_cookie(&mut response, &req,"user-session-id", &user_session.user_session_id.id.to_string());
-    set_cookie(&mut response, &req,"session-token", &user_session.session_token.token);
+    set_session_token_cookie(&mut response, &req, &user_session);
     Ok(response)
 }
 
@@ -108,6 +107,17 @@ pub fn set_cookie(res: &mut HttpResponse,req: &HttpRequest, cookie_name: &str, v
     res.add_cookie(&cookie).expect("Can´t add cookies to the Response");
 }
 
+
+pub fn set_session_token_cookie(response: &mut HttpResponse, req: &HttpRequest, user_session: &UserSession){
+    set_cookie(response, &req, "user-session-id", &user_session.user_session_id.id.to_string());
+    set_cookie(response, &req, "session-token", &user_session.session_token.token);
+}
+
+
+
+
+
+
 pub fn remove_cookie(res: &mut HttpResponse, req: &HttpRequest, cookie_name: &str){
     if let Some(cookie)= req.cookie(cookie_name) {
         res.add_removal_cookie(&cookie).expect("Can´t add cookies to the Response")
@@ -119,27 +129,55 @@ pub fn remove_cookie(res: &mut HttpResponse, req: &HttpRequest, cookie_name: &st
 
 
 #[get("/api/authorization")]
-async fn has_authorization(_req: HttpRequest) -> HttpResponse {
-    let board = JeopardyBoard::default(NORMAL);
+async fn has_authorization(req: HttpRequest, srv: web::Data<Addr<game::GameServer>>, auth: web::Data<Addr<AuthenticationServer>>) -> HttpResponse {
+    let user_session = get_session(&req, &srv).await;
 
-    HttpResponse::from(HttpResponse::Ok().json(board))
+    let mut response = HttpResponse::from(HttpResponse::Ok().json(is_admin(user_session.clone(), auth).await));
+    set_session_token_cookie(&mut response, &req, &user_session);
+    response
+}
+
+#[get("/api/discord_session")]
+async fn discord_session(req: HttpRequest, srv: web::Data<Addr<game::GameServer>>, auth: web::Data<Addr<AuthenticationServer>>) -> HttpResponse {
+    let user_session = get_session(&req, &srv).await;
+    let discord_user = match user_session.clone().discord_auth{
+        None => None,
+        Some(data) => data.discord_user,
+    };
+    let mut response = HttpResponse::from(HttpResponse::Ok().json(discord_user));
+    set_session_token_cookie(&mut response, &req, &user_session);
+    response
 }
 
 #[post("/api/create")]
-async fn create_game_lobby(_req: HttpRequest) -> HttpResponse {
-    HttpResponse::from(HttpResponse::Ok())
+async fn create_game_lobby(req: HttpRequest,json: web::Json<Option<JeopardyBoard>>, srv: web::Data<Addr<game::GameServer>>, auth: web::Data<Addr<AuthenticationServer>>) -> HttpResponse {
+    let user_session = get_session(&req, &srv).await;
+    let mut response =   HttpResponse::from(HttpResponse::NotFound());
+    if is_admin(user_session.clone(), auth).await{
+        let data = srv.send(CreateLobby{ user_session_id: user_session.user_session_id.clone(), jeopardy_board: json.into_inner() }).await.expect("Something happens by getting the user");
+        response = HttpResponse::from(HttpResponse::Ok().json(data));
+    }
+    set_session_token_cookie(&mut response, &req, &user_session);
+    response
 }
 
 
 #[post("/api/join")]
-async fn join_game(_req: HttpRequest) -> HttpResponse {
-    HttpResponse::Ok().body("true")
+async fn join_game(req: HttpRequest, srv: web::Data<Addr<game::GameServer>>, auth: web::Data<Addr<AuthenticationServer>>) -> HttpResponse {
+    let user_session = get_session(&req, &srv).await;
+    let discord_user = match user_session.clone().discord_auth{
+        None => None,
+        Some(data) => data.discord_user,
+    };
+    let mut response = HttpResponse::from(HttpResponse::Ok().json(discord_user));
+    set_session_token_cookie(&mut response, &req, &user_session);
+    response
 }
 
-
-#[patch("/api/update-authorization")]
-async fn update_authorization(_req: HttpRequest) -> HttpResponse {
-    HttpResponse::Ok().body("true")
+#[get("/api/board")]
+async fn board() -> HttpResponse {
+    let mut response = HttpResponse::from(HttpResponse::Ok().json(JeopardyBoard::default(SHORT)));
+    response
 }
 
 

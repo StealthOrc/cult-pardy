@@ -1,16 +1,30 @@
 
-use actix::{Addr, MailboxError};
+use actix::{Addr, MailboxError, Response};
 use actix_files::NamedFile;
 use actix_web::{get, web, HttpRequest, HttpResponse};
 use serde_json::json;
 use std::env;
 use std::path::PathBuf;
 use cult_common::LobbyId;
-use crate::apis::api::{get_session, remove_cookie, set_cookie};
+use crate::apis::api::{get_session, remove_cookie, set_cookie, set_session_token_cookie};
 use crate::authentication::discord::{DiscordME, is_admin, to_main_page};
 use crate::servers::authentication::{AuthenticationServer, CheckAdminAccessToken};
 use crate::servers::{authentication, game};
 use crate::servers::game::{GameServer};
+
+
+pub fn index_response(req: &HttpRequest) -> HttpResponse{
+    let mut cexe = env::current_exe().unwrap();
+    cexe.pop();
+    cexe.push("www");
+    cexe.push("index.html");
+    let final_path = cexe.into_os_string().into_string().unwrap();
+    let named_file = NamedFile::open(final_path).expect("{:?}File not found");
+    named_file.into_response(&req)
+}
+
+
+
 
 #[get("/game/{lobby_id}")]
 async fn find_game(
@@ -21,29 +35,10 @@ async fn find_game(
     let user_session = get_session(&req, &srv).await;
     let lobby_id = lobby_id.into_inner();
 
-    let haslobby = srv.send(game::HasLobby { lobby_id: LobbyId::of(lobby_id.clone()) }).await.expect("No Lobby found!");
-    let error = json!(
-        {
-            "Error": "Lobby not found",
-            "Lobby": lobby_id
-        }
-    );
-    let _users = json!(
-        {
-            "Lobby": lobby_id,
-            "User-session-id":user_session.user_session_id.id,
-            "Users": haslobby,
-        }
-    );
-    let mut cexe = env::current_exe().unwrap();
-    cexe.pop();
-    cexe.push("www");
-    cexe.push("index.html");
-    let final_path = cexe.into_os_string().into_string().unwrap();
-    let named_file = NamedFile::open(final_path).expect("{:?}File not found");
-    let mut response = named_file.into_response(&req);
-    set_cookie(&mut response, &req,"user-session-id", &user_session.user_session_id.id.to_string());
-    set_cookie(&mut response, &req,"session-token", &user_session.session_token.token);
+    let has_lobby = srv.send(game::HasLobby { lobby_id: LobbyId::of(lobby_id.clone()) }).await.expect("No Lobby found!");
+    println!("HasLobby?{}", has_lobby);
+    let mut response = index_response(&req);
+    set_session_token_cookie(&mut response, &req, &user_session);
     Ok(response)
 }
 
@@ -59,7 +54,9 @@ async fn grant_admin_access(
 ) -> Result<HttpResponse, actix_web::Error> {
 
     let user_session = get_session(&req, &srv).await;
-    let mut response = HttpResponse::InternalServerError().finish();
+    let mut response = HttpResponse::Found()
+        .append_header(("Location", "http://localhost:8000/discord?type=grant"))
+        .finish();
 
     if (is_admin(user_session.clone(), auth.clone()).await) {
         return to_main_page(&user_session,&req);
@@ -74,23 +71,13 @@ async fn grant_admin_access(
         Err(_) =>  return to_main_page(&user_session,&req)
     }
 
-
     if let Some(discord_data) = user_session.clone().discord_auth {
         if discord_data.discord_user.is_some() {
             response = HttpResponse::Found().append_header(("Location", "http://localhost:8000/grant")).finish();
-            set_cookie(&mut response, &req,"user-session-id", &user_session.user_session_id.id.to_string());
-            set_cookie(&mut response, &req,"session-token", &user_session.session_token.token);
-            set_cookie(&mut response, &req,"token", &grand_id.to_string());
-            return Ok(response)
         }
     }
 
-    let mut response = HttpResponse::Found()
-        .append_header(("Location", "http://localhost:8000/discord?type=grant"))
-        .finish();
-
-    set_cookie(&mut response, &req,"user-session-id", &user_session.user_session_id.id.to_string());
-    set_cookie(&mut response, &req,"session-token", &user_session.session_token.token);
+    set_session_token_cookie(&mut response, &req, &user_session);
     set_cookie(&mut response, &req,"token", &grand_id.to_string());
     Ok(response)
 }
@@ -100,21 +87,10 @@ async fn index(
     req: HttpRequest,
     srv: web::Data<Addr<GameServer>>,
 ) -> actix_web::Result<HttpResponse> {
-    let mut cexe = env::current_exe().unwrap();
-    cexe.pop();
-    cexe.push("www");
-    cexe.push("index.html");
-    let final_path = cexe.into_os_string().into_string().unwrap();
-    let named_file = NamedFile::open(final_path).expect("File not found");
-
-    //TODO HACKY!!
-
     let user_session = get_session(&req, &srv).await;
-
-    let mut response = named_file.into_response(&req);
+    let mut response = index_response(&req);
     remove_cookie(&mut response, &req, "token");
-    set_cookie(&mut response, &req,"user-session-id", &user_session.user_session_id.id.to_string());
-    set_cookie(&mut response, &req,"session-token", &user_session.session_token.token);
+    set_session_token_cookie(&mut response, &req, &user_session);
     Ok(response)
 }
 
@@ -138,8 +114,7 @@ async fn assets(
     let user_session = get_session(&req, &srv).await;
 
     let mut response = named_file.into_response(&req);
-    set_cookie(&mut response, &req,"user-session-id", &user_session.user_session_id.id.to_string());
-    set_cookie(&mut response, &req,"session-token", &user_session.session_token.token);
+    set_session_token_cookie(&mut response, &req, &user_session);
     Ok(response)
 }
 
@@ -150,6 +125,7 @@ async fn test(
     srv: web::Data<Addr<GameServer>>,
 ) -> actix_web::Result<HttpResponse> {
     let mut cexe = env::current_exe().unwrap();
+    println!("??");
     cexe.pop();
     cexe.push("www");
     cexe.push("index.html");
@@ -161,8 +137,7 @@ async fn test(
     let user_session = get_session(&req, &srv).await;
 
     let mut response = named_file.into_response(&req);
-    set_cookie(&mut response, &req,"user-session-id", &user_session.user_session_id.id.to_string());
-    set_cookie(&mut response, &req,"session-token", &user_session.session_token.token);
+    set_session_token_cookie(&mut response, &req, &user_session);
     Ok(response)
 }
 

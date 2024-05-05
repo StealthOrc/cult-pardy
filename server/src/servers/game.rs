@@ -15,7 +15,8 @@ use oauth2::TokenResponse;
 use rand::random;
 use rand::rngs::ThreadRng;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use cult_common::{DiscordUser, DTOSession, JeopardyBoard, LobbyId, SessionEvent, SessionToken, UserSessionId, WebsocketServerEvents, WebsocketSessionId};
+use strum::{Display, EnumIter};
+use cult_common::{DiscordUser, DTOSession, JeopardyBoard, LobbyCreateResponse, LobbyId, SessionEvent, SessionToken, UserSessionId, WebsocketServerEvents, WebsocketSessionId};
 use cult_common::BoardEvent::CurrentBoard;
 use cult_common::JeopardyMode::NORMAL;
 use cult_common::SessionEvent::SessionDisconnected;
@@ -88,6 +89,14 @@ pub struct GetUserSession {
     pub user_session_id: Option<UserSessionId>,
     pub session_token: Option<SessionToken>,
 }
+
+#[derive(Message)]
+#[rtype(result = "LobbyCreateResponse")]
+pub struct CreateLobby {
+    pub user_session_id: UserSessionId,
+    pub jeopardy_board:Option<JeopardyBoard>
+}
+
 
 
 #[derive(Message)]
@@ -272,14 +281,16 @@ pub struct Lobby{
     lobby_id: LobbyId,
     user_session: HashSet<UserSessionId>,
     websocket_session_id: HashSet<WebsocketSessionId>,
-    game_state: GameState
+    game_state: GameState,
+    jeopardy_board: JeopardyBoard,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, EnumIter, Display)]
 enum GameState{
     Waiting,
     Starting,
-    Playing
+    Playing,
+    End
 }
 
 
@@ -298,6 +309,7 @@ impl GameServer {
             user_session: HashSet::new(),
             websocket_session_id: HashSet::new(),
             game_state: GameState::Waiting,
+            jeopardy_board: JeopardyBoard::default(NORMAL),
         };
 
 
@@ -305,7 +317,7 @@ impl GameServer {
         lobbies.insert(name.clone(), main);
 
 
-        println!("Game lobby's: {:?}", lobbies);
+        println!("Game lobby's: {:?}", &lobbies.values().map(|lobby| lobby.lobby_id.clone()).collect::<Vec<_>>());
         GameServer {
             login_discord_auth,
             rng: rand::thread_rng(),
@@ -325,6 +337,23 @@ impl GameServer {
         self.user_sessions.insert(session.user_session_id.clone(), session.clone());
         println!("Added User-session {:?}", session);
         session
+    }
+
+    fn new_lobby(&mut self, jeopardy_board: JeopardyBoard) -> Lobby {
+        let mut lobby_id= LobbyId::random();
+        while self.lobbies.contains_key(&lobby_id) {
+            lobby_id = LobbyId::random();
+        }
+        let lobby = Lobby{
+            lobby_id:lobby_id.clone(),
+            user_session: HashSet::new(),
+            websocket_session_id: HashSet::new(),
+            game_state: GameState::Waiting,
+            jeopardy_board,
+        };
+        self.lobbies.insert(lobby_id.clone(), lobby.clone());
+        println!("Added Lobby {:?}", lobby_id);
+        lobby
     }
 
     fn get_dto_sessions(&self, lobby_id: LobbyId) -> HashSet<DTOSession> {
@@ -609,5 +638,22 @@ impl Handler<AddDiscordAccount> for GameServer {
         return false
     }
 }
+
+impl Handler<CreateLobby> for GameServer {
+    type Result = MessageResult<CreateLobby>;
+
+    fn handle(&mut self, msg: CreateLobby, ctx: &mut Self::Context) -> Self::Result {
+        let board = match msg.jeopardy_board {
+            None => return MessageResult(LobbyCreateResponse::Error("No JeopardyBoard".to_string())),
+            Some(board) => board,
+        };
+        if board.categories.len() <1 {
+            return MessageResult(LobbyCreateResponse::Error("No categories".to_string()))
+        }
+        let board = self.new_lobby(board);
+        MessageResult(LobbyCreateResponse::Created(board.lobby_id))
+    }
+}
+
 
 

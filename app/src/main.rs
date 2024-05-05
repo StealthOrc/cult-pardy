@@ -30,7 +30,7 @@ enum Route {
 fn switch(routes: Route) -> Html {
     match routes {
         Route::Home => html! { <h1> { "Home" } </h1> },
-        Route::Game => html! { <App/> },
+        Route::Game => html!{ <App  />} ,
         _ => html! { <h1>{ "404" }</h1> },
     }
 }

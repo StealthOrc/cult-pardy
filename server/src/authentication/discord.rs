@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use strum::{Display};
 use cult_common::{DiscordUser, get_false, get_true, JsonPrinter};
-use crate::apis::api::{get_session, get_token, remove_cookie, set_cookie};
+use crate::apis::api::{get_session, get_token, remove_cookie, set_cookie, set_session_token_cookie};
 use crate::apis::data::{extract_value};
 use crate::authentication::discord::DiscordRedirectURL::{Grant, Login};
 use crate::servers::authentication::{AddAdminAccess, AuthenticationServer, CheckAdminAccess, RedeemAdminAccessToken};
@@ -312,15 +312,13 @@ pub async fn login_only(
     }
 
 
-    set_cookie(&mut response, &req,"user-session-id", &user_session.user_session_id.id.to_string());
-    set_cookie(&mut response, &req,"session-token", &user_session.session_token.token);
+    set_session_token_cookie(&mut response, &req, &user_session);
     Ok(response)
 }
 
 
 fn to_response(mut response: HttpResponse, req: &actix_web::HttpRequest, user_session: &UserSession) -> anyhow::Result<HttpResponse, actix_web::Error> {
-    set_cookie(&mut response, &req,"user-session-id", &user_session.user_session_id.id.to_string());
-    set_cookie(&mut response, &req,"session-token", &user_session.session_token.token);
+    set_session_token_cookie(&mut response, &req, &user_session);
     Ok(response)
 }
 
@@ -329,8 +327,7 @@ pub fn to_main_page(user_session: &UserSession, req:&actix_web::HttpRequest) -> 
     let mut response = HttpResponse::Found()
         .append_header(("Location", "http://localhost:8000/"))
         .finish();
-    set_cookie(&mut response,&req, "user-session-id", &user_session.user_session_id.id.to_string());
-    set_cookie(&mut response, &req,"session-token", &user_session.session_token.token);
+    set_session_token_cookie(&mut response, &req, &user_session);
     Ok(response)
 }
 
@@ -387,8 +384,7 @@ pub async fn grant_access(
 
 
 
-    set_cookie(&mut response,&req, "user-session-id", &user_session.user_session_id.id.to_string());
-    set_cookie(&mut response,&req, "session-token", &user_session.session_token.token);
+    set_session_token_cookie(&mut response, &req, &user_session);
     remove_cookie(&mut response, &req, "token");
     Ok(response)
 }

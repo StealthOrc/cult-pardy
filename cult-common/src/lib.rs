@@ -65,13 +65,48 @@ impl JeopardyMode {
     }
 }
 
+#[derive(Debug, Clone,Serialize, Eq, PartialEq)]
+pub enum LobbyCreateResponse{
+    Created(LobbyId),
+    Error(String),
+}
 
 
-#[derive(Debug, Serialize, Deserialize)]
+
+
+#[derive(Debug, Clone,Serialize, Eq, PartialEq)]
 pub struct JeopardyBoard {
+    pub title: String,
     pub categories: Vec<Category>,
     #[serde(skip_serializing)]
-    pub current: Option<Vector2D>
+    pub current: Option<Vector2D>,
+    #[serde(skip_serializing)]
+    pub create: DateTime<Local>
+}
+
+
+impl<'de> Deserialize<'de> for JeopardyBoard {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct PartialJeopardyBoard {
+            title: String,
+            categories: Vec<Category>,
+        }
+
+        let partial_board = PartialJeopardyBoard::deserialize(deserializer)?;
+
+        let board = JeopardyBoard {
+            title: partial_board.title,
+            categories: partial_board.categories,
+            current: None,
+            create: Local::now(),
+        };
+
+        Ok(board)
+    }
 }
 
 
@@ -82,7 +117,7 @@ pub struct DtoJeopardyBoard {
 }
 
 
-#[derive(Debug,Clone, Serialize, Deserialize)]
+#[derive(Debug,Clone, Serialize, Deserialize,Eq, PartialEq)]
 pub struct Vector2D {
     pub x: u8,
     pub y: u8,
@@ -99,8 +134,9 @@ pub struct DtoCategory {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DtoQuestion {
-    pub value: i32,
+    pub question_type: QuestionType,
     pub question_text: Option<String>,
+    pub value: i32,
     pub answer: Option<String>,
     pub won_user_id: Option<UserSessionId>,
 }
@@ -119,7 +155,7 @@ impl crate::DtoCategory {
 
 
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone,Serialize, Deserialize,Eq, PartialEq)]
 pub struct Category {
     pub title: String,
     pub questions: Vec<Question>
@@ -241,10 +277,11 @@ impl UserSessionId{
 
 
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug,  Clone,Serialize, Eq, PartialEq)]
 pub struct Question {
+    pub question_type: QuestionType,
+    pub question: String,
     pub value: i32,
-    pub question_text: String,
     pub answer: String,
     #[serde(skip_serializing)]
     pub open: bool,
@@ -253,10 +290,53 @@ pub struct Question {
 }
 
 
+impl<'de> Deserialize<'de> for Question {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct PartialQuestion {
+            question_type: QuestionType,
+            question: String,
+            value: i32,
+            answer: String,
+        }
+        let partial_question = PartialQuestion::deserialize(deserializer)?;
+        let question = Question {
+            question_type: partial_question.question_type,
+            question: partial_question.question,
+            value: partial_question.value,
+            answer: partial_question.answer,
+            open: false,
+            won_user_id: None,
+        };
+
+        Ok(question)
+    }
+}
+
+
+
+
+
+#[derive(Debug, Clone,Serialize, Deserialize,Eq, PartialEq)]
+pub enum  QuestionType {
+    Media(String),
+    Question,
+}
+
+
+
+
+
+
+
+
 impl Question {
     pub fn dto(self) -> DtoQuestion{
         let question_text=  match self.open {
-            true => Some(self.question_text),
+            true => Some(self.question),
             false => None
         };
         let answer=  match self.open {
@@ -264,6 +344,7 @@ impl Question {
             false => None
         };
         DtoQuestion{
+            question_type: self.question_type,
             value: self.value,
             question_text,
             answer,
@@ -418,6 +499,16 @@ impl LobbyId{
             id:id.to_string(),
         }
     }
+
+    pub fn random() -> Self {
+        let id = rand::thread_rng().sample_iter(&Alphanumeric)
+                .take(10)
+                .map(char::from).collect();
+        LobbyId{
+            id,
+        }
+
+    }
 }
 
 
@@ -433,7 +524,8 @@ impl JeopardyBoard {
                 let answer_name = format!("answer{}", question);
                 let question = Question{
                     value,
-                    question_text: question_name,
+                    question: question_name,
+                    question_type: QuestionType::Question,
                     answer: answer_name,
                     open: false,
                     won_user_id: None,
@@ -445,8 +537,10 @@ impl JeopardyBoard {
             categories.push(Category::new(category_name, questions))
         }
         JeopardyBoard{
+            title: "Default JeopardyBoard".to_string(),
             categories,
             current: None,
+            create: Local::now(),
         }
     }
 
