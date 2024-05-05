@@ -18,7 +18,7 @@ pub fn parse_addr_str(domain: &str, port: usize) -> SocketAddr {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash)]
 pub struct DiscordUser {
-    pub id: String,
+    pub discord_id: DiscordID,
     pub username: String,
     pub avatar_id: String,
     pub discriminator: String,
@@ -27,11 +27,7 @@ pub struct DiscordUser {
 
 impl DiscordUser {
     pub fn avatar_image_url(self) -> String {
-        format!("https://cdn.discordapp.com/avatars/{}/{}.jpg",self.id,self.avatar_id)
-    }
-
-    pub fn discord_id(self) -> DiscordID {
-        DiscordID::new(self.id)
+        format!("https://cdn.discordapp.com/avatars/{}/{}.jpg",self.discord_id.id,self.avatar_id)
     }
 
 
@@ -178,11 +174,11 @@ impl Category {
     }
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash)]
+#[derive(Default, Debug, Clone, PartialEq,  Eq, Hash)]
 pub struct UserSessionId {
     pub id:String,
 }
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct DiscordID {
     pub id:String,
 }
@@ -467,7 +463,7 @@ pub enum WebsocketError{
 }
 
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize,Deserialize)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct WebsocketSessionId {
     id:String,
 }
@@ -601,6 +597,68 @@ impl JeopardyBoard {
     }
 
 }
+
+impl Serialize for UserSessionId {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+    {
+        serializer.serialize_str(&self.id)
+    }
+}
+
+impl<'de> Deserialize<'de> for UserSessionId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+    {
+        let id = String::deserialize(deserializer)?;
+        Ok(UserSessionId { id })
+    }
+}
+
+impl Serialize for DiscordID {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+    {
+        serializer.serialize_str(&self.id)
+    }
+}
+
+impl<'de> Deserialize<'de> for DiscordID {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+    {
+        let id = String::deserialize(deserializer)?;
+        Ok(DiscordID { id })
+    }
+}
+
+impl Serialize for WebsocketSessionId {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+    {
+        serializer.serialize_str(&self.id)
+    }
+}
+
+impl<'de> Deserialize<'de> for WebsocketSessionId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+    {
+        let id: String = Deserialize::deserialize(deserializer)?;
+        Ok(WebsocketSessionId { id })
+    }
+}
+
+
+
+
+
 
 pub fn get_false() -> bool {
     false

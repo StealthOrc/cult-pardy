@@ -154,7 +154,7 @@ async fn create_game_lobby(req: HttpRequest,json: web::Json<Option<JeopardyBoard
     if is_admin(user_session.clone(), auth).await{
         if let Some(discord_data) = user_session.clone().discord_auth {
             if let Some(discord_user) = discord_data.discord_user {
-                let data = srv.send(CreateLobby { user_session_id: user_session.user_session_id.clone(), discord_id: discord_user.discord_id(), jeopardy_board: json.into_inner() }).await.expect("Something happens by getting the user");
+                let data = srv.send(CreateLobby { user_session_id: user_session.user_session_id.clone(), discord_id: discord_user.discord_id, jeopardy_board: json.into_inner() }).await.expect("Something happens by getting the user");
                 response = HttpResponse::from(HttpResponse::Ok().json(data));
             }
         }

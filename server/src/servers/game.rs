@@ -211,9 +211,9 @@ impl DiscordData {
 
     pub async fn redeem_admin_access_token(self, token:usize) -> Option<RedeemAdminAccessToken>{
         if let Some(discord_user) = self.discord_user {
-            return Some(RedeemAdminAccessToken::new(token, discord_user.id))
+            return Some(RedeemAdminAccessToken::new(token, discord_user.discord_id))
         } else if let Some(discord_me) = DiscordME::get(self.basic_token_response.clone()).await {
-            return Some(RedeemAdminAccessToken::new(token, discord_me.id))
+            return Some(RedeemAdminAccessToken::new(token, DiscordID::new(discord_me.id)))
         }
         None
     }

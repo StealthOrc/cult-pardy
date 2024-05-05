@@ -12,7 +12,7 @@ use oauth2::reqwest::{async_http_client};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use strum::{Display};
-use cult_common::{DiscordUser, get_false, get_true, JsonPrinter};
+use cult_common::{DiscordID, DiscordUser, get_false, get_true, JsonPrinter};
 use crate::apis::api::{get_session, get_token, remove_cookie, set_cookie, set_session_token_cookie};
 use crate::apis::data::{extract_value};
 use crate::authentication::discord::DiscordRedirectURL::{Grant, Login};
@@ -204,7 +204,7 @@ impl DiscordME{
 
    pub fn to_discord_user(self) -> DiscordUser{
        DiscordUser{
-           id: self.id,
+           discord_id: DiscordID::new(self.id),
            username: self.username,
            avatar_id: self.avatar,
            discriminator: self.discriminator,
@@ -216,7 +216,7 @@ impl DiscordME{
     pub fn redeem_admin_access_token(self, token:usize) -> RedeemAdminAccessToken{
         RedeemAdminAccessToken{
             token,
-            discord_id: self.id,
+            discord_id: DiscordID::new(self.id),
         }
     }
 
@@ -272,7 +272,7 @@ pub(crate) async fn is_admin(user_session: UserSession, auth: web::Data<Addr<Aut
     };
     let discord_id = match data.discord_user {
         None => return false,
-        Some(discord_user) => discord_user.id,
+        Some(discord_user) => discord_user.discord_id,
     };
     return auth.send(CheckAdminAccess {
         discord_id,

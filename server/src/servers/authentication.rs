@@ -7,10 +7,11 @@ use actix::{Actor, Addr, Context, Handler, Message, MessageResult};
 use futures::AsyncWriteExt;
 use rand::{random};
 use serde::{Deserialize, Serialize};
+use cult_common::DiscordID;
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Hash, Clone)]
 struct Admin{
-    discord_id:String,
+    discord_id:DiscordID,
 }
 
 
@@ -33,7 +34,7 @@ impl Message for NewAdminAccessToken {
 
 
 pub struct AddAdminAccess {
-    pub discord_id: String,
+    pub discord_id: DiscordID,
 
 }
 impl actix::Message for AddAdminAccess {
@@ -52,11 +53,11 @@ impl actix::Message for CheckAdminAccessToken {
 
 pub struct RedeemAdminAccessToken{
     pub token: usize,
-    pub discord_id: String,
+    pub discord_id: DiscordID,
 }
 
 impl RedeemAdminAccessToken{
-    pub fn new(token: usize, discord_id: String) -> Self{
+    pub fn new(token: usize, discord_id: DiscordID) -> Self{
         RedeemAdminAccessToken{
             token,
             discord_id,
@@ -71,7 +72,7 @@ impl actix::Message for RedeemAdminAccessToken {
 
 
 pub struct CheckAdminAccess{
-    pub discord_id: String,
+    pub discord_id: DiscordID,
 
 }
 impl actix::Message for CheckAdminAccess {
