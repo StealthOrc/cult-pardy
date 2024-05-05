@@ -6,7 +6,7 @@ mod servers;
 
 use std::env;
 use actix_files::NamedFile;
-use crate::apis::api::{board, create_game_lobby, discord_session, has_authorization};
+use crate::apis::api::{board, create_game_lobby, discord_session, has_authorization, join_game};
 use crate::apis::api::session_request;
 
 use actix_web::{web, App, HttpServer, HttpRequest, HttpResponse, get};
@@ -16,7 +16,7 @@ use tokio::runtime::Runtime;
 use cult_common::*;
 use cult_common::JeopardyMode::NORMAL;
 use crate::authentication::discord;
-use crate::frontend::frontend::{assets, find_game, grant_admin_access, index, index_response, test};
+use crate::frontend::frontend::{assets, find_game, grant_admin_access, index, index_response};
 use crate::servers::input::{InputServer};
 use crate::servers::Services;
 use crate::ws::gamewebsocket;
@@ -51,13 +51,13 @@ async fn main() -> Result<()> {
             .service(index)
             .service(find_game)
             .service(assets)
-            .service(test)
             .service(session_request)
             .service(grant_admin_access)
             .service(has_authorization)
             .service(board)
             .service(discord_session)
             .service(create_game_lobby)
+            .service(join_game)
             .service(download)
             .default_service(
                 web::route().to(not_found)
@@ -77,8 +77,6 @@ async fn not_found() -> std::result::Result<HttpResponse, actix_web::Error> {
         .finish();
     Ok(response)
 }
-
-
 
 
 

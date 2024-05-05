@@ -8,7 +8,7 @@ use chrono::Local;
 use serde::Serialize;
 use serde_json::json;
 use cult_common::JeopardyMode::{NORMAL, SHORT};
-use cult_common::{JeopardyBoard, LobbyId,  SessionToken, UserSessionId};
+use cult_common::{ApiResponse, JeopardyBoard, LobbyId, SessionToken, UserSessionId};
 use crate::apis::data::{extract_header_string, extract_value};
 use crate::authentication::discord::is_admin;
 use crate::servers::authentication::AuthenticationServer;
@@ -131,8 +131,7 @@ pub fn remove_cookie(res: &mut HttpResponse, req: &HttpRequest, cookie_name: &st
 #[get("/api/authorization")]
 async fn has_authorization(req: HttpRequest, srv: web::Data<Addr<game::GameServer>>, auth: web::Data<Addr<AuthenticationServer>>) -> HttpResponse {
     let user_session = get_session(&req, &srv).await;
-
-    let mut response = HttpResponse::from(HttpResponse::Ok().json(is_admin(user_session.clone(), auth).await));
+    let mut response = HttpResponse::from(HttpResponse::Ok().json(ApiResponse::new(is_admin(user_session.clone(), auth).await)));
     set_session_token_cookie(&mut response, &req, &user_session);
     response
 }
@@ -154,24 +153,31 @@ async fn create_game_lobby(req: HttpRequest,json: web::Json<Option<JeopardyBoard
     let user_session = get_session(&req, &srv).await;
     let mut response =   HttpResponse::from(HttpResponse::NotFound());
     if is_admin(user_session.clone(), auth).await{
-        let data = srv.send(CreateLobby{ user_session_id: user_session.user_session_id.clone(), jeopardy_board: json.into_inner() }).await.expect("Something happens by getting the user");
-        response = HttpResponse::from(HttpResponse::Ok().json(data));
+        if let Some(discord_data) = user_session.clone().discord_auth {
+            if let Some(discord_user) = discord_data.discord_user {
+                let data = srv.send(CreateLobby { user_session_id: user_session.user_session_id.clone(), discord_id: discord_user.discord_id(), jeopardy_board: json.into_inner() }).await.expect("Something happens by getting the user");
+                response = HttpResponse::from(HttpResponse::Ok().json(data));
+            }
+        }
     }
     set_session_token_cookie(&mut response, &req, &user_session);
     response
 }
 
 
-#[post("/api/join")]
-async fn join_game(req: HttpRequest, srv: web::Data<Addr<game::GameServer>>, auth: web::Data<Addr<AuthenticationServer>>) -> HttpResponse {
-    let user_session = get_session(&req, &srv).await;
-    let discord_user = match user_session.clone().discord_auth{
-        None => None,
-        Some(data) => data.discord_user,
+#[get("/api/join")]
+async fn join_game(req: HttpRequest, srv: web::Data<Addr<game::GameServer>>) -> Result<HttpResponse, actix_web::Error> {
+    println!("{:?}", extract_header_string(&req, "lobby-id"));
+    let lobby_id = match extract_header_string(&req, "lobby-id") {
+        Ok(data) => data,
+        Err(error) => return Ok(error),
     };
-    let mut response = HttpResponse::from(HttpResponse::Ok().json(discord_user));
+    let user_session = get_session(&req, &srv).await;
+    let can_join = srv.send(game::CanJoinLobby { user_session_id: user_session.user_session_id.clone(), lobby_id: LobbyId::of(lobby_id.clone())}).await.expect("No Lobby found!");
+
+    let mut response = HttpResponse::from(HttpResponse::Ok().json(ApiResponse::new(can_join)));
     set_session_token_cookie(&mut response, &req, &user_session);
-    response
+    Ok(response)
 }
 
 #[get("/api/board")]

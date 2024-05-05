@@ -32,9 +32,16 @@ pub struct DiscordUser {
 }
 
 impl DiscordUser {
-    fn avatar_image_url(self) -> String {
+    pub fn avatar_image_url(self) -> String {
         format!("https://cdn.discordapp.com/avatars/{}/{}.jpg",self.id,self.avatar_id)
     }
+
+    pub fn discord_id(self) -> DiscordID {
+        DiscordID::new(self.id)
+    }
+
+
+
 }
 
 
@@ -181,8 +188,51 @@ impl Category {
 pub struct UserSessionId {
     pub id:String,
 }
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash)]
+pub struct DiscordID {
+    pub id:String,
+}
+
+impl DiscordID {
+    pub fn new(id:String) -> Self{
+        DiscordID{
+            id
+        }
+    }
+
+    pub fn of_str(id:&str) -> Self{
+        DiscordID{
+            id:id.to_string()
+        }
+    }
+
+    pub fn server() -> Self {
+        DiscordID{
+            id:"000000000000000".to_string()
+        }
+    }
+
+}
 
 
+#[derive(Serialize, Deserialize)]
+pub struct ApiResponse {
+    pub success: bool,
+}
+
+impl ApiResponse {
+
+    pub fn new(success:bool) -> Self {
+        ApiResponse{
+            success,
+        }
+    }
+    pub fn of(success:bool) -> Self {
+        ApiResponse{
+            success,
+        }
+    }
+}
 
 
 #[derive(Debug, Clone,Hash, Eq, PartialEq, Serialize, Deserialize)]

@@ -35,8 +35,8 @@ async fn find_game(
     let user_session = get_session(&req, &srv).await;
     let lobby_id = lobby_id.into_inner();
 
-    let has_lobby = srv.send(game::HasLobby { lobby_id: LobbyId::of(lobby_id.clone()) }).await.expect("No Lobby found!");
-    println!("HasLobby?{}", has_lobby);
+    let can_join = srv.send(game::CanJoinLobby { user_session_id: user_session.user_session_id.clone(), lobby_id: LobbyId::of(lobby_id.clone())}).await.expect("No Lobby found!");
+    println!("HasLobby?{}", can_join);
     let mut response = index_response(&req);
     set_session_token_cookie(&mut response, &req, &user_session);
     Ok(response)
@@ -110,29 +110,6 @@ async fn assets(
     cexe.push(path);
     let final_path = cexe.into_os_string().into_string().unwrap();
     let named_file = NamedFile::open(final_path).expect("File not found");
-
-    let user_session = get_session(&req, &srv).await;
-
-    let mut response = named_file.into_response(&req);
-    set_session_token_cookie(&mut response, &req, &user_session);
-    Ok(response)
-}
-
-
-#[get("/*")]
-async fn test(
-    req: HttpRequest,
-    srv: web::Data<Addr<GameServer>>,
-) -> actix_web::Result<HttpResponse> {
-    let mut cexe = env::current_exe().unwrap();
-    println!("??");
-    cexe.pop();
-    cexe.push("www");
-    cexe.push("index.html");
-    let final_path = cexe.into_os_string().into_string().unwrap();
-    let named_file = NamedFile::open(final_path).expect("File not found");
-
-    //TODO HACKY!!
 
     let user_session = get_session(&req, &srv).await;
 
