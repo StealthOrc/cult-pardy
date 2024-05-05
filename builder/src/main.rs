@@ -16,18 +16,18 @@ async fn main() -> Result<()> {
     println!("{:?}", args);
 
     if(args.contains(&"--build".to_string())){
-        buildApp().await?;
-        build_Server().await?;
+        buildApp(&args).await?;
+        build_Server(&args).await?;
         if(args.contains(&"--run".to_string())){
             start_server().await?;
         }
     } else if(args.contains(&"--run".to_string())){
-        buildApp().await?;
-        run_server().await?;
+        buildApp(&args).await?;
+        run_server(&args).await?;
 
     } else {
-        buildApp().await?;
-        build_Server().await?;
+        buildApp(&args).await?;
+        build_Server(&args).await?;
     }
     println!("{:?}", args);
     Ok(())
@@ -53,13 +53,19 @@ async fn start_server() -> anyhow::Result<()>{
 
 
 
-async fn build_Server() -> anyhow::Result<()>{
+async fn build_Server(args: &Vec<String>) -> anyhow::Result<()>{
     println!("Building server!");
     let binding = env::current_dir()?;
     let parent_dir = binding.parent().expect("?");
     env::set_current_dir(parent_dir)?;
 
     let current_dir = env::current_dir()?;
+
+    if(args.contains(&"--fix".to_string())){
+        cargo_fix(&args).await.expect("TODO: panic message");
+    }
+
+
     let mut shell = Command::new("powershell")
         .arg("cargo")
         .arg("build")
@@ -73,13 +79,34 @@ async fn build_Server() -> anyhow::Result<()>{
     Ok(())
 }
 
-async fn run_server() -> anyhow::Result<()>{
+
+async fn cargo_fix(args: &Vec<String>) -> anyhow::Result<()>{
+    let current_dir = env::current_dir()?;
+    let mut shell = Command::new("powershell")
+        .arg("cargo")
+        .arg("fix")
+        .arg("--allow-dirty")//
+        .arg("--allow-staged")//
+        .current_dir(current_dir)
+        .spawn()?;
+    shell.wait().await?;
+    println!("Cargo fix!");
+    Ok(())
+}
+
+
+async fn run_server(args: &Vec<String>) -> anyhow::Result<()>{
     println!("Run server!");
     let binding = env::current_dir()?;
     let parent_dir = binding.parent().expect("?");
     env::set_current_dir(parent_dir)?;
 
     let current_dir = env::current_dir()?;
+
+    if(args.contains(&"--fix".to_string())){
+        cargo_fix(&args).await.expect("TODO: panic message");
+    }
+
     let mut shell = Command::new("powershell")
         .arg("cargo")
         .arg("run")
@@ -94,7 +121,7 @@ async fn run_server() -> anyhow::Result<()>{
 }
 
 
-async fn buildApp() -> anyhow::Result<()>{
+async fn buildApp(args: &Vec<String>) -> anyhow::Result<()>{
     if let Ok(current_dir) = env::current_dir() {
         if let Some(file_name) = current_dir.file_name() {
             if let Some(dir_name) = file_name.to_str() {
@@ -123,6 +150,14 @@ async fn buildApp() -> anyhow::Result<()>{
 
 
     let current_dir = env::current_dir()?;
+
+
+
+    if(args.contains(&"--fix".to_string())){
+        cargo_fix(&args).await.expect("TODO: panic message");
+    }
+
+
     let mut shell = Command::new("powershell")
         .arg("trunk")
         .arg("build")

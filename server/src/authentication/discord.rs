@@ -2,14 +2,12 @@
 #![feature(const_trait_impl)]
 use std::borrow::ToOwned;
 use std::env;
-use std::future::Future;
 use std::str::FromStr;
-use actix::{Addr, MailboxError};
+use actix::{Addr};
 use actix_web::{get, HttpResponse, web};
-use actix_web::error::HttpError;
 use attohttpc::Method;
 use oauth2::basic::{BasicClient, BasicTokenResponse};
-use oauth2::{AuthorizationCode, AuthUrl, ClientId, ClientSecret, CsrfToken, HttpRequest, RedirectUrl, Scope, TokenResponse, TokenUrl};
+use oauth2::{AuthorizationCode, AuthUrl, ClientId, ClientSecret, CsrfToken, RedirectUrl, Scope, TokenResponse, TokenUrl};
 use oauth2::reqwest::{async_http_client};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -18,7 +16,7 @@ use cult_common::{DiscordUser, get_false, get_true, JsonPrinter};
 use crate::apis::api::{get_session, get_token, remove_cookie, set_cookie, set_session_token_cookie};
 use crate::apis::data::{extract_value};
 use crate::authentication::discord::DiscordRedirectURL::{Grant, Login};
-use crate::servers::authentication::{AddAdminAccess, AuthenticationServer, CheckAdminAccess, RedeemAdminAccessToken};
+use crate::servers::authentication::{AuthenticationServer, CheckAdminAccess, RedeemAdminAccessToken};
 use crate::servers::game::{AddDiscordAccount, DiscordData, GameServer, UserSession};
 
 #[derive(Clone, Display,Debug)]

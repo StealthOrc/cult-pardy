@@ -1,15 +1,14 @@
 
-use actix::{Addr, MailboxError, Response};
+use actix::{Addr};
 use actix_files::NamedFile;
 use actix_web::{get, web, HttpRequest, HttpResponse};
-use serde_json::json;
 use std::env;
 use std::path::PathBuf;
 use cult_common::LobbyId;
 use crate::apis::api::{get_session, remove_cookie, set_cookie, set_session_token_cookie};
-use crate::authentication::discord::{DiscordME, is_admin, to_main_page};
+use crate::authentication::discord::{is_admin, to_main_page};
 use crate::servers::authentication::{AuthenticationServer, CheckAdminAccessToken};
-use crate::servers::{authentication, game};
+use crate::servers::{game};
 use crate::servers::game::{GameServer};
 
 
@@ -58,13 +57,13 @@ async fn grant_admin_access(
         .append_header(("Location", "http://localhost:8000/discord?type=grant"))
         .finish();
 
-    if (is_admin(user_session.clone(), auth.clone()).await) {
+    if is_admin(user_session.clone(), auth.clone()).await {
         return to_main_page(&user_session,&req);
     }
 
     match auth.send(CheckAdminAccessToken{ token: grand_id.clone()}).await {
         Ok(valid) => {
-            if(!valid){
+            if !valid {
                 return to_main_page(&user_session,&req)
             }
         }

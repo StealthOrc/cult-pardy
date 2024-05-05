@@ -6,10 +6,7 @@ use app::App;
 use yew::prelude::*;
 use yew_router::prelude::*;
 //testing purposes
-use gloo_console::log;
 use gloo_storage::Storage;
-use wasm_bindgen::JsValue;
-use crate::file::Model;
 
 #[derive(Clone, Routable, PartialEq)]
 enum Route {

@@ -1,11 +1,7 @@
-use crate::service::FrontendService;
 use cult_common::parse_addr_str;
-use futures::channel::mpsc::TrySendError;
-use futures::{SinkExt, StreamExt};
+use futures::{StreamExt};
 use gloo_console::{info, log};
 use gloo_net::websocket::Message;
-use wasm_bindgen::JsValue;
-use wasm_bindgen_futures::spawn_local;
 use wasm_cookies::cookies::*;
 use web_sys::HtmlDocument;
 use yew::prelude::*;
@@ -51,7 +47,7 @@ impl Component for App {
 
 
         let lobby_id = get_game_id_from_url().expect("SomeData?");
-        let mut wss = WebsocketService::new(
+        let wss = WebsocketService::new(
             parse_addr_str("127.0.0.1", 8000).to_string().as_str(),
             lobby_id.as_str(),
             usr_session_id.as_str(),

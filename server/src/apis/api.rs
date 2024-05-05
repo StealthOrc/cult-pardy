@@ -1,13 +1,12 @@
-use std::time::{Duration, Instant};
-use crate::servers::game::{CreateLobby, DiscordData, GetUserSession};
-use actix::{Addr, MailboxError};
+use crate::servers::game::{CreateLobby, GetUserSession};
+use actix::{Addr};
 
 use actix_web::cookie::{Cookie};
-use actix_web::{get, HttpRequest, HttpResponse, patch, post, web};
+use actix_web::{get, HttpRequest, HttpResponse, post, web};
 use chrono::Local;
 use serde::Serialize;
 use serde_json::json;
-use cult_common::JeopardyMode::{NORMAL, SHORT};
+use cult_common::JeopardyMode::{SHORT};
 use cult_common::{ApiResponse, JeopardyBoard, LobbyId, SessionToken, UserSessionId};
 use crate::apis::data::{extract_header_string, extract_value};
 use crate::authentication::discord::is_admin;
@@ -93,7 +92,7 @@ pub fn set_cookie(res: &mut HttpResponse,req: &HttpRequest, cookie_name: &str, v
         //.expires(Expiration::DateTime(OffsetDateTime::from(expiration_time)))
         .finish();
     if let Some(cookie) = req.cookie(cookie_name) {
-        if(cookie.value().eq(value)) {
+        if cookie.value().eq(value) {
             return;
         }
     }
@@ -182,7 +181,7 @@ async fn join_game(req: HttpRequest, srv: web::Data<Addr<game::GameServer>>) -> 
 
 #[get("/api/board")]
 async fn board() -> HttpResponse {
-    let mut response = HttpResponse::from(HttpResponse::Ok().json(JeopardyBoard::default(SHORT)));
+    let response = HttpResponse::from(HttpResponse::Ok().json(JeopardyBoard::default(SHORT)));
     response
 }
 

@@ -1,17 +1,11 @@
-use std::collections::{HashMap, HashSet};
-use std::fmt::Arguments;
+use std::collections::{HashMap};
 use std::hash::{Hash, Hasher};
 use std::net::SocketAddr;
-use std::thread::Thread;
-use std::time::{Duration, Instant, SystemTime};
-use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
-use rand::{rngs::ThreadRng, Rng, random};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use rand::{Rng, random};
 use rand::distributions::Alphanumeric;
-use serde::de::Visitor;
-use chrono::{DateTime, Local, TimeZone};
-use rand::seq::index::IndexVec;
-use serde_json::from_str;
-use strum::{Display, EnumIter};
+use chrono::{DateTime, Local};
+use strum::{Display};
 
 
 pub fn parse_addr_str(domain: &str, port: usize) -> SocketAddr {
@@ -594,7 +588,7 @@ impl JeopardyBoard {
         }
     }
 
-    pub fn dto(mut self) -> DtoJeopardyBoard {
+    pub fn dto(self) -> DtoJeopardyBoard {
         let current = match self.current {
             None => None,
             Some(question) => Some(question)

@@ -4,19 +4,16 @@ mod ws;
 mod authentication;
 mod servers;
 
-use std::env;
-use actix_files::NamedFile;
 use crate::apis::api::{board, create_game_lobby, discord_session, has_authorization, join_game};
 use crate::apis::api::session_request;
 
 use actix_web::{web, App, HttpServer, HttpRequest, HttpResponse, get};
-use actix_web::http::StatusCode;
 use anyhow::Result;
 use tokio::runtime::Runtime;
 use cult_common::*;
 use cult_common::JeopardyMode::NORMAL;
 use crate::authentication::discord;
-use crate::frontend::frontend::{assets, find_game, grant_admin_access, index, index_response};
+use crate::frontend::frontend::{assets, find_game, grant_admin_access, index};
 use crate::servers::input::{InputServer};
 use crate::servers::Services;
 use crate::ws::gamewebsocket;

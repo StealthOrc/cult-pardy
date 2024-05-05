@@ -1,12 +1,10 @@
 use std::io::Read;
 use futures::{channel::mpsc::Sender, SinkExt, StreamExt};
-use futures::channel::mpsc::Receiver;
 use gloo_console::log;
 use gloo_net::websocket::{futures::WebSocket, Message};
-use gloo_net::websocket::Message::Text;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::spawn_local;
-use cult_common::{WebsocketEvent, WebsocketServerEvents};
+use cult_common::{WebsocketServerEvents};
 
 #[derive(Clone)]
 pub struct WebsocketService {

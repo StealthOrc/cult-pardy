@@ -1,6 +1,4 @@
 
-use wasm_bindgen::{JsCast, JsValue};
-use wasm_bindgen_futures::JsFuture;
 use yew::{html, Component, Html, Context};
 use cult_common::JeopardyBoard;
 use cult_common::JeopardyMode::NORMAL;

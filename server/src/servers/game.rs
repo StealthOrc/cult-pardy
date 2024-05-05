@@ -5,16 +5,13 @@
 
 
 use std::collections::{HashMap, HashSet};
-use std::ops::DerefMut;
-use std::time::{Duration, Instant};
 use actix::{Actor, Addr, Context, Handler, Message, MessageResult, Recipient};
 use chrono::TimeDelta;
 use oauth2::basic::{BasicClient, BasicTokenResponse};
 use oauth2::reqwest::async_http_client;
 use oauth2::TokenResponse;
-use rand::random;
 use rand::rngs::ThreadRng;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 use strum::{Display, EnumIter};
 use cult_common::{DiscordID, DiscordUser, DTOSession, JeopardyBoard, LobbyCreateResponse, LobbyId, SessionEvent, SessionToken, UserSessionId, WebsocketServerEvents, WebsocketSessionId};
 use cult_common::BoardEvent::CurrentBoard;
@@ -25,7 +22,6 @@ use cult_common::WebsocketEvent::{WebsocketDisconnected, WebsocketJoined};
 use crate::authentication::discord::{DiscordME, LoginDiscordAuth};
 use crate::servers::authentication::RedeemAdminAccessToken;
 use crate::servers::game::GameState::Waiting;
-use crate::ws::session;
 use crate::ws::session::UserData;
 
 /// Chat server sends this messages to session
@@ -370,7 +366,7 @@ impl GameServer {
     fn get_dto_sessions(&self, lobby_id: LobbyId) -> HashSet<DTOSession> {
         let mut sessions = HashSet::new();
         if let Some(lobby) = self.lobbies.get(&lobby_id){
-            for (session_id) in &lobby.user_session {
+            for session_id in &lobby.user_session {
                 if let Some(session) = self.user_sessions.get(&session_id){
                     sessions.insert(session.clone().dto());
                 }
@@ -602,7 +598,7 @@ impl Handler<GetUserSession> for GameServer {
             None => return MessageResult(self.new_session()),
             Some(data) => data,
         };
-        if let Some(mut session) = self.user_sessions.get_mut(&user_session) {
+        if let Some(session) = self.user_sessions.get_mut(&user_session) {
             if session.clone().session_token.token.eq(&token.token) {
                 if token.create.signed_duration_since(session.session_token.create) >TimeDelta::seconds(60){
                     session.session_token.update();
@@ -628,7 +624,7 @@ impl Handler<HasSessionForWebSocket> for GameServer {
             None => return MessageResult(self.new_session()),
             Some(data) => data,
         };
-        if let Some(mut session) = self.user_sessions.get_mut(&user_session) {
+        if let Some(session) = self.user_sessions.get_mut(&user_session) {
             if session.clone().session_token.token.eq(&token.token) {
                 return return MessageResult(session.clone())
             }
