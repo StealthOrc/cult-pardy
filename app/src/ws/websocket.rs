@@ -5,7 +5,7 @@ use gloo_console::log;
 use gloo_net::websocket::{futures::WebSocket, Message};
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::spawn_local;
-use cult_common::{decompress, WebsocketServerEvents};
+use cult_common::{decompress, WebsocketServerEvents, WebsocketSessionEvent};
 
 #[derive(Clone)]
 pub struct WebsocketService {
@@ -21,7 +21,7 @@ impl WebsocketService {
         on_read: F,
     ) -> Self
     where
-        F: Fn(String) + 'static,
+        F: Fn(WebsocketServerEvents) + 'static,
     {
         let ws = WebSocket::open(
             format!("ws://{addr}/ws?lobby-id={lobby_id}&user-session-id={user_session_id}&session-token={session_token}")
@@ -60,6 +60,7 @@ impl WebsocketService {
                         if let Ok(bytes) = decompress(&data){
                             match serde_json::from_slice::<WebsocketServerEvents>(&bytes) {
                                 Ok(event) => {
+                                    on_read(event.clone());
                                     log!("Receive an server event ", JsValue::from(event.event_name()));
                                 }
                                 Err(err) => {

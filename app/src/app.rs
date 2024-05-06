@@ -1,4 +1,4 @@
-use cult_common::parse_addr_str;
+use cult_common::{BoardEvent, parse_addr_str, WebsocketServerEvents, WebsocketSessionEvent};
 use futures::{StreamExt};
 use gloo_console::{info, log};
 use gloo_net::websocket::Message;
@@ -49,19 +49,20 @@ impl Component for App {
 
         let lobby_id = get_game_id_from_url().expect("SomeData?");
 
-        let on_read = |data: String| {
-            log!(format!("onread: {data}"));
-            let v: DtoJeopardyBoard = serde_json::from_str(data.as_str())
-                .expect("could not convert Websocket data to Json!");
-            log!(format!(
-                "Question 1/Value {}/{}",
-                v.categories[0].questions[0].question_text,
-                match v.categories[0].questions[0].value {
-                    Some(value) => value,
-                    None => 0,
+        let on_read = |event: WebsocketServerEvents| {
+            match event {
+                WebsocketServerEvents::Board(board_event) => match board_event {
+                    BoardEvent::CurrentBoard(board) => {
+                        log!(format!("onread: {:?}", board));
+                        log!(format!("Question 1/Value {:?}/{}",board.categories.get(0).unwrap().questions.get(0).unwrap().question_text, board.categories.get(0).unwrap().questions.get(0).unwrap().value));
+                    }
+                    BoardEvent::UpdateBoard(_) => {}
                 }
-                .to_string()
-            ))
+                WebsocketServerEvents::Websocket(_) => {}
+                WebsocketServerEvents::Session(_) => {}
+                WebsocketServerEvents::Error(_) => {}
+                WebsocketServerEvents::Text(_) => {}
+            }
         };
 
         let wss = WebsocketService::new(
