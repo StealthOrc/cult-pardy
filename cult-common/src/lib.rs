@@ -1,25 +1,22 @@
-use std::collections::{HashMap};
+use chrono::{DateTime, Local};
+use flate2::read::DeflateDecoder;
+use flate2::write::DeflateEncoder;
+use rand::distributions::Alphanumeric;
+use rand::{random, Rng};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::io;
 use std::io::{Read, Write};
 use std::net::SocketAddr;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use rand::{Rng, random};
-use rand::distributions::Alphanumeric;
-use chrono::{DateTime, Local};
-use flate2::read::DeflateDecoder;
-use flate2::write::DeflateEncoder;
 use strum::{Display, IntoStaticStr, ToString};
-
 
 pub fn parse_addr_str(domain: &str, port: usize) -> SocketAddr {
     let addr = format!("{}:{}", domain, port);
     let addr = addr.parse::<SocketAddr>().expect("Failed to parse address");
     addr
 }
-
-
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash)]
 pub struct DiscordUser {
@@ -32,65 +29,58 @@ pub struct DiscordUser {
 
 impl DiscordUser {
     pub fn avatar_image_url(self) -> String {
-        format!("https://cdn.discordapp.com/avatars/{}/{}.jpg",self.discord_id.id,self.avatar_id)
+        format!(
+            "https://cdn.discordapp.com/avatars/{}/{}.jpg",
+            self.discord_id.id, self.avatar_id
+        )
     }
-
-
-
 }
-
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash)]
-pub struct DTOSession{
-    pub user_session_id:UserSessionId,
-    pub discord_user:Option<DiscordUser>
+pub struct DTOSession {
+    pub user_session_id: UserSessionId,
+    pub discord_user: Option<DiscordUser>,
 }
 
-
-
 #[derive(Clone, Copy)]
-pub enum JeopardyMode{
+pub enum JeopardyMode {
     //3x3
     SHORT,
     //5x5
     NORMAL,
     //7x7
-    LONG
+    LONG,
 }
 impl JeopardyMode {
     pub fn field_size(self) -> usize {
         match self {
             JeopardyMode::SHORT => 3,
             JeopardyMode::NORMAL => 5,
-            JeopardyMode::LONG => 7
+            JeopardyMode::LONG => 7,
         }
     }
 }
 
-#[derive(Debug, Clone,Serialize, Eq, PartialEq)]
-pub enum LobbyCreateResponse{
+#[derive(Debug, Clone, Serialize, Eq, PartialEq)]
+pub enum LobbyCreateResponse {
     Created(LobbyId),
     Error(String),
 }
 
-
-
-
-#[derive(Debug, Clone,Serialize, Eq, PartialEq)]
+#[derive(Debug, Clone, Serialize, Eq, PartialEq)]
 pub struct JeopardyBoard {
     pub title: String,
     pub categories: Vec<Category>,
     #[serde(skip_serializing)]
     pub current: Option<Vector2D>,
     #[serde(skip_serializing)]
-    pub create: DateTime<Local>
+    pub create: DateTime<Local>,
 }
-
 
 impl<'de> Deserialize<'de> for JeopardyBoard {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: Deserializer<'de>,
+    where
+        D: Deserializer<'de>,
     {
         #[derive(Deserialize)]
         struct PartialJeopardyBoard {
@@ -111,30 +101,25 @@ impl<'de> Deserialize<'de> for JeopardyBoard {
     }
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DtoJeopardyBoard {
     pub categories: Vec<DtoCategory>,
-    pub current: Option<Vector2D>
+    pub current: Option<Vector2D>,
 }
 
-
-#[derive(Debug,Clone, Serialize, Deserialize,Eq, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Default)]
 pub struct Vector2D {
     pub x: u8,
     pub y: u8,
 }
 
-
-
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DtoCategory {
     pub title: String,
-    pub questions: Vec<DtoQuestion>
+    pub questions: Vec<DtoQuestion>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize, Default)]
 pub struct DtoQuestion {
     pub question_type: QuestionType,
     pub question_text: Option<String>,
@@ -143,72 +128,59 @@ pub struct DtoQuestion {
     pub won_user_id: Option<UserSessionId>,
 }
 
-
-
 impl crate::DtoCategory {
-    pub fn new(title:String, questions:Vec<DtoQuestion>) -> Self{
-        crate::DtoCategory {
-            title,
-            questions,
-        }
+    pub fn new(title: String, questions: Vec<DtoQuestion>) -> Self {
+        crate::DtoCategory { title, questions }
     }
-
 }
 
-
-
-#[derive(Debug, Clone,Serialize, Deserialize,Eq, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Category {
     pub title: String,
-    pub questions: Vec<Question>
+    pub questions: Vec<Question>,
 }
 
 impl Category {
-    pub fn new(title:String, questions:Vec<Question>) -> Self{
-        Category{
-            title,
-            questions,
-        }
+    pub fn new(title: String, questions: Vec<Question>) -> Self {
+        Category { title, questions }
     }
 
     pub fn dto(self) -> DtoCategory {
         DtoCategory {
             title: self.title,
-            questions: self.questions.into_iter().map(|question| question.dto()).collect(),
+            questions: self
+                .questions
+                .into_iter()
+                .map(|question| question.dto())
+                .collect(),
         }
     }
 }
 
-#[derive(Default, Debug, Clone, PartialEq,  Eq, Hash)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct UserSessionId {
-    pub id:String,
+    pub id: String,
 }
 #[derive(Default, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct DiscordID {
-    pub id:String,
+    pub id: String,
 }
 
 impl DiscordID {
-    pub fn new(id:String) -> Self{
-        DiscordID{
-            id
-        }
+    pub fn new(id: String) -> Self {
+        DiscordID { id }
     }
 
-    pub fn of_str(id:&str) -> Self{
-        DiscordID{
-            id:id.to_string()
-        }
+    pub fn of_str(id: &str) -> Self {
+        DiscordID { id: id.to_string() }
     }
 
     pub fn server() -> Self {
-        DiscordID{
-            id:"000000000000000".to_string()
+        DiscordID {
+            id: "000000000000000".to_string(),
         }
     }
-
 }
-
 
 #[derive(Serialize, Deserialize)]
 pub struct ApiResponse {
@@ -216,21 +188,15 @@ pub struct ApiResponse {
 }
 
 impl ApiResponse {
-
-    pub fn new(success:bool) -> Self {
-        ApiResponse{
-            success,
-        }
+    pub fn new(success: bool) -> Self {
+        ApiResponse { success }
     }
-    pub fn of(success:bool) -> Self {
-        ApiResponse{
-            success,
-        }
+    pub fn of(success: bool) -> Self {
+        ApiResponse { success }
     }
 }
 
-
-#[derive(Debug, Clone,Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct SessionToken {
     pub token: String,
     pub create: DateTime<Local>,
@@ -238,7 +204,7 @@ pub struct SessionToken {
 
 impl SessionToken {
     pub fn new() -> SessionToken {
-       let token=  Self::new_token();
+        let token = Self::new_token();
         SessionToken {
             token,
             create: Local::now(),
@@ -246,7 +212,7 @@ impl SessionToken {
     }
 
     pub fn random() -> SessionToken {
-        let token=  Self::new_token();
+        let token = Self::new_token();
         SessionToken {
             token,
             create: Local::now(),
@@ -258,56 +224,48 @@ impl SessionToken {
         self.token = Self::new_token();
     }
     fn new_token() -> String {
-        rand::thread_rng().sample_iter(&Alphanumeric)
+        rand::thread_rng()
+            .sample_iter(&Alphanumeric)
             .take(30)
-            .map(char::from).collect()
+            .map(char::from)
+            .collect()
     }
-
 }
 
-
-#[derive(Debug, Clone,Serialize,Deserialize, Eq, PartialEq, Default)]
-pub struct JsonPrinter{
-    pub results: HashMap<String, bool>
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Default)]
+pub struct JsonPrinter {
+    pub results: HashMap<String, bool>,
 }
 
 impl JsonPrinter {
     pub fn new() -> Self {
-        JsonPrinter{
+        JsonPrinter {
             results: HashMap::new(),
         }
     }
 
-    pub fn add_string(&mut self, text:String, result:bool) {
+    pub fn add_string(&mut self, text: String, result: bool) {
         self.results.insert(text, result);
     }
 
-    pub fn add(&mut self, text:&str, result:bool) {
+    pub fn add(&mut self, text: &str, result: bool) {
         self.results.insert(text.to_string(), result);
     }
-
 }
 
-
-impl UserSessionId{
+impl UserSessionId {
     pub fn id(self) -> usize {
         return self.id.parse::<usize>().unwrap();
     }
 
-    pub fn of(id:usize) -> Self{
-        UserSessionId{
-            id:id.to_string(),
-        }
+    pub fn of(id: usize) -> Self {
+        UserSessionId { id: id.to_string() }
     }
-    pub fn from_string(id:String) -> Self{
-        UserSessionId{
-            id,
-        }
+    pub fn from_string(id: String) -> Self {
+        UserSessionId { id }
     }
-    pub fn from_str(id:&str) -> Self{
-        UserSessionId{
-            id:id.to_string(),
-        }
+    pub fn from_str(id: &str) -> Self {
+        UserSessionId { id: id.to_string() }
     }
 
     pub fn random() -> Self {
@@ -317,12 +275,7 @@ impl UserSessionId{
     }
 }
 
-
-
-
-
-
-#[derive(Debug,  Clone,Serialize, Eq, PartialEq)]
+#[derive(Debug, Clone, Serialize, Eq, PartialEq)]
 pub struct Question {
     pub question_type: QuestionType,
     pub question: String,
@@ -331,14 +284,13 @@ pub struct Question {
     #[serde(skip_serializing)]
     pub open: bool,
     #[serde(skip_serializing)]
-    pub won_user_id: Option<UserSessionId>
+    pub won_user_id: Option<UserSessionId>,
 }
-
 
 impl<'de> Deserialize<'de> for Question {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: Deserializer<'de>,
+    where
+        D: Deserializer<'de>,
     {
         #[derive(Deserialize)]
         struct PartialQuestion {
@@ -361,45 +313,32 @@ impl<'de> Deserialize<'de> for Question {
     }
 }
 
-
-
-
-
-#[derive(Debug, Clone,Serialize, Deserialize,Eq, PartialEq)]
-pub enum  QuestionType {
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Default)]
+pub enum QuestionType {
     Media(String),
+    #[default]
     Question,
 }
 
-
-
-
-
-
-
-
 impl Question {
-    pub fn dto(self) -> DtoQuestion{
-        let question_text=  match self.open {
+    pub fn dto(self) -> DtoQuestion {
+        let question_text = match self.open {
             true => Some(self.question),
-            false => None
+            false => None,
         };
-        let answer=  match self.open {
+        let answer = match self.open {
             true => Some(self.answer),
-            false => None
+            false => None,
         };
-        DtoQuestion{
+        DtoQuestion {
             question_type: self.question_type,
             value: self.value,
             question_text,
             answer,
             won_user_id: self.won_user_id,
         }
-
     }
-
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize, Display)]
 pub enum WebsocketServerEvents {
@@ -407,14 +346,13 @@ pub enum WebsocketServerEvents {
     Websocket(WebsocketEvent),
     Session(SessionEvent),
     Error(WebsocketError),
-    Text(String)
+    Text(String),
 }
 
-impl WebsocketServerEvents{
-
+impl WebsocketServerEvents {
     pub fn event_name(self) -> String {
         let wse = self.to_string();
-        let event= match self {
+        let event = match self {
             WebsocketServerEvents::Board(event) => event.to_string(),
             WebsocketServerEvents::Websocket(event) => event.to_string(),
             WebsocketServerEvents::Session(event) => event.to_string(),
@@ -424,18 +362,13 @@ impl WebsocketServerEvents{
 
         format!("{} -> {} ", wse, event)
     }
-
-
-
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize, Display)]
 pub enum BoardEvent {
     CurrentBoard(DtoJeopardyBoard),
     UpdateBoard(String),
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize, Display)]
 pub enum WebsocketEvent {
@@ -456,9 +389,8 @@ pub enum WebsocketSessionEvent {
     Click(Vector2D),
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize, Display)]
-pub enum WebsocketError{
+pub enum WebsocketError {
     LobbyNotFound(LobbyId),
     SessionNotFound(UserSessionId),
     GameStarted(LobbyId),
@@ -467,64 +399,48 @@ pub enum WebsocketError{
     UNKNOWN(String),
 }
 
-
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct WebsocketSessionId {
-    id:String,
+    id: String,
 }
 
-
-impl WebsocketSessionId{
-
-
+impl WebsocketSessionId {
     pub fn id(self) -> usize {
         return self.id.parse::<usize>().unwrap();
     }
 
-    pub fn random() ->Self  {
-        WebsocketSessionId{
-            id: random::<usize>().to_string()
+    pub fn random() -> Self {
+        WebsocketSessionId {
+            id: random::<usize>().to_string(),
         }
     }
-    pub fn of(id:usize) -> Self{
-        WebsocketSessionId{
-            id:id.to_string()
-        }
+    pub fn of(id: usize) -> Self {
+        WebsocketSessionId { id: id.to_string() }
     }
-    pub fn from_string(id:String) -> Self{
-        WebsocketSessionId{
-            id: id.to_string()
-        }
+    pub fn from_string(id: String) -> Self {
+        WebsocketSessionId { id: id.to_string() }
     }
-    pub fn from_str(id:&str) -> Self{
-        let id=  id.parse::<usize>().expect("Can´t convert String to usize");
-        WebsocketSessionId{
-            id:id.to_string()
-        }
+    pub fn from_str(id: &str) -> Self {
+        let id = id.parse::<usize>().expect("Can´t convert String to usize");
+        WebsocketSessionId { id: id.to_string() }
     }
 }
 
-
-
-
-#[derive(Debug, Clone,  Hash, Eq, PartialEq, )]
-pub struct LobbyId{
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+pub struct LobbyId {
     pub id: String,
 }
 
-impl Display for LobbyId{
+impl Display for LobbyId {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.id)
     }
 }
 
-
-
-
 impl Serialize for LobbyId {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer,
+    where
+        S: Serializer,
     {
         serializer.serialize_str(&self.id)
     }
@@ -532,43 +448,36 @@ impl Serialize for LobbyId {
 
 impl<'de> Deserialize<'de> for LobbyId {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: Deserializer<'de>,
+    where
+        D: Deserializer<'de>,
     {
         let id: String = Deserialize::deserialize(deserializer)?;
         Ok(LobbyId { id })
     }
 }
 
-
-impl LobbyId{
-    pub fn of(id:String) -> Self{
-        LobbyId{
-            id,
-        }
+impl LobbyId {
+    pub fn of(id: String) -> Self {
+        LobbyId { id }
     }
 
-    pub fn from_str(id:&str) -> Self{
-        LobbyId{
-            id:id.to_string(),
-        }
+    pub fn from_str(id: &str) -> Self {
+        LobbyId { id: id.to_string() }
     }
 
     pub fn random() -> Self {
-        let id = rand::thread_rng().sample_iter(&Alphanumeric)
-                .take(10)
-                .map(char::from).collect();
-        LobbyId{
-            id,
-        }
-
+        let id = rand::thread_rng()
+            .sample_iter(&Alphanumeric)
+            .take(10)
+            .map(char::from)
+            .collect();
+        LobbyId { id }
     }
 }
 
-
 impl JeopardyBoard {
     pub fn default(mode: JeopardyMode) -> Self {
-        let mut categories:Vec<Category > = Vec::new();
+        let mut categories: Vec<Category> = Vec::new();
         for category in 0..mode.field_size() {
             let category_name = format!("Category_{}", category);
             let mut questions: Vec<Question> = Vec::new();
@@ -576,7 +485,7 @@ impl JeopardyBoard {
             for question in 0..mode.field_size() {
                 let question_name = format!("question_{}", question);
                 let answer_name = format!("answer{}", question);
-                let question = Question{
+                let question = Question {
                     value,
                     question: question_name,
                     question_type: QuestionType::Question,
@@ -584,13 +493,13 @@ impl JeopardyBoard {
                     open: false,
                     won_user_id: None,
                 };
-                value = value*2;
+                value = value * 2;
                 questions.push(question)
             }
 
             categories.push(Category::new(category_name, questions))
         }
-        JeopardyBoard{
+        JeopardyBoard {
             title: "Default JeopardyBoard".to_string(),
             categories,
             current: None,
@@ -601,21 +510,23 @@ impl JeopardyBoard {
     pub fn dto(self) -> DtoJeopardyBoard {
         let current = match self.current {
             None => None,
-            Some(question) => Some(question)
+            Some(question) => Some(question),
         };
-        DtoJeopardyBoard{
-            categories: self.categories.into_iter().map(|category| category.dto()).collect(),
+        DtoJeopardyBoard {
+            categories: self
+                .categories
+                .into_iter()
+                .map(|category| category.dto())
+                .collect(),
             current,
         }
-
     }
-
 }
 
 impl Serialize for UserSessionId {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer,
+    where
+        S: Serializer,
     {
         serializer.serialize_str(&self.id)
     }
@@ -623,8 +534,8 @@ impl Serialize for UserSessionId {
 
 impl<'de> Deserialize<'de> for UserSessionId {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: Deserializer<'de>,
+    where
+        D: Deserializer<'de>,
     {
         let id = String::deserialize(deserializer)?;
         Ok(UserSessionId { id })
@@ -633,8 +544,8 @@ impl<'de> Deserialize<'de> for UserSessionId {
 
 impl Serialize for DiscordID {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer,
+    where
+        S: Serializer,
     {
         serializer.serialize_str(&self.id)
     }
@@ -642,8 +553,8 @@ impl Serialize for DiscordID {
 
 impl<'de> Deserialize<'de> for DiscordID {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: Deserializer<'de>,
+    where
+        D: Deserializer<'de>,
     {
         let id = String::deserialize(deserializer)?;
         Ok(DiscordID { id })
@@ -652,8 +563,8 @@ impl<'de> Deserialize<'de> for DiscordID {
 
 impl Serialize for WebsocketSessionId {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer,
+    where
+        S: Serializer,
     {
         serializer.serialize_str(&self.id)
     }
@@ -661,15 +572,13 @@ impl Serialize for WebsocketSessionId {
 
 impl<'de> Deserialize<'de> for WebsocketSessionId {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: Deserializer<'de>,
+    where
+        D: Deserializer<'de>,
     {
         let id: String = Deserialize::deserialize(deserializer)?;
         Ok(WebsocketSessionId { id })
     }
 }
-
-
 
 pub fn compress(data: &[u8]) -> io::Result<Vec<u8>> {
     let mut encoder = DeflateEncoder::new(Vec::new(), flate2::Compression::default());
@@ -683,8 +592,6 @@ pub fn decompress(data: &[u8]) -> io::Result<Vec<u8>> {
     decoder.read_to_end(&mut decompressed_data)?;
     Ok(decompressed_data)
 }
-
-
 
 pub fn get_false() -> bool {
     false
