@@ -5,7 +5,7 @@ use actix_web::http::header::ContentEncoding::Deflate;
 use actix_web::web;
 use actix_web_actors::ws;
 use actix_web_actors::ws::WebsocketContext;
-use cult_common::{compress, LobbyId, UserSessionId, WebsocketSessionId};
+use cult_common::{compress, decompress, LobbyId, UserSessionId, WebsocketServerEvents, WebsocketSessionEvent, WebsocketSessionId};
 use crate::servers::game;
 use crate::servers::game::{SessionDisconnect, SessionMessageType};
 
@@ -160,7 +160,18 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                     send_chat_message(self, text)
                 }
             }
-            ws::Message::Binary(_) => println!("Unexpected binary"),
+            ws::Message::Binary(data) => {
+                if let Ok(bytes) = decompress(&data){
+                    match serde_json::from_slice::<WebsocketSessionEvent>(&bytes) {
+                        Ok(event) => {
+                            println!("Receive an client event {:?}", event);
+                        }
+                        Err(err) => {
+                            println!("Error deserializing JSON data:  {:?}", err);
+                        }
+                    }
+                }
+            }
             ws::Message::Close(reason) => {
                 ctx.close(reason);
                 ctx.stop();
