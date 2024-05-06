@@ -13,7 +13,16 @@ pub struct WebsocketService {
 }
 impl WebsocketService {
     // add code here
-    pub fn new(addr: &str, lobby_id: &str, user_session_id: &str, session_token: &str) -> Self {
+    pub fn new<F>(
+        addr: &str,
+        lobby_id: &str,
+        user_session_id: &str,
+        session_token: &str,
+        on_read: F,
+    ) -> Self
+    where
+        F: Fn(String) + 'static,
+    {
         let ws = WebSocket::open(
             format!("ws://{addr}/ws?lobby-id={lobby_id}&user-session-id={user_session_id}&session-token={session_token}")
                 .as_str(),
@@ -45,7 +54,7 @@ impl WebsocketService {
             while let Some(msg) = read.next().await {
                 match msg {
                     Ok(Message::Text(data)) => {
-                        log!("from websocket {}",JsValue::from(data.clone()));
+                        println!("from websocket {}", data);
                     }
                     Ok(Message::Bytes(data)) => {
                         if let Ok(bytes) = decompress(&data){

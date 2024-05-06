@@ -48,11 +48,28 @@ impl Component for App {
 
 
         let lobby_id = get_game_id_from_url().expect("SomeData?");
+
+        let on_read = |data: String| {
+            log!(format!("onread: {data}"));
+            let v: DtoJeopardyBoard = serde_json::from_str(data.as_str())
+                .expect("could not convert Websocket data to Json!");
+            log!(format!(
+                "Question 1/Value {}/{}",
+                v.categories[0].questions[0].question_text,
+                match v.categories[0].questions[0].value {
+                    Some(value) => value,
+                    None => 0,
+                }
+                .to_string()
+            ))
+        };
+
         let wss = WebsocketService::new(
             parse_addr_str("127.0.0.1", 8000).to_string().as_str(),
             lobby_id.as_str(),
             usr_session_id.as_str(),
-            session_token.as_str()
+            session_token.as_str(),
+            on_read,
         );
 
         App { ws_service: wss, game_id: lobby_id }
@@ -65,7 +82,7 @@ impl Component for App {
             .send_tunnel
             .try_send(Message::Text("Test".parse().unwrap()));
         match ws {
-            Ok(e) => {
+            Ok(_) => {
                 info!("OK SEND")
             }
             Err(e) => {
