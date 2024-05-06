@@ -1,4 +1,5 @@
 use std::collections::{HashMap};
+use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::io;
 use std::io::{Read, Write};
@@ -9,7 +10,7 @@ use rand::distributions::Alphanumeric;
 use chrono::{DateTime, Local};
 use flate2::read::DeflateDecoder;
 use flate2::write::DeflateEncoder;
-use strum::{Display};
+use strum::{Display, IntoStaticStr, ToString};
 
 
 pub fn parse_addr_str(domain: &str, port: usize) -> SocketAddr {
@@ -506,10 +507,19 @@ impl WebsocketSessionId{
 
 
 
-#[derive(Debug, Clone,  Hash, Eq, PartialEq)]
+#[derive(Debug, Clone,  Hash, Eq, PartialEq, )]
 pub struct LobbyId{
     pub id: String,
 }
+
+impl Display for LobbyId{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.id)
+    }
+}
+
+
+
 
 impl Serialize for LobbyId {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>

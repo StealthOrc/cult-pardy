@@ -6,7 +6,8 @@ use wasm_cookies::cookies::*;
 use web_sys::HtmlDocument;
 use yew::prelude::*;
 
-use crate::websocket::WebsocketService;
+use crate::ws::websocket::WebsocketService;
+
 // testing purposes
 fn document() -> HtmlDocument {
     use wasm_bindgen::JsCast;
@@ -19,7 +20,7 @@ fn document() -> HtmlDocument {
         .unwrap()
 }
 
-fn cookie_string() -> String {
+pub(crate) fn cookie_string() -> String {
     document().cookie().unwrap()
 }
 
@@ -139,7 +140,7 @@ impl Component for App {
         }
     }
 }
-fn get_game_id_from_url() -> Option<String> {
+pub(crate) fn get_game_id_from_url() -> Option<String> {
     let window = web_sys::window().expect("No global `window` exists.");
     let location = window.location();
     let pathname = location.pathname().expect("Failed to get pathname from URL");

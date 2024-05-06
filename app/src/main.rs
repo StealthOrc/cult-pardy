@@ -1,15 +1,19 @@
 mod app;
-mod websocket;
 mod service;
 mod file;
-use app::App;
+mod game;
+mod ws;
+mod mainpage;
+
 use yew::prelude::*;
 use yew_router::prelude::*;
 //testing purposes
 use gloo_storage::Storage;
+use crate::app::App;
+use crate::mainpage::MainPage;
 
 #[derive(Clone, Routable, PartialEq)]
-enum Route {
+pub enum Route {
     #[at("/")]
     Home,
     #[cfg(not(debug_assertions))]
@@ -26,7 +30,7 @@ enum Route {
 
 fn switch(routes: Route) -> Html {
     match routes {
-        Route::Home => html! { <h1> { "Home" } </h1> },
+        Route::Home => html! {  <MainPage /> },
         Route::Game => html!{ <App  />} ,
         _ => html! { <h1>{ "404" }</h1> },
     }
