@@ -22,3 +22,4 @@ oauth2 = "4.4.2"
 attohttpc = { version = "0.28.0", features = ["json"] }
 strum = { version = "0.26.2", features = ["derive"] }
 chrono = { version = "0.4.38", features = ["serde"] }
+flate2 = "1.0.30"

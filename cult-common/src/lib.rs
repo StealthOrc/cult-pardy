@@ -1,10 +1,14 @@
 use std::collections::{HashMap};
 use std::hash::{Hash, Hasher};
+use std::io;
+use std::io::{Read, Write};
 use std::net::SocketAddr;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use rand::{Rng, random};
 use rand::distributions::Alphanumeric;
 use chrono::{DateTime, Local};
+use flate2::read::DeflateDecoder;
+use flate2::write::DeflateEncoder;
 use strum::{Display};
 
 
@@ -657,6 +661,18 @@ impl<'de> Deserialize<'de> for WebsocketSessionId {
 
 
 
+pub fn compress(data: &[u8]) -> io::Result<Vec<u8>> {
+    let mut encoder = DeflateEncoder::new(Vec::new(), flate2::Compression::default());
+    encoder.write_all(data)?;
+    encoder.finish().map_err(|e| e.into())
+}
+
+pub fn decompress(data: &[u8]) -> io::Result<Vec<u8>> {
+    let mut decoder = DeflateDecoder::new(data);
+    let mut decompressed_data = Vec::new();
+    decoder.read_to_end(&mut decompressed_data)?;
+    Ok(decompressed_data)
+}
 
 
 

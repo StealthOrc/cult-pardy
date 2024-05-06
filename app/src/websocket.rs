@@ -1,10 +1,11 @@
-use std::io::Read;
+use std::io::{Read, Write};
+use flate2::read::DeflateDecoder;
 use futures::{channel::mpsc::Sender, SinkExt, StreamExt};
 use gloo_console::log;
 use gloo_net::websocket::{futures::WebSocket, Message};
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::spawn_local;
-use cult_common::{WebsocketServerEvents};
+use cult_common::{decompress, WebsocketServerEvents};
 
 #[derive(Clone)]
 pub struct WebsocketService {
@@ -46,16 +47,17 @@ impl WebsocketService {
                     Ok(Message::Text(data)) => {
                         log!("from websocket {}",JsValue::from(data.clone()));
                     }
-                    Ok(Message::Bytes(bytes)) => {
-                        match serde_json::from_slice::<WebsocketServerEvents>(&bytes) {
+                    Ok(Message::Bytes(data)) => {
+                        if let Ok(bytes) = decompress(&data){
+                            match serde_json::from_slice::<WebsocketServerEvents>(&bytes) {
                                 Ok(event) => {
                                     log!("Receive an server event ", JsValue::from(event.event_name()));
                                 }
                                 Err(err) => {
                                     log!("Error deserializing JSON data: {}", JsValue::from(err.to_string()));
                                 }
+                            }
                         }
-
                     }
                     Err(e) => {
                         log!("ws error:{}", JsValue::from(e.to_string()));

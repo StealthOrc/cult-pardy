@@ -344,6 +344,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "cult-common",
+ "flate2",
  "futures",
  "gloo-console 0.3.0",
  "gloo-net 0.5.0",
@@ -632,6 +633,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "chrono",
+ "flate2",
  "rand 0.9.0-alpha.1",
  "serde",
  "serde_json",
@@ -738,9 +740,9 @@ checksum = "658bd65b1cf4c852a3cc96f18a8ce7b5640f6b703f905c7d74532294c2a63984"
 
 [[package]]
 name = "flate2"
-version = "1.0.28"
+version = "1.0.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "46303f565772937ffe1d394a4fac6f411c6013172fadde9dcdb1e147a086940e"
+checksum = "5f54427cfd1c7829e2a139fcefea601bf088ebca651d2bf53ebc600eac295dae"
 dependencies = [
  "crc32fast",
  "miniz_oxide",
@@ -2330,6 +2332,7 @@ dependencies = [
  "attohttpc",
  "chrono",
  "cult-common",
+ "flate2",
  "futures",
  "log",
  "oauth2",

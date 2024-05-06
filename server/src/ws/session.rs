@@ -1,10 +1,11 @@
 use std::time::{Duration, Instant};
 
 use actix::prelude::*;
+use actix_web::http::header::ContentEncoding::Deflate;
 use actix_web::web;
 use actix_web_actors::ws;
 use actix_web_actors::ws::WebsocketContext;
-use cult_common::{LobbyId, UserSessionId, WebsocketSessionId};
+use cult_common::{compress, LobbyId, UserSessionId, WebsocketSessionId};
 use crate::servers::game;
 use crate::servers::game::{SessionDisconnect, SessionMessageType};
 
@@ -118,8 +119,10 @@ impl Handler<game::SessionMessageType> for WsSession {
                 ctx.stop()
             }
             SessionMessageType::Data(data) => {
-                let json = serde_json::to_vec(&data).expect("Can´t convert to vec");
-                ctx.binary(json)
+                let binary = serde_json::to_vec(&data).expect("Can´t convert to vec");
+                if let Ok(bytes) = compress(&binary){
+                    ctx.binary(bytes)
+                }
             }
         }
     }
