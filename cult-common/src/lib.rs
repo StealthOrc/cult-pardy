@@ -128,6 +128,8 @@ pub struct DtoQuestion {
     pub won_user_id: Option<UserSessionId>,
 }
 
+
+
 impl crate::DtoCategory {
     pub fn new(title: String, questions: Vec<DtoQuestion>) -> Self {
         crate::DtoCategory { title, questions }
@@ -151,7 +153,7 @@ impl Category {
             questions: self
                 .questions
                 .into_iter()
-                .map(|question| question.dto())
+                .map(|question| question.dto(false))
                 .collect(),
         }
     }
@@ -321,8 +323,8 @@ pub enum QuestionType {
 }
 
 impl Question {
-    pub fn dto(self) -> DtoQuestion {
-        let question_text = match self.open {
+    pub fn dto(self, current:bool) -> DtoQuestion {
+        let question_text = match current {
             true => Some(self.question),
             false => None,
         };
@@ -367,6 +369,7 @@ impl WebsocketServerEvents {
 #[derive(Debug, Clone, Serialize, Deserialize, Display)]
 pub enum BoardEvent {
     CurrentBoard(DtoJeopardyBoard),
+    CurrentQuestion(Vector2D, DtoQuestion),
     UpdateBoard(String),
 }
 

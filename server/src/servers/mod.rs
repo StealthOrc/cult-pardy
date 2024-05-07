@@ -21,11 +21,12 @@ pub(crate) struct Services{
 impl Services {
     pub fn init() -> Self {
         let login_client = LoginDiscordAuth::init();
+        let auth_server = AuthenticationServer::new().start();
         Services{
             grant_client : GrantDiscordAuth::init(),
             login_client: login_client.clone(),
-            authentication_server:AuthenticationServer::new().start(),
-            game_server : GameServer::new(login_client).start(),
+            authentication_server:auth_server.clone(),
+            game_server : GameServer::new(login_client,auth_server).start(),
         }
     }
 

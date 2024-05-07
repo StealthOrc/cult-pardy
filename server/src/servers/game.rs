@@ -13,14 +13,14 @@ use oauth2::TokenResponse;
 use rand::rngs::ThreadRng;
 use serde::{Deserialize, Serialize};
 use strum::{Display, EnumIter};
-use cult_common::{DiscordID, DiscordUser, DTOSession, JeopardyBoard, LobbyCreateResponse, LobbyId, SessionEvent, SessionToken, UserSessionId, WebsocketServerEvents, WebsocketSessionId};
+use cult_common::{BoardEvent, DiscordID, DiscordUser, DTOSession, JeopardyBoard, LobbyCreateResponse, LobbyId, SessionEvent, SessionToken, UserSessionId, Vector2D, WebsocketServerEvents, WebsocketSessionId};
 use cult_common::BoardEvent::CurrentBoard;
 use cult_common::JeopardyMode::NORMAL;
 use cult_common::SessionEvent::SessionDisconnected;
 use cult_common::WebsocketError::{LobbyNotFound, SessionNotFound};
 use cult_common::WebsocketEvent::{WebsocketDisconnected, WebsocketJoined};
 use crate::authentication::discord::{DiscordME, LoginDiscordAuth};
-use crate::servers::authentication::RedeemAdminAccessToken;
+use crate::servers::authentication::{AuthenticationServer, CheckAdminAccess, RedeemAdminAccessToken};
 use crate::servers::game::GameState::Waiting;
 use crate::ws::session::UserData;
 
@@ -77,6 +77,13 @@ pub struct Lobbies;
 #[rtype(result = "bool")]
 pub struct HasLobby {
     pub lobby_id:LobbyId,
+}
+
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct LobbyClick {
+    pub vector_2d: Vector2D,
+    pub user_data:UserData,
 }
 
 #[derive(Message)]
@@ -155,6 +162,7 @@ impl actix::Message for GrandAdminAccess {
 #[derive(Debug)]
 pub struct GameServer {
     pub login_discord_auth: LoginDiscordAuth,
+    pub authentication_server: Addr<AuthenticationServer>,
     pub rng: ThreadRng,
     pub user_sessions: HashMap<UserSessionId, UserSession>,
     pub lobbies: HashMap<LobbyId, Lobby>
@@ -306,7 +314,7 @@ pub enum GameState{
 
 
 impl GameServer {
-    pub fn new(login_discord_auth: LoginDiscordAuth) -> GameServer {
+    pub fn new(login_discord_auth: LoginDiscordAuth, authentication_server: Addr<AuthenticationServer>) -> GameServer {
 
         let name =  LobbyId::from_str("main");
         let main = Lobby{
@@ -326,6 +334,7 @@ impl GameServer {
         println!("Game lobby's: {:?}", &lobbies.values().map(|lobby| lobby.lobby_id.clone()).collect::<Vec<_>>());
         GameServer {
             login_discord_auth,
+            authentication_server,
             rng: rand::thread_rng(),
             user_sessions: HashMap::new(),
             lobbies,
@@ -674,6 +683,57 @@ impl Handler<CanJoinLobby> for GameServer {
             return true
         }
         lobby.user_session.contains(&msg.user_session_id)
+    }
+}
+
+impl Handler<LobbyClick> for GameServer {
+    type Result = ();
+
+    fn handle(&mut self, msg: LobbyClick, _ctx: &mut Self::Context) -> Self::Result {
+
+        let mut lobby = match self.lobbies.get_mut(&msg.user_data.lobby_id) {
+            None => return,
+            Some(lobby) => lobby
+        };
+        let user_session  = match self.user_sessions.get(&msg.user_data.user_session_id) {
+            None => return,
+            Some(data) => data,
+        };
+
+        let discord_data  = match &user_session.discord_auth {
+            None => return,
+            Some(data) => data,
+        };
+
+        let discord_user  = match &discord_data.discord_user {
+            None => return,
+            Some(data) => data,
+        };
+
+        if !&lobby.creator.eq(&DiscordID::server()){
+            return;
+        }
+
+        let category  = match lobby.jeopardy_board.categories.get(msg.vector_2d.x as usize) {
+            None => return,
+            Some(data) => data,
+        };
+
+        let question  = match category.questions.get(msg.vector_2d.y as usize) {
+            None => return,
+            Some(data) => data,
+        };
+
+        lobby.jeopardy_board.current = Some(msg.vector_2d);
+
+
+        let event = WebsocketServerEvents::Board(
+          BoardEvent::CurrentQuestion(
+              msg.vector_2d,
+              question.clone().dto(true)
+          )
+        );
+        self.send_lobby_message(&msg.user_data.lobby_id, event)
     }
 }
 

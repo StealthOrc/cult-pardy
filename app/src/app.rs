@@ -75,19 +75,23 @@ impl Component for App {
         let dto: SharedStateDtoJeopardyBoard = Rc::new(RefCell::new(None));
         let on_read = {
             let mydto: SharedStateDtoJeopardyBoard = Rc::clone(&dto);
-            move |event: WebsocketServerEvents, callback: Callback<AppMsg>| match event {
-                WebsocketServerEvents::Board(board_event) => match board_event {
-                    BoardEvent::CurrentBoard(board) => {
-                        log!("board recieved!");
-                        (*mydto).replace(Some(board));
-                        callback.emit(AppMsg::BoardLoaded);
-                    }
-                    BoardEvent::UpdateBoard(_) => {}
-                },
-                WebsocketServerEvents::Websocket(_) => {}
-                WebsocketServerEvents::Session(_) => {}
-                WebsocketServerEvents::Error(_) => {}
-                WebsocketServerEvents::Text(_) => {}
+            move |event: WebsocketServerEvents, callback: Callback<AppMsg>| {
+                log!(format!("Event received -> {}", event.clone().event_name()));
+                match event {
+                    WebsocketServerEvents::Board(board_event) => match board_event {
+                        BoardEvent::CurrentBoard(board) => {
+                            log!("board received!");
+                            (*mydto).replace(Some(board));
+                            callback.emit(AppMsg::BoardLoaded);
+                        }
+                        BoardEvent::UpdateBoard(_) => {},
+                        BoardEvent::CurrentQuestion(vector2d, dto_question) => {}
+                    },
+                    WebsocketServerEvents::Websocket(_) => {}
+                    WebsocketServerEvents::Session(_) => {}
+                    WebsocketServerEvents::Error(_) => {}
+                    WebsocketServerEvents::Text(_) => {}
+                }
             }
         };
 
