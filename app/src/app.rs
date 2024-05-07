@@ -176,34 +176,35 @@ impl Component for App {
 
 
 pub fn get_board(dto_jeopardy_board: &DtoJeopardyBoard) -> Html {
+    let num_categories = dto_jeopardy_board.categories.len();
+
+    let grid_columns = format!("repeat({}, 1fr)", num_categories);
+
     return html! {
-                    <main>
-                        <div class="listcontainer">
-                            <ul>
+        <main class="jeopardy-container">
+            <div class="jeopardy-board" style={format!("grid-template-columns: {}", grid_columns)}>
+                {
+                    dto_jeopardy_board.categories.iter().enumerate().map(|(row_index, category)| {
+                        html! {
+                            <div class="jeopardy-category">
+                                <h2>{&category.title}</h2>
                                 {
-                                        dto_jeopardy_board.categories.iter().enumerate().map( |(row_index, category)|{
+                                    category.questions.iter().enumerate().map(|(col_index, question)| {
                                         html! {
-                                            <li>
-                                                 <h2>{&category.title}</h2>
-                                                {
-                                                    dto_jeopardy_board.categories.get(0).unwrap().questions.iter().enumerate().map( |(col_index, question)|{
-                                                        html! {
-                                                            <Button name={format!("{}€",question.value)} vec={Vector2D{x: row_index as u8,y: col_index as u8,}}/>
-                                                        }
-                                                     }).collect::<Html>()
-                                                }
-                                            </li>
+                                            <div class="jeopardy-question">
+                                                <Button dtoq={question.clone()} name={format!("{}€", question.value)}  vec={Vector2D { x: row_index as u8, y: col_index as u8 }} />
+                                            </div>
                                         }
                                     }).collect::<Html>()
                                 }
-                            </ul>
-                        </div>
-                    </main>
+                            </div>
+                        }
+                    }).collect::<Html>()
                 }
+            </div>
+        </main>
+    }
 }
-
-
-
 
 
 pub(crate) fn get_game_id_from_url() -> Option<String> {
