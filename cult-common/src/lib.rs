@@ -511,17 +511,29 @@ impl JeopardyBoard {
     }
 
     pub fn dto(self) -> DtoJeopardyBoard {
-        let current = match self.current {
-            None => None,
-            Some(question) => Some(question),
-        };
+        let cat = self.categories.iter().enumerate().map(|(row_index, category)| {
+            let questions = category.questions.iter().enumerate().map(|(col_index, question)| {
+                match self.current {
+                    None => question.clone().dto(false),
+                    Some(vec) => {
+                        let current = Vector2D{x: row_index as u8, y: col_index as u8};
+                        question.clone().dto(vec.eq(&current))
+                    }
+                }
+
+            }).collect::<Vec<DtoQuestion>>();
+
+            DtoCategory{
+                title: category.clone().title,
+                questions,
+            }
+
+        }).collect::<Vec<DtoCategory>>();
+
+
         DtoJeopardyBoard {
-            categories: self
-                .categories
-                .into_iter()
-                .map(|category| category.dto())
-                .collect(),
-            current,
+            categories: cat,
+            current: self.current,
         }
     }
 }
