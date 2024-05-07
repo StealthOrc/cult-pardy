@@ -2,13 +2,14 @@ use std::time::{Duration, Instant};
 
 use actix::prelude::*;
 
+use crate::servers::game;
+use crate::servers::game::{SessionDisconnect, SessionMessageType};
 use actix_web::web;
 use actix_web_actors::ws;
 use actix_web_actors::ws::WebsocketContext;
-use cult_common::{compress, decompress, LobbyId, UserSessionId, WebsocketSessionEvent, WebsocketSessionId};
-use crate::servers::game;
-use crate::servers::game::{SessionDisconnect, SessionMessageType};
-
+use cult_common::{
+    compress, decompress, LobbyId, UserSessionId, WebsocketSessionEvent, WebsocketSessionId,
+};
 
 /// How often heartbeat pings are sent
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
@@ -16,9 +17,8 @@ const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
 /// How long before lack of client response causes a timeout
 const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
 
-
 #[derive(Debug)]
-pub struct WsSession{
+pub struct WsSession {
     pub player: UserData,
     pub hb: Instant,
     pub handler: Addr<game::GameServer>,
@@ -41,14 +41,13 @@ impl UserData {
     }
 }
 
-
-
-
-
 impl WsSession {
-
-    pub fn default(user_session_id: UserSessionId, lobby: LobbyId, srv: web::Data<Addr<game::GameServer>>) -> Self{
-        WsSession{
+    pub fn default(
+        user_session_id: UserSessionId,
+        lobby: LobbyId,
+        srv: web::Data<Addr<game::GameServer>>,
+    ) -> Self {
+        WsSession {
             player: UserData::default(user_session_id, lobby),
             hb: Instant::now(),
             handler: srv.get_ref().clone(),
@@ -76,19 +75,21 @@ impl Actor for WsSession {
         // we'll start heartbeat process on session start.
         self.hb(ctx);
         let addr = ctx.address();
-        self.handler.send(game::Connect { lobby_id: self.player.lobby_id.clone(), user_session_id: self.player.user_session_id.clone(), addr: addr.recipient(), })
+        self.handler
+            .send(game::Connect {
+                lobby_id: self.player.lobby_id.clone(),
+                user_session_id: self.player.user_session_id.clone(),
+                addr: addr.recipient(),
+            })
             .into_actor(self)
             .then(|res, act, ctx| {
                 match res {
-                    Ok(res) => {
-                        match res {
-
-                            None => {
-                                println!("Something happens 3");
-                                ctx.stop()
-                            },
-                            Some(id) => act.player.websocket_session_id = Some(id)
+                    Ok(res) => match res {
+                        None => {
+                            println!("Something happens 3");
+                            ctx.stop()
                         }
+                        Some(id) => act.player.websocket_session_id = Some(id),
                     },
 
                     _ => ctx.stop(),
@@ -102,7 +103,7 @@ impl Actor for WsSession {
         //notify chat server
         //println!("STOP!? id: {}", self.player.websocket_session_id.unwrap().id);
 
-        self.handler.do_send(SessionDisconnect{
+        self.handler.do_send(SessionDisconnect {
             user_data: self.player.clone(),
         });
         Running::Stop
@@ -115,12 +116,10 @@ impl Handler<game::SessionMessageType> for WsSession {
 
     fn handle(&mut self, msg: game::SessionMessageType, ctx: &mut Self::Context) {
         match msg {
-            SessionMessageType::SelfDisconnect => {
-                ctx.stop()
-            }
+            SessionMessageType::SelfDisconnect => ctx.stop(),
             SessionMessageType::Data(data) => {
                 let binary = serde_json::to_vec(&data).expect("Can´t convert to vec");
-                if let Ok(bytes) = compress(&binary){
+                if let Ok(bytes) = compress(&binary) {
                     ctx.binary(bytes)
                 }
             }
@@ -143,7 +142,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
         match msg {
             ws::Message::Ping(msg) => {
                 self.hb = Instant::now();
-               ctx.pong(&msg);
+                ctx.pong(&msg);
             }
             ws::Message::Pong(_) => {
                 self.hb = Instant::now();
@@ -161,11 +160,10 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                 }
             }
             ws::Message::Binary(data) => {
-                if let Ok(bytes) = decompress(&data){
+                if let Ok(bytes) = decompress(&data) {
                     match serde_json::from_slice::<WebsocketSessionEvent>(&bytes) {
                         Ok(event) => {
                             match event {
-                                WebsocketSessionEvent::Text(_) => {}
                                 WebsocketSessionEvent::Click(vector2d) => {
                                     self.handler.do_send(game::LobbyClick {
                                         vector_2d: vector2d,
@@ -191,14 +189,14 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
             ws::Message::Nop => (),
         }
     }
-
 }
-
 
 fn handle_list_command(handler: &mut WsSession, ctx: &mut WebsocketContext<WsSession>) {
     println!("Listing rooms...");
     // Send ListRooms message to chat server and handle response asynchronously
-    let fut = handler.handler.send(game::ListRooms)
+    let fut = handler
+        .handler
+        .send(game::ListRooms)
         .into_actor(handler)
         .then(|res, _, ctx| {
             match res {
@@ -214,7 +212,6 @@ fn handle_list_command(handler: &mut WsSession, ctx: &mut WebsocketContext<WsSes
     ctx.wait(fut);
 }
 
-
 fn send_chat_message(handler: &mut WsSession, msg: &str) {
     // Send message to chat server
     handler.handler.do_send(game::ClientMessage {
@@ -222,3 +219,4 @@ fn send_chat_message(handler: &mut WsSession, msg: &str) {
         msg: msg.to_owned(),
     });
 }
+
