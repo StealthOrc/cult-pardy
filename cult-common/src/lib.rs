@@ -10,7 +10,7 @@ use std::hash::{Hash, Hasher};
 use std::io;
 use std::io::{Read, Write};
 use std::net::SocketAddr;
-use strum::{Display, IntoStaticStr, ToString};
+use strum::Display;
 
 pub fn parse_addr_str(domain: &str, port: usize) -> SocketAddr {
     let addr = format!("{}:{}", domain, port);

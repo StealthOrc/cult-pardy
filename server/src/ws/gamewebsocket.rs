@@ -37,7 +37,7 @@ pub async fn start_ws(req: HttpRequest, stream: web::Payload, srv: web::Data<Add
         }),
     }).await {
         Ok(data) => data,
-        Err(error) => return Ok(HttpResponse::NotFound().finish()),
+        Err(_error) => return Ok(HttpResponse::NotFound().finish()),
     };
 
 

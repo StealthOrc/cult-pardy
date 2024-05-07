@@ -78,7 +78,7 @@ async fn not_found() -> std::result::Result<HttpResponse, actix_web::Error> {
 
 
 #[get("/api/download")]
-async fn download(req: HttpRequest) -> std::result::Result<HttpResponse, actix_web::Error> {
+async fn download(_req: HttpRequest) -> std::result::Result<HttpResponse, actix_web::Error> {
     let json_data = serde_json::to_string_pretty(&JeopardyBoard::default(NORMAL)).expect("Test?");
     Ok(HttpResponse::Ok()
         .content_type("application/json")

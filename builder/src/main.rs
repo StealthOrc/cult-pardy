@@ -2,12 +2,12 @@ use std::path::Path;
 use std::env;
 use std::env::current_dir;
 use std::path::PathBuf;
-use std::process::Stdio;
-use cult_common::*;
+
+
 use anyhow::Result;
 use fs_extra::dir::{copy, CopyOptions, create_all, remove};
-use tokio::{fs, io};
-use tokio::io::AsyncWriteExt;
+
+
 use tokio::process::Command;
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -15,13 +15,13 @@ async fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
     println!("{:?}", args);
 
-    if(args.contains(&"--build".to_string())){
+    if args.contains(&"--build".to_string()) {
         buildApp(&args).await?;
         build_Server(&args).await?;
-        if(args.contains(&"--run".to_string())){
+        if args.contains(&"--run".to_string()) {
             start_server().await?;
         }
-    } else if(args.contains(&"--run".to_string())){
+    } else if args.contains(&"--run".to_string()) {
         buildApp(&args).await?;
         run_server(&args).await?;
 
@@ -61,7 +61,7 @@ async fn build_Server(args: &Vec<String>) -> anyhow::Result<()>{
 
     let current_dir = env::current_dir()?;
 
-    if(args.contains(&"--fix".to_string())){
+    if args.contains(&"--fix".to_string()) {
         cargo_fix(&args).await.expect("TODO: panic message");
     }
 
@@ -80,7 +80,7 @@ async fn build_Server(args: &Vec<String>) -> anyhow::Result<()>{
 }
 
 
-async fn cargo_fix(args: &Vec<String>) -> anyhow::Result<()>{
+async fn cargo_fix(_args: &Vec<String>) -> anyhow::Result<()>{
     let current_dir = env::current_dir()?;
     let mut shell = Command::new("powershell")
         .arg("cargo")
@@ -103,7 +103,7 @@ async fn run_server(args: &Vec<String>) -> anyhow::Result<()>{
 
     let current_dir = env::current_dir()?;
 
-    if(args.contains(&"--fix".to_string())){
+    if args.contains(&"--fix".to_string()) {
         cargo_fix(&args).await.expect("TODO: panic message");
     }
 
@@ -153,7 +153,7 @@ async fn buildApp(args: &Vec<String>) -> anyhow::Result<()>{
 
 
 
-    if(args.contains(&"--fix".to_string())){
+    if args.contains(&"--fix".to_string()) {
         cargo_fix(&args).await.expect("TODO: panic message");
     }
 

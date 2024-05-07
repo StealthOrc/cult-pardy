@@ -46,7 +46,7 @@ impl Commands {
                     Ok(admin_token) => {
                         println!("Your Admin access Token is [{}] its ", admin_token.token)
                     }
-                    Err(error) => {
+                    Err(_error) => {
                         println!("There was something wrong by creating the Admin access Token")
                     }
                 }

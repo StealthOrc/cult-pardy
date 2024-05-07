@@ -492,7 +492,7 @@ impl Handler<Connect> for GameServer {
             println!("Someone joined: {:?}{:?}", &msg, &websocket_session_id.clone());
             self.send_lobby_message(&msg.lobby_id.clone(), WebsocketServerEvents::Session(SessionEvent::SessionJoined(msg.user_session_id.clone())));
         }
-        let sessions =
+        let _sessions =
 
         self.send_lobby_message(&msg.lobby_id, WebsocketServerEvents::Websocket(WebsocketJoined(websocket_session_id.clone())));
         self.send_websocket_session_message(&msg.lobby_id, &websocket_session_id, WebsocketServerEvents::Board(CurrentBoard(lobby.jeopardy_board.dto())));
@@ -581,7 +581,7 @@ impl Handler<HasLobby> for GameServer {
     fn handle(&mut self, msg: HasLobby, _ctx: &mut Context<Self>) -> Self::Result {
         match self.lobbies.get(&msg.lobby_id) {
             None => false,
-            Some(sessions) => true
+            Some(_sessions) => true
         }
     }
 }
@@ -637,7 +637,7 @@ impl Handler<HasSessionForWebSocket> for GameServer {
 impl Handler<AddDiscordAccount> for GameServer {
     type Result = bool;
 
-    fn handle(&mut self, msg: AddDiscordAccount, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: AddDiscordAccount, _ctx: &mut Self::Context) -> Self::Result {
         if let Some(user_session) = self.user_sessions.get_mut(&msg.user_session_id) {
             user_session.discord_auth = Some(msg.discord_data);
             return true
@@ -649,7 +649,7 @@ impl Handler<AddDiscordAccount> for GameServer {
 impl Handler<CreateLobby> for GameServer {
     type Result = MessageResult<CreateLobby>;
 
-    fn handle(&mut self, msg: CreateLobby, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: CreateLobby, _ctx: &mut Self::Context) -> Self::Result {
         let board = match msg.jeopardy_board {
             None => return MessageResult(LobbyCreateResponse::Error("No JeopardyBoard".to_string())),
             Some(board) => board,
@@ -665,7 +665,7 @@ impl Handler<CreateLobby> for GameServer {
 impl Handler<CanJoinLobby> for GameServer {
     type Result = bool;
 
-    fn handle(&mut self, msg: CanJoinLobby, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: CanJoinLobby, _ctx: &mut Self::Context) -> Self::Result {
         let lobby = match self.lobbies.get(&msg.lobby_id) {
             None => return false,
             Some(lobby) => lobby

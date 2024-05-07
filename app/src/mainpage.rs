@@ -1,12 +1,12 @@
-use std::collections::HashMap;
-use gloo_console::log;
-use gloo_net::websocket::Message;
-use reqwest::Client;
-use wasm_bindgen_futures::spawn_local;
+
+
+
+
+
 use wasm_cookies::cookies::get;
-use web_sys::{HtmlInputElement, window};
-use yew::{html, Callback, Component, Html, Context, use_node_ref, Properties};
-use yew_router::{AnyRoute, navigator};
+use web_sys::{window};
+use yew::{html, Callback, Component, Html, Context, Properties};
+
 use yew_router::prelude::RouterScopeExt;
 use cult_common::LobbyId;
 use crate::app;
@@ -28,15 +28,15 @@ impl Component for MainPage {
     type Properties = ();
 
     fn create(_ctx: &Context<Self>) -> Self {
-        let request_url = "http://localhost:800/api/discord_session";
-        let usr_session_id: String = get(&app::cookie_string(), "user-session-id")
+        let _request_url = "http://localhost:800/api/discord_session";
+        let _usr_session_id: String = get(&app::cookie_string(), "user-session-id")
             .expect("could not get cookie")
             .expect("could not get cookie from user");
-        let session_token: String = get(&app::cookie_string(), "session-token")
+        let _session_token: String = get(&app::cookie_string(), "session-token")
             .expect("could not get cookie")
             .expect("could not get cookie from user");
 
-        let cookies = vec![
+        let _cookies = vec![
             ("usr-session-id", "1"),
             ("session-token", "2"),
         ];

@@ -1,11 +1,11 @@
 use std::time::{Duration, Instant};
 
 use actix::prelude::*;
-use actix_web::http::header::ContentEncoding::Deflate;
+
 use actix_web::web;
 use actix_web_actors::ws;
 use actix_web_actors::ws::WebsocketContext;
-use cult_common::{compress, decompress, LobbyId, UserSessionId, WebsocketServerEvents, WebsocketSessionEvent, WebsocketSessionId};
+use cult_common::{compress, decompress, LobbyId, UserSessionId, WebsocketSessionEvent, WebsocketSessionId};
 use crate::servers::game;
 use crate::servers::game::{SessionDisconnect, SessionMessageType};
 

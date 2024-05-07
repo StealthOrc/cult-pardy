@@ -85,7 +85,7 @@ pub fn get_token(req: &HttpRequest) -> Option<usize> {
 
 pub fn set_cookie(res: &mut HttpResponse,req: &HttpRequest, cookie_name: &str, value: &String){
    //let expiration_time = SystemTime::now() + Duration::from_secs(60);
-    let cookie = Cookie::build(cookie_name, value)
+    let _cookie = Cookie::build(cookie_name, value)
         .path("/")
         .secure(true)
         //TODO Do we need this?
@@ -136,7 +136,7 @@ async fn has_authorization(req: HttpRequest, srv: web::Data<Addr<game::GameServe
 }
 
 #[get("/api/discord_session")]
-async fn discord_session(req: HttpRequest, srv: web::Data<Addr<game::GameServer>>, auth: web::Data<Addr<AuthenticationServer>>) -> HttpResponse {
+async fn discord_session(req: HttpRequest, srv: web::Data<Addr<game::GameServer>>, _auth: web::Data<Addr<AuthenticationServer>>) -> HttpResponse {
     let user_session = get_session(&req, &srv).await;
     let discord_user = match user_session.clone().discord_auth{
         None => None,

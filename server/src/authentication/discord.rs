@@ -128,7 +128,7 @@ pub async fn discord_oauth(
                 Login => &login.client
             }
         },
-        Err(error) => &login.client
+        Err(_error) => &login.client
     };
 
 
@@ -285,7 +285,7 @@ pub(crate) async fn is_admin(user_session: UserSession, auth: web::Data<Addr<Aut
 pub async fn login_only(
     req: actix_web::HttpRequest,
     srv: web::Data<Addr<GameServer>>,
-    auth: web::Data<Addr<AuthenticationServer>>,
+    _auth: web::Data<Addr<AuthenticationServer>>,
     code: web::Query<Code>,
     oauth_client: web::Data<LoginDiscordAuth>,
 ) -> anyhow::Result<HttpResponse, actix_web::Error> {
