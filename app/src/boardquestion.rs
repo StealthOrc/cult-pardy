@@ -1,4 +1,4 @@
-use cult_common::{DtoJeopardyBoard, DtoQuestion};
+use cult_common::{DtoJeopardyBoard, DtoQuestion, WebsocketSessionEvent};
 use yew::prelude::*;
 
 use crate::types::WebsocketCallback;
@@ -28,8 +28,12 @@ impl Component for BoardQuestion {
             .question_text
             .clone()
             .expect("did not find question_text!");
-        html! {
-            <div class={classes!("question-container")}>{question_text}</div>
+
+        let onclick = props
+            .onclick
+            .reform(move |_| WebsocketSessionEvent::Back);
+        return html! {
+            <button onclick={onclick.clone()}>{format!("Disabled: {}€",question_text) }</button>
         }
     }
 }

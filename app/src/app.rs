@@ -66,7 +66,6 @@ impl Component for App {
                             mydto.borrow_mut().replace(board);
                             callback.emit(AppMsg::BoardLoaded);
                         }
-                        BoardEvent::UpdateBoard(_) => {}
                         BoardEvent::CurrentQuestion(vector2d, dto_question) => {
                             match mydto.borrow_mut().as_mut() {
                                 Some(board) => {

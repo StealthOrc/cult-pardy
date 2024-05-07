@@ -85,10 +85,16 @@ pub struct HasLobby {
 
 #[derive(Message)]
 #[rtype(result = "()")]
-pub struct LobbyClick {
-    pub vector_2d: Vector2D,
+pub struct LobbyBackClick {
     pub user_data:UserData,
 }
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct LobbyClick {
+    pub user_data:UserData,
+    pub vector_2d:Vector2D,
+}
+
 
 #[derive(Message)]
 #[rtype(result = "bool")]
@@ -739,6 +745,48 @@ impl Handler<LobbyClick> for GameServer {
                 fut::ready(())
             });
             _ctx.wait(fut);
+        return;
+    }
+}
+
+impl Handler<LobbyBackClick> for GameServer {
+    type Result = ();
+
+    fn handle(&mut self, msg: LobbyBackClick, _ctx: &mut Self::Context) -> Self::Result {
+        let user_session = match self.user_sessions.get(&msg.user_data.user_session_id) {
+            None => return,
+            Some(data) => data,
+        };
+        let discord_data = match &user_session.discord_auth {
+            None => return,
+            Some(data) => data,
+        };
+        let discord_user = match &discord_data.discord_user {
+            None => return,
+            Some(data) => data,
+        };
+        let id = discord_user.discord_id.clone();
+
+        let fut = self.authentication_server.send(CheckAdminAccess {
+            discord_id: discord_user.clone().discord_id,
+        })
+            .into_actor(self)
+            .then(move |is_admin, msg2, ctx| {
+                let is_admin = is_admin.unwrap_or(false);
+                let mut lobby = match msg2.lobbies.get_mut(&msg.user_data.lobby_id) {
+                    None => return fut::ready(()),
+                    Some(lobby) => lobby
+                };
+                if &lobby.creator.eq(&id) | &is_admin {
+                    lobby.jeopardy_board.current = None;
+                    let board = lobby.jeopardy_board.clone();
+                    let event = WebsocketServerEvents::Board(CurrentBoard(board.dto()),
+                    );
+                    msg2.send_lobby_message(&msg.user_data.lobby_id, event);
+                }
+                fut::ready(())
+            });
+        _ctx.wait(fut);
         return;
     }
 }

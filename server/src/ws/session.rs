@@ -169,6 +169,11 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                                         vector_2d: vector2d,
                                         user_data: self.player.clone(),
                                     });
+                                },
+                                WebsocketSessionEvent::Back => {
+                                    self.handler.do_send(game::LobbyBackClick{
+                                        user_data: self.player.clone(),
+                                    });
                                 }
                             }
                             println!("Receive an client event {:?}", event);

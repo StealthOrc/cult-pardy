@@ -368,7 +368,6 @@ impl WebsocketServerEvents {
 pub enum BoardEvent {
     CurrentBoard(DtoJeopardyBoard),
     CurrentQuestion(Vector2D, DtoQuestion),
-    UpdateBoard(String),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Display)]
@@ -387,6 +386,7 @@ pub enum SessionEvent {
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, Display)]
 pub enum WebsocketSessionEvent {
     Click(Vector2D),
+    Back,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Display)]
