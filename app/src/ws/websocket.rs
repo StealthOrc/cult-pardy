@@ -12,6 +12,13 @@ use yew::prelude::*;
 pub struct WebsocketService {
     pub send_tunnel: Sender<Message>,
 }
+
+impl PartialEq for WebsocketService {
+    fn eq(&self, other: &Self) -> bool {
+        true
+    }
+}
+
 impl WebsocketService {
     // add code here
     pub fn new<F>(

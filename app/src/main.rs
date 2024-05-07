@@ -1,4 +1,7 @@
 mod app;
+mod board;
+mod boardbutton;
+mod boardquestion;
 mod file;
 mod game;
 mod mainpage;
