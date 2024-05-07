@@ -101,7 +101,7 @@ impl<'de> Deserialize<'de> for JeopardyBoard {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct DtoJeopardyBoard {
     pub categories: Vec<DtoCategory>,
     pub current: Option<Vector2D>,
@@ -113,7 +113,7 @@ pub struct Vector2D {
     pub y: u8,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct DtoCategory {
     pub title: String,
     pub questions: Vec<DtoQuestion>,

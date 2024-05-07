@@ -8,10 +8,12 @@ use gloo_net::websocket::Message;
 use std::{borrow::Borrow, cell::RefCell, rc::Rc};
 use wasm_cookies::cookies::*;
 use web_sys::HtmlDocument;
+use yew::html::Scope;
 use yew::prelude::*;
 
 use crate::types::AppMsg;
 use crate::ws::websocket::WebsocketService;
+use crate::{board::*, boardbutton::*, boardquestion::*};
 
 // testing purposes
 fn document() -> HtmlDocument {
@@ -29,29 +31,9 @@ pub(crate) fn cookie_string() -> String {
     document().cookie().unwrap()
 }
 
-#[derive(Properties, Clone, PartialEq, Default)]
-pub struct ButtonProps {
-    #[prop_or_default]
-    pub dtoq: DtoQuestion,
-    #[prop_or_default]
-    pub name: String,
-    pub onclick: Callback<MouseEvent>,
-}
-
-#[function_component]
-fn Button(props: &ButtonProps) -> Html {
-    if props.dtoq.won_user_id.is_some() {
-        html! {
-        <button onclick={props.onclick.clone()}>{format!("Disabled: {}",props.name) }</button>
-        }
-    } else {
-        html! {
-        <div class="button-container"><button onclick={props.onclick.clone()}>{props.name.clone()}</button></div>
-        }
-    }
-}
 type SharedStateDtoJeopardyBoard = Rc<RefCell<Option<DtoJeopardyBoard>>>;
 
+#[derive(PartialEq)]
 pub struct App {
     ws_service: WebsocketService,
     jp_board_dto: SharedStateDtoJeopardyBoard,
@@ -84,7 +66,7 @@ impl Component for App {
                             (*mydto).replace(Some(board));
                             callback.emit(AppMsg::BoardLoaded);
                         }
-                        BoardEvent::UpdateBoard(_) => {},
+                        BoardEvent::UpdateBoard(_) => {}
                         BoardEvent::CurrentQuestion(vector2d, dto_question) => {}
                     },
                     WebsocketServerEvents::Websocket(_) => {}
@@ -154,44 +136,16 @@ impl Component for App {
             Some(board) => board,
         };
         match board.current {
-            Some(_) => todo!("show current question"),
-            None => get_board(&board, ctx),
-        }
-    }
-}
-
-pub fn get_board(dto_jeopardy_board: &DtoJeopardyBoard, ctx: &Context<App>) -> Html {
-    let num_categories = dto_jeopardy_board.categories.len();
-
-    let grid_columns = format!("repeat({}, 1fr)", num_categories);
-
-    html! {
-        <main class="jeopardy-container">
-            <div class="jeopardy-board" style={format!("grid-template-columns: {}", grid_columns)}>
-                {
-                    dto_jeopardy_board.categories.iter().enumerate().map(|(row_index, category)| {
-                        html! {
-                            <div class="jeopardy-category">
-                                <h2>{&category.title}</h2>
-                                {
-                                    category.questions.iter().enumerate().map(|(col_index, question)| {
-                                        let vec2D = Vector2D { x: row_index as u8, y: col_index as u8 };
-                                        let onclick = ctx.link().callback(move |_| {
-                                            AppMsg::GetButtonQuestion(vec2D)
-                                        });
-                                        html! {
-                                            <div class="jeopardy-question">
-                                                <Button dtoq={question.clone()} name={format!("{}€", question.value)} {onclick} />
-                                            </div>
-                                        }
-                                    }).collect::<Html>()
-                                }
-                            </div>
-                        }
-                    }).collect::<Html>()
+            Some(_) => html! {
+                <BoardQuestion board={board}/>
+            },
+            None => {
+                let onclick = ctx.link().callback(AppMsg::GetButtonQuestion);
+                html! {
+                    <Board board={board} {onclick}/>
                 }
-            </div>
-        </main>
+            }
+        }
     }
 }
 
