@@ -5,8 +5,11 @@
 
 
 use std::collections::{HashMap, HashSet};
-use actix::{Actor, Addr, Context, Handler, Message, MessageResult, Recipient};
+use actix::{Actor, ActorFutureExt, Addr, AsyncContext, Context, ContextFutureSpawner, fut, Handler, Message, MessageResult, Recipient, WrapFuture};
+use actix_web::error::ErrorInternalServerError;
+use actix_web::rt::System;
 use chrono::TimeDelta;
+use futures::executor::block_on;
 use oauth2::basic::{BasicClient, BasicTokenResponse};
 use oauth2::reqwest::async_http_client;
 use oauth2::TokenResponse;
@@ -21,6 +24,7 @@ use cult_common::WebsocketError::{LobbyNotFound, SessionNotFound};
 use cult_common::WebsocketEvent::{WebsocketDisconnected, WebsocketJoined};
 use crate::authentication::discord::{DiscordME, LoginDiscordAuth};
 use crate::servers::authentication::{AuthenticationServer, CheckAdminAccess, RedeemAdminAccessToken};
+use crate::servers::game;
 use crate::servers::game::GameState::Waiting;
 use crate::ws::session::UserData;
 
@@ -690,50 +694,52 @@ impl Handler<LobbyClick> for GameServer {
     type Result = ();
 
     fn handle(&mut self, msg: LobbyClick, _ctx: &mut Self::Context) -> Self::Result {
-
-        let mut lobby = match self.lobbies.get_mut(&msg.user_data.lobby_id) {
-            None => return,
-            Some(lobby) => lobby
-        };
-        let user_session  = match self.user_sessions.get(&msg.user_data.user_session_id) {
+        let user_session = match self.user_sessions.get(&msg.user_data.user_session_id) {
             None => return,
             Some(data) => data,
         };
-
-        let discord_data  = match &user_session.discord_auth {
+        let discord_data = match &user_session.discord_auth {
             None => return,
             Some(data) => data,
         };
-
-        let discord_user  = match &discord_data.discord_user {
+        let discord_user = match &discord_data.discord_user {
             None => return,
             Some(data) => data,
         };
+        let id = discord_user.discord_id.clone();
 
-        if !&lobby.creator.eq(&DiscordID::server()){
-            return;
-        }
-
-        let category  = match lobby.jeopardy_board.categories.get(msg.vector_2d.x as usize) {
-            None => return,
-            Some(data) => data,
-        };
-
-        let question  = match category.questions.get(msg.vector_2d.y as usize) {
-            None => return,
-            Some(data) => data,
-        };
-
-        lobby.jeopardy_board.current = Some(msg.vector_2d);
-
-
-        let event = WebsocketServerEvents::Board(
-          BoardEvent::CurrentQuestion(
-              msg.vector_2d,
-              question.clone().dto(true)
-          )
-        );
-        self.send_lobby_message(&msg.user_data.lobby_id, event)
+        let fut = self.authentication_server.send(CheckAdminAccess {
+            discord_id: discord_user.clone().discord_id,
+        })
+            .into_actor(self)
+            .then(move |is_admin, msg2, ctx| {
+                let is_admin = is_admin.unwrap_or(false);
+                let mut lobby = match msg2.lobbies.get_mut(&msg.user_data.lobby_id) {
+                    None => return fut::ready(()),
+                    Some(lobby) => lobby
+                };
+                if &lobby.creator.eq(&id) | &is_admin {
+                    let category = match lobby.jeopardy_board.categories.get(msg.vector_2d.x as usize) {
+                        None => return fut::ready(()),
+                        Some(data) => data,
+                    };
+                    let question = match category.questions.get(msg.vector_2d.y as usize) {
+                        None => return fut::ready(()),
+                        Some(data) => data,
+                    };
+                    lobby.jeopardy_board.current = Some(msg.vector_2d);
+                    let event = WebsocketServerEvents::Board(
+                        BoardEvent::CurrentQuestion(
+                            msg.vector_2d,
+                            question.clone().dto(true),
+                        ),
+                    );
+                    msg2.send_lobby_message(&msg.user_data.lobby_id, event);
+                }
+                fut::ready(())
+            });
+            _ctx.wait(fut);
+        return;
     }
 }
 

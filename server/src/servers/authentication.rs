@@ -129,7 +129,7 @@ fn append_structs_to_file(file_path: &str, structs_to_append: Admin) -> Result<(
 }
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AuthenticationServer {
     admin_token: HashSet<AdminAccessTokenResponse>,
     ////Maybe only IDs? DISCORD_ID
