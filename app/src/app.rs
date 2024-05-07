@@ -143,15 +143,19 @@ impl Component for App {
     fn view(&self, ctx: &Context<Self>) -> Html {
         let board = (*(self.jp_board_dto)).borrow().as_ref().cloned();
         log!(format!("view() {:?}", board));
-        match board {
+        let board = match board {
             None => {
                 log!("sending msg: Msg::BoardUnloaded");
                 ctx.link().send_message(AppMsg::BoardUnloaded);
-                html! {
+                return html! {
                     <h1>{ "LOADING..." }</h1>
-                }
+                };
             }
-            Some(board) => get_board(&board, ctx),
+            Some(board) => board,
+        };
+        match board.current {
+            Some(_) => todo!("show current question"),
+            None => get_board(&board, ctx),
         }
     }
 }
