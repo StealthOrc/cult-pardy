@@ -1,10 +1,9 @@
-use cult_common::{decompress, WebsocketServerEvents};
+use cult_common::{compress, decompress, WebsocketServerEvents};
 
 use crate::types::AppMsg;
 use futures::{channel::mpsc::Sender, SinkExt, StreamExt};
 use gloo_console::log;
 use gloo_net::websocket::{futures::WebSocket, Message};
-use std::io::Read;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
@@ -44,12 +43,9 @@ impl WebsocketService {
                         write.send(Message::Text(data)).await.unwrap();
                     }
                     Message::Bytes(b) => {
-                        let mut test = "".to_string();
-                        b.as_slice()
-                            .read_to_string(&mut test)
-                            .expect("TODO: panic message");
-                        log!("sending Bytes:{:?}", JsValue::from(test));
-                        write.send(Message::Bytes(b)).await.unwrap();
+                        let bytes = compress(&b).expect("could not compress bytes");
+                        log!(format!("sending Bytes:{:?}", bytes));
+                        write.send(Message::Bytes(bytes)).await.unwrap();
                     }
                 }
             }
@@ -89,4 +85,3 @@ impl WebsocketService {
         }
     }
 }
-

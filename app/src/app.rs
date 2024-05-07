@@ -1,5 +1,6 @@
 use cult_common::{
-    parse_addr_str, BoardEvent, DtoJeopardyBoard, DtoQuestion, Vector2D, WebsocketServerEvents,
+    compress, parse_addr_str, BoardEvent, DtoJeopardyBoard, DtoQuestion, Vector2D,
+    WebsocketServerEvents,
 };
 use futures::StreamExt;
 use gloo_console::log;
@@ -33,24 +34,19 @@ pub struct ButtonProps {
     #[prop_or_default]
     pub dtoq: DtoQuestion,
     #[prop_or_default]
-    pub vec: Vector2D,
-    #[prop_or_default]
     pub name: String,
+    pub onclick: Callback<MouseEvent>,
 }
 
 #[function_component]
 fn Button(props: &ButtonProps) -> Html {
-    let p = props.clone();
-    let onclick = Callback::from(move |_| {
-        log!(format!("{:?}", p.vec));
-    });
     if props.dtoq.won_user_id.is_some() {
         html! {
-        <button {onclick}>{format!("Disabled: {}",props.name) }</button>
+        <button onclick={props.onclick.clone()}>{format!("Disabled: {}",props.name) }</button>
         }
     } else {
         html! {
-        <div class="button-container"><button onclick={onclick}>{props.name.clone()}</button></div>
+        <div class="button-container"><button onclick={props.onclick.clone()}>{props.name.clone()}</button></div>
         }
     }
 }
@@ -122,11 +118,11 @@ impl Component for App {
                 log!("Board was loaded, lets refresh!");
                 true
             }
-            AppMsg::SendWebSocket => {
-                let ws = self
-                    .ws_service
-                    .send_tunnel
-                    .try_send(Message::Text("Test".parse().unwrap()));
+            AppMsg::GetButtonQuestion(buttonpos) => {
+                log!(format!("GetButtonQuestion: {:?}", buttonpos));
+                let eventdata = cult_common::WebsocketSessionEvent::Click(buttonpos);
+                let binary = serde_json::to_vec(&eventdata).expect("Can´t convert to vec");
+                let ws = self.ws_service.send_tunnel.try_send(Message::Bytes(binary));
                 match ws {
                     Ok(_) => {
                         log!("SedWebSocket: OK SEND")
@@ -135,14 +131,14 @@ impl Component for App {
                         log!("SedWebSocket: Error: ", e.to_string())
                     }
                 };
-                true
+                false
             }
         }
     }
 
     fn view(&self, ctx: &Context<Self>) -> Html {
         let board = (*(self.jp_board_dto)).borrow().as_ref().cloned();
-        log!(format!("{:#?}", board));
+        log!(format!("view() {:?}", board));
         match board {
             None => {
                 log!("sending msg: Msg::BoardUnloaded");
@@ -151,12 +147,12 @@ impl Component for App {
                     <h1>{ "LOADING..." }</h1>
                 }
             }
-            Some(board) => get_board(&board),
+            Some(board) => get_board(&board, ctx),
         }
     }
 }
 
-pub fn get_board(dto_jeopardy_board: &DtoJeopardyBoard) -> Html {
+pub fn get_board(dto_jeopardy_board: &DtoJeopardyBoard, ctx: &Context<App>) -> Html {
     let num_categories = dto_jeopardy_board.categories.len();
 
     let grid_columns = format!("repeat({}, 1fr)", num_categories);
@@ -171,9 +167,13 @@ pub fn get_board(dto_jeopardy_board: &DtoJeopardyBoard) -> Html {
                                 <h2>{&category.title}</h2>
                                 {
                                     category.questions.iter().enumerate().map(|(col_index, question)| {
+                                        let vec2D = Vector2D { x: row_index as u8, y: col_index as u8 };
+                                        let onclick = ctx.link().callback(move |_| {
+                                            AppMsg::GetButtonQuestion(vec2D)
+                                        });
                                         html! {
                                             <div class="jeopardy-question">
-                                                <Button dtoq={question.clone()} name={format!("{}€", question.value)}  vec={Vector2D { x: row_index as u8, y: col_index as u8 }} />
+                                                <Button dtoq={question.clone()} name={format!("{}€", question.value)} {onclick} />
                                             </div>
                                         }
                                     }).collect::<Html>()

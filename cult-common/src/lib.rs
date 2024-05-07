@@ -107,7 +107,7 @@ pub struct DtoJeopardyBoard {
     pub current: Option<Vector2D>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Default)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq, Default)]
 pub struct Vector2D {
     pub x: u8,
     pub y: u8,
