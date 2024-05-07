@@ -1,12 +1,12 @@
-use cult_common::{DtoJeopardyBoard, Vector2D};
+use cult_common::{DtoJeopardyBoard, Vector2D, WebsocketSessionEvent};
 use yew::prelude::*;
 
-use crate::boardbutton::BoardButton;
+use crate::{boardbutton::BoardButton, types::WebsocketCallback};
 
 #[derive(Properties, PartialEq, Debug)]
 pub struct BoardProps {
     pub board: DtoJeopardyBoard,
-    pub onclick: Callback<Vector2D>,
+    pub onclick: WebsocketCallback,
 }
 
 pub(crate) struct Board {}

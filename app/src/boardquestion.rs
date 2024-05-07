@@ -1,9 +1,12 @@
-use cult_common::DtoJeopardyBoard;
+use cult_common::{DtoJeopardyBoard, DtoQuestion};
 use yew::prelude::*;
+
+use crate::types::WebsocketCallback;
 
 #[derive(Properties, PartialEq)]
 pub struct QuestionProps {
-    pub board: DtoJeopardyBoard,
+    pub question: DtoQuestion,
+    pub onclick: WebsocketCallback,
 }
 
 #[derive(Debug)]
@@ -20,8 +23,13 @@ impl Component for BoardQuestion {
 
     fn view(&self, ctx: &Context<Self>) -> Html {
         let props = ctx.props();
+        let question_text = props
+            .question
+            .question_text
+            .clone()
+            .expect("did not find question_text!");
         html! {
-            <div class={classes!("question-container")}></div>
+            <div class={classes!("question-container")}>{question_text}</div>
         }
     }
 }

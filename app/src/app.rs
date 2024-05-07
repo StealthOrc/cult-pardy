@@ -63,11 +63,33 @@ impl Component for App {
                     WebsocketServerEvents::Board(board_event) => match board_event {
                         BoardEvent::CurrentBoard(board) => {
                             log!("board received!");
-                            (*mydto).replace(Some(board));
+                            mydto.borrow_mut().replace(board);
                             callback.emit(AppMsg::BoardLoaded);
                         }
                         BoardEvent::UpdateBoard(_) => {}
-                        BoardEvent::CurrentQuestion(vector2d, dto_question) => {}
+                        BoardEvent::CurrentQuestion(vector2d, dto_question) => {
+                            match mydto.borrow_mut().as_mut() {
+                                Some(board) => {
+                                    //got new data, so replace our current model with the new data
+                                    board.current = Some(vector2d);
+                                    let mut cat =
+                                        board.categories.get_mut(vector2d.x as usize).expect(
+                                            format!(
+                                                "could not get category {} as mutable.",
+                                                vector2d.x
+                                            )
+                                            .as_str(),
+                                        );
+
+                                    std::mem::replace(
+                                        &mut cat.questions[vector2d.y as usize],
+                                        dto_question,
+                                    );
+                                    callback.emit(AppMsg::ShowQuestion);
+                                }
+                                None => todo!(),
+                            }
+                        }
                     },
                     WebsocketServerEvents::Websocket(_) => {}
                     WebsocketServerEvents::Session(_) => {}
@@ -77,7 +99,10 @@ impl Component for App {
             }
         };
 
-        log!(format!("create(): dto={:?}", (*dto).borrow().as_ref()));
+        log!(format!(
+            "create(): dto={:?}",
+            (*Rc::clone(&dto)).borrow().as_ref()
+        ));
 
         let wss = WebsocketService::new(
             parse_addr_str("127.0.0.1", 8000).to_string().as_str(),
@@ -104,10 +129,9 @@ impl Component for App {
                 log!("Board was loaded, lets refresh!");
                 true
             }
-            AppMsg::GetButtonQuestion(buttonpos) => {
-                log!(format!("GetButtonQuestion: {:?}", buttonpos));
-                let eventdata = cult_common::WebsocketSessionEvent::Click(buttonpos);
-                let binary = serde_json::to_vec(&eventdata).expect("Can´t convert to vec");
+            AppMsg::SendWebsocketMessage(event) => {
+                log!(format!("GetButtonQuestion: {:?}", event));
+                let binary = serde_json::to_vec(&event).expect("Can´t convert to vec");
                 let ws = self.ws_service.send_tunnel.try_send(Message::Bytes(binary));
                 match ws {
                     Ok(_) => {
@@ -119,6 +143,7 @@ impl Component for App {
                 };
                 false
             }
+            AppMsg::ShowQuestion => true,
         }
     }
 
@@ -136,11 +161,16 @@ impl Component for App {
             Some(board) => board,
         };
         match board.current {
-            Some(_) => html! {
-                <BoardQuestion board={board}/>
-            },
+            Some(current) => {
+                let onclick = ctx.link().callback(AppMsg::SendWebsocketMessage);
+                let question =
+                    board.categories[current.x as usize].questions[current.y as usize].clone();
+                html! {
+                    <BoardQuestion {question} {onclick}/>
+                }
+            }
             None => {
-                let onclick = ctx.link().callback(AppMsg::GetButtonQuestion);
+                let onclick = ctx.link().callback(AppMsg::SendWebsocketMessage);
                 html! {
                     <Board board={board} {onclick}/>
                 }

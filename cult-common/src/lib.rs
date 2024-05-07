@@ -128,8 +128,6 @@ pub struct DtoQuestion {
     pub won_user_id: Option<UserSessionId>,
 }
 
-
-
 impl crate::DtoCategory {
     pub fn new(title: String, questions: Vec<DtoQuestion>) -> Self {
         crate::DtoCategory { title, questions }
@@ -323,7 +321,7 @@ pub enum QuestionType {
 }
 
 impl Question {
-    pub fn dto(self, current:bool) -> DtoQuestion {
+    pub fn dto(self, current: bool) -> DtoQuestion {
         let question_text = match current {
             true => Some(self.question),
             false => None,
@@ -386,9 +384,8 @@ pub enum SessionEvent {
     SessionDisconnected(UserSessionId),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Display)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, Display)]
 pub enum WebsocketSessionEvent {
-    Text(String),
     Click(Vector2D),
 }
 
