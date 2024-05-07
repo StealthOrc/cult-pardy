@@ -1,16 +1,17 @@
 mod app;
-mod service;
 mod file;
 mod game;
-mod ws;
 mod mainpage;
+mod service;
+mod types;
+mod ws;
 
 use yew::prelude::*;
 use yew_router::prelude::*;
 //testing purposes
-use gloo_storage::Storage;
 use crate::app::App;
 use crate::mainpage::MainPage;
+use gloo_storage::Storage;
 
 #[derive(Clone, Routable, PartialEq)]
 pub enum Route {
@@ -31,7 +32,7 @@ pub enum Route {
 fn switch(routes: Route) -> Html {
     match routes {
         Route::Home => html! {  <MainPage /> },
-        Route::Game => html!{ <App  />} ,
+        Route::Game => html! { <App  />},
         _ => html! { <h1>{ "404" }</h1> },
     }
 }

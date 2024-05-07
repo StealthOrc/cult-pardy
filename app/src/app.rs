@@ -1,19 +1,15 @@
 use cult_common::{
     parse_addr_str, BoardEvent, DtoJeopardyBoard, DtoQuestion, Vector2D, WebsocketServerEvents,
-    WebsocketSessionEvent,
 };
 use futures::StreamExt;
-use gloo_console::{info, log};
-use gloo_net::websocket::{self, Message};
-use std::{
-    borrow::{Borrow, BorrowMut},
-    cell::RefCell,
-    rc::Rc,
-};
+use gloo_console::log;
+use gloo_net::websocket::Message;
+use std::{borrow::Borrow, cell::RefCell, rc::Rc};
 use wasm_cookies::cookies::*;
 use web_sys::HtmlDocument;
 use yew::prelude::*;
 
+use crate::types::AppMsg;
 use crate::ws::websocket::WebsocketService;
 
 // testing purposes
@@ -30,12 +26,6 @@ fn document() -> HtmlDocument {
 
 pub(crate) fn cookie_string() -> String {
     document().cookie().unwrap()
-}
-
-pub enum Msg {
-    TestMessage(String),
-    SendWebSocket,
-    BoardUnloaded
 }
 
 #[derive(Properties, Clone, PartialEq, Default)]
@@ -72,10 +62,10 @@ pub struct App {
 }
 
 impl Component for App {
-    type Message = Msg;
+    type Message = AppMsg;
     type Properties = ();
 
-    fn create(_ctx: &Context<Self>) -> Self {
+    fn create(ctx: &Context<Self>) -> Self {
         let usr_session_id: String = get(&cookie_string(), "user-session-id")
             .expect("could not get cookie")
             .expect("could not get cookie from user");
@@ -86,13 +76,15 @@ impl Component for App {
         let lobby_id = get_game_id_from_url().expect("SomeData?");
 
         // type SharedStateDtoJeopardyBoard = Rc<RefCell<Option<DtoJeopardyBoard>>>;
-        let mut dto: SharedStateDtoJeopardyBoard = Rc::new(RefCell::new(None));
+        let dto: SharedStateDtoJeopardyBoard = Rc::new(RefCell::new(None));
         let on_read = {
             let mydto: SharedStateDtoJeopardyBoard = Rc::clone(&dto);
-            move |event: WebsocketServerEvents| match event {
+            move |event: WebsocketServerEvents, callback: Callback<AppMsg>| match event {
                 WebsocketServerEvents::Board(board_event) => match board_event {
                     BoardEvent::CurrentBoard(board) => {
+                        log!("board recieved!");
                         (*mydto).replace(Some(board));
+                        callback.emit(AppMsg::BoardLoaded);
                     }
                     BoardEvent::UpdateBoard(_) => {}
                 },
@@ -103,8 +95,7 @@ impl Component for App {
             }
         };
 
-        let dto = dto;
-        log!(format!("{:?}", (*dto).borrow().as_ref()));
+        log!(format!("create(): dto={:?}", (*dto).borrow().as_ref()));
 
         let wss = WebsocketService::new(
             parse_addr_str("127.0.0.1", 8000).to_string().as_str(),
@@ -112,6 +103,7 @@ impl Component for App {
             usr_session_id.as_str(),
             session_token.as_str(),
             on_read,
+            ctx.link().callback(|msg: AppMsg| msg),
         );
 
         App {
@@ -122,65 +114,54 @@ impl Component for App {
 
     fn update(&mut self, _ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
-            Msg::BoardUnloaded => {
+            AppMsg::BoardUnloaded => {
+                log!("Board is not yet loaded!");
+                false
+            }
+            AppMsg::BoardLoaded => {
+                log!("Board was loaded, lets refresh!");
                 true
             }
-            Msg::TestMessage(test) => {
-                log!(format!("update(): {test}"));
-                true
-            }
-            Msg::SendWebSocket => {
+            AppMsg::SendWebSocket => {
                 let ws = self
                     .ws_service
                     .send_tunnel
                     .try_send(Message::Text("Test".parse().unwrap()));
                 match ws {
                     Ok(_) => {
-                        log!("OK SEND")
+                        log!("SedWebSocket: OK SEND")
                     }
                     Err(e) => {
-                        log!("Hello", e.to_string())
+                        log!("SedWebSocket: Error: ", e.to_string())
                     }
                 };
                 true
             }
-
-            _ => false,
         }
     }
-
-    /*     <li>
-                                  <ul>
-                                    <h2>{header1}</h2>
-                                    <Button name={test1} vec={vec2d.clone()}/>
-                                    <Button name={test2} vec={vec2d.clone()}/>
-                                    <Button name={test3} vec={vec2d.clone()}/>
-                                </ul>*/
 
     fn view(&self, ctx: &Context<Self>) -> Html {
         let board = (*(self.jp_board_dto)).borrow().as_ref().cloned();
+        log!(format!("{:#?}", board));
         match board {
             None => {
-                //ctx.link().send_message(Msg::BoardUnloaded);
-                let onclick = ctx.link().callback(|_| Msg::BoardUnloaded);
-                return html! {
-                    <button {onclick}>{ "LOADING..." }</button>
+                log!("sending msg: Msg::BoardUnloaded");
+                ctx.link().send_message(AppMsg::BoardUnloaded);
+                html! {
+                    <h1>{ "LOADING..." }</h1>
                 }
-            },
-            Some(board) => {
-                get_board(&board)
             }
+            Some(board) => get_board(&board),
         }
     }
 }
-
 
 pub fn get_board(dto_jeopardy_board: &DtoJeopardyBoard) -> Html {
     let num_categories = dto_jeopardy_board.categories.len();
 
     let grid_columns = format!("repeat({}, 1fr)", num_categories);
 
-    return html! {
+    html! {
         <main class="jeopardy-container">
             <div class="jeopardy-board" style={format!("grid-template-columns: {}", grid_columns)}>
                 {
@@ -205,7 +186,6 @@ pub fn get_board(dto_jeopardy_board: &DtoJeopardyBoard) -> Html {
         </main>
     }
 }
-
 
 pub(crate) fn get_game_id_from_url() -> Option<String> {
     let window = web_sys::window().expect("No global `window` exists.");
