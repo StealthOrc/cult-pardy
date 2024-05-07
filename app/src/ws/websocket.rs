@@ -20,14 +20,14 @@ impl WebsocketService {
         session_token: &str,
         mut on_read: F,
     ) -> Self
-    where
-        F: FnMut(WebsocketServerEvents) + 'static,
+        where
+            F: FnMut(WebsocketServerEvents) + 'static,
     {
         let ws = WebSocket::open(
             format!("ws://{addr}/ws?lobby-id={lobby_id}&user-session-id={user_session_id}&session-token={session_token}")
                 .as_str(),
         )
-        .unwrap();
+            .unwrap();
 
         let (mut write, mut read) = ws.split();
         let (tunnel_send, mut tunnel_receive) = futures::channel::mpsc::channel::<Message>(1000);

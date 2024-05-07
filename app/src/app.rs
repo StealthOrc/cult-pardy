@@ -35,6 +35,7 @@ pub(crate) fn cookie_string() -> String {
 pub enum Msg {
     TestMessage(String),
     SendWebSocket,
+    BoardUnloaded
 }
 
 #[derive(Properties, Clone, PartialEq, Default)]
@@ -85,21 +86,13 @@ impl Component for App {
         let lobby_id = get_game_id_from_url().expect("SomeData?");
 
         // type SharedStateDtoJeopardyBoard = Rc<RefCell<Option<DtoJeopardyBoard>>>;
-        let mut testString: Rc<RefCell<String>> = Rc::new(RefCell::new(String::from("Test")));
         let mut dto: SharedStateDtoJeopardyBoard = Rc::new(RefCell::new(None));
         let on_read = {
             let mydto: SharedStateDtoJeopardyBoard = Rc::clone(&dto);
-            let mytestString = Rc::clone(&testString);
             move |event: WebsocketServerEvents| match event {
                 WebsocketServerEvents::Board(board_event) => match board_event {
                     BoardEvent::CurrentBoard(board) => {
-                        // let mut test = (*mydto).borrow_mut().unwrap();
-                        // test = board;
                         (*mydto).replace(Some(board));
-                        (*mytestString).replace(String::from("test2"));
-
-                        log!("------");
-                        log!(format!("onread:{:?}", (*mydto).borrow().as_ref()));
                     }
                     BoardEvent::UpdateBoard(_) => {}
                 },
@@ -129,6 +122,9 @@ impl Component for App {
 
     fn update(&mut self, _ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
+            Msg::BoardUnloaded => {
+                true
+            }
             Msg::TestMessage(test) => {
                 log!(format!("update(): {test}"));
                 true
@@ -148,88 +144,68 @@ impl Component for App {
                 };
                 true
             }
-            _ => true,
+
+            _ => false,
         }
     }
 
-    fn view(&self, ctx: &Context<Self>) -> Html {
-        log!("------");
-        log!(format!(
-            "view(): {:?}",
-            (*(self.jp_board_dto)).borrow().as_ref()
-        ));
+    /*     <li>
+                                  <ul>
+                                    <h2>{header1}</h2>
+                                    <Button name={test1} vec={vec2d.clone()}/>
+                                    <Button name={test2} vec={vec2d.clone()}/>
+                                    <Button name={test3} vec={vec2d.clone()}/>
+                                </ul>*/
 
-        let test1 = "100€";
-        let test2 = "200€";
-        let test3 = "300€";
-        let _cultpardy = "cult-pardy";
-        let header1 = "🌟 Anime";
-        let header2 = "🎨 Art";
-        let header3 = "🗻 Japan";
-        let header4 = "🎹 Music";
-        let header5 = "🍿 Movies and watchables";
-        // let testcb = ctx.link().callback(Msg::TestMessage);
-        // testcb.emit("Hello World!".to_owned());
-        // let onclick = ctx
-        //     .link()
-        //     .callback(|_| Msg::TestMessage(String::from("clicked")));
-        // #[prop_or_default]
-        // pub dtoq: DtoQuestion,
-        // #[prop_or_default]
-        // pub vec: Vector2D,
-        // #[prop_or_default]
-        // pub id: usize,
-        let vec2d = Vector2D { x: 1, y: 2 };
-        html! {
-        <main>
-            <div class="listcontainer">
-                <ul>
-                  <li>
-                      <ul>
-                        <h2>{header1}</h2>
-                        <Button name={test1} vec={vec2d.clone()}/>
-                        <Button name={test2} vec={vec2d.clone()}/>
-                        <Button name={test3} vec={vec2d.clone()}/>
-                    </ul>
-                  </li>
-                  <li>
-                      <ul>
-                        <h2>{header2}</h2>
-                        <Button name={test1} vec={vec2d.clone()}/>
-                        <Button name={test2} vec={vec2d.clone()}/>
-                        <Button name={test3} vec={vec2d.clone()}/>
-                    </ul>
-                  </li>
-                  <li>
-                      <ul>
-                        <h2>{header3}</h2>
-                        <Button name={test1} vec={vec2d.clone()}/>
-                        <Button name={test2} vec={vec2d.clone()}/>
-                        <Button name={test3} vec={vec2d.clone()}/>
-                    </ul>
-                  </li>
-                  <li>
-                      <ul>
-                        <h2>{header4}</h2>
-                        <Button name={test1} vec={vec2d.clone()}/>
-                        <Button name={test2} vec={vec2d.clone()}/>
-                        <Button name={test3} vec={vec2d.clone()}/>
-                    </ul>
-                  </li>
-                  <li>
-                      <ul>
-                        <h2>{header5}</h2>
-                        <Button name={test1} vec={vec2d.clone()}/>
-                        <Button name={test2} vec={vec2d.clone()}/>
-                        <Button name={test3} vec={vec2d.clone()}/>
-                    </ul>
-                  </li>
-                </ul>
-            </div>
-        </main>
+    fn view(&self, ctx: &Context<Self>) -> Html {
+        let board = (*(self.jp_board_dto)).borrow().as_ref().cloned();
+        match board {
+            None => {
+                //ctx.link().send_message(Msg::BoardUnloaded);
+                let onclick = ctx.link().callback(|_| Msg::BoardUnloaded);
+                return html! {
+                    <button {onclick}>{ "LOADING..." }</button>
+                }
+            },
+            Some(board) => {
+                get_board(&board)
+            }
         }
     }
 }
+
+
+pub fn get_board(dto_jeopardy_board: &DtoJeopardyBoard) -> Html {
+    return html! {
+                    <main>
+                        <div class="listcontainer">
+                            <ul>
+                                {
+                                        dto_jeopardy_board.categories.iter().enumerate().map( |(row_index, category)|{
+                                        html! {
+                                            <li>
+                                                 <h2>{&category.title}</h2>
+                                                {
+                                                    dto_jeopardy_board.categories.get(0).unwrap().questions.iter().enumerate().map( |(col_index, question)|{
+                                                        html! {
+                                                            <Button name={format!("{}€",question.value)} vec={Vector2D{x: row_index as u8,y: col_index as u8,}}/>
+                                                        }
+                                                     }).collect::<Html>()
+                                                }
+                                            </li>
+                                        }
+                                    }).collect::<Html>()
+                                }
+                            </ul>
+                        </div>
+                    </main>
+                }
+}
+
+
+
+
+
 pub(crate) fn get_game_id_from_url() -> Option<String> {
     let window = web_sys::window().expect("No global `window` exists.");
     let location = window.location();
