@@ -420,7 +420,7 @@ pub enum WebsocketEvent {
 #[derive(Debug, Clone, Serialize, Deserialize, Display, Hash)]
 pub enum SessionEvent {
     CurrentSessions(Vec<DTOSession>),
-    SessionJoined(UserSessionId),
+    SessionJoined(DTOSession),
     SessionDisconnected(UserSessionId),
 }
 

@@ -7,6 +7,7 @@ use crate::servers::game::{SessionDisconnect, SessionMessageType};
 use actix_web::web;
 use actix_web_actors::ws;
 use actix_web_actors::ws::WebsocketContext;
+use chrono::{DateTime, Local, TimeDelta};
 use cult_common::{
     compress, decompress, LobbyId, UserSessionId, WebsocketSessionEvent, WebsocketSessionId,
 };
@@ -29,6 +30,8 @@ pub struct UserData {
     pub websocket_session_id: Option<WebsocketSessionId>,
     pub user_session_id: UserSessionId,
     pub lobby_id: LobbyId,
+    pub last_pong: DateTime<Local>,
+    pub ping: i64
 }
 
 impl UserData {
@@ -37,6 +40,8 @@ impl UserData {
             websocket_session_id: None,
             user_session_id,
             lobby_id: lobby,
+            last_pong: Local::now(),
+            ping: 0
         }
     }
 }
@@ -100,9 +105,6 @@ impl Actor for WsSession {
     }
 
     fn stopping(&mut self, _: &mut Self::Context) -> Running {
-        //notify chat server
-        //println!("STOP!? id: {}", self.player.websocket_session_id.unwrap().id);
-
         self.handler.do_send(SessionDisconnect {
             user_data: self.player.clone(),
         });
@@ -145,6 +147,9 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                 ctx.pong(&msg);
             }
             ws::Message::Pong(_) => {
+                let current_ping = Local::now();
+                self.player.last_pong = current_ping;
+                self.player.ping = (current_ping.signed_duration_since(self.player.last_pong).num_milliseconds() - TimeDelta::seconds(5).num_milliseconds())/5;
                 self.hb = Instant::now();
             }
             ws::Message::Text(text) => {

@@ -519,10 +519,10 @@ impl Handler<Connect> for GameServer {
         });
 
         if new_session {
+            let dto_session = user_session.clone().dto();
             println!("Someone joined: {:?}{:?}", &msg, &websocket_session_id.clone());
-            self.send_lobby_message(&msg.lobby_id.clone(), WebsocketServerEvents::Session(SessionEvent::SessionJoined(msg.user_session_id.clone())));
+            self.send_lobby_message(&msg.lobby_id.clone(), WebsocketServerEvents::Session(SessionEvent::SessionJoined(dto_session)));
         }
-        let _sessions =
 
         self.send_lobby_message(&msg.lobby_id, WebsocketServerEvents::Websocket(WebsocketJoined(websocket_session_id.clone())));
         self.send_websocket_session_message(&msg.lobby_id, &websocket_session_id, WebsocketServerEvents::Board(CurrentBoard(lobby.jeopardy_board.dto())));
