@@ -72,7 +72,7 @@ impl Component for App {
                                     //got new data, so replace our current model with the new data
                                     board.current = Some(vector2d);
                                     let mut cat =
-                                        board.categories.get_mut(vector2d.x as usize).expect(
+                                        board.categories.get_mut(vector2d.x).expect(
                                             format!(
                                                 "could not get category {} as mutable.",
                                                 vector2d.x
@@ -81,7 +81,7 @@ impl Component for App {
                                         );
 
                                     std::mem::replace(
-                                        &mut cat.questions[vector2d.y as usize],
+                                        &mut cat.questions[vector2d.y],
                                         dto_question,
                                     );
                                     callback.emit(AppMsg::ShowQuestion);
@@ -163,7 +163,7 @@ impl Component for App {
             Some(current) => {
                 let onclick = ctx.link().callback(AppMsg::SendWebsocketMessage);
                 let question =
-                    board.categories[current.x as usize].questions[current.y as usize].clone();
+                    board.categories[current.x].questions[current.y].clone();
                 html! {
                     <BoardQuestion {question} {onclick}/>
                 }

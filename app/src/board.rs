@@ -38,7 +38,7 @@ impl Component for Board {
                                     <h2>{&category.title}</h2>
                                     {
                                         category.questions.iter().enumerate().map(|(col_index, question)| {
-                                            let vec_2d = Vector2D { x: row_index as u8, y: col_index as u8 };
+                                            let vec_2d = Vector2D { x: row_index, y: col_index };
                                             html! {
                                                 <div class="jeopardy-question">
                                                     <BoardButton dtoq={question.clone()} onclick={ctx.props().onclick.clone()} {vec_2d}/>

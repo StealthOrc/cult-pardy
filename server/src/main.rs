@@ -9,6 +9,7 @@ use crate::apis::api::session_request;
 
 use actix_web::{web, App, HttpServer, HttpRequest, HttpResponse, get};
 use anyhow::Result;
+use mongodb::Client;
 use tokio::runtime::Runtime;
 use cult_common::*;
 use cult_common::JeopardyMode::NORMAL;
@@ -25,7 +26,8 @@ async fn main() -> Result<()> {
     let port = 8000;
     let addr = parse_addr_str(addr, port);
 
-    let services = Services::init();
+    let services = Services::init().await;
+
 
 
 
@@ -35,8 +37,10 @@ async fn main() -> Result<()> {
     let rt = Runtime::new().expect("Somethings wrong with the Runtime");
     rt.spawn(input_server.read_input());
 
+
     let server = HttpServer::new(move || {
         App::new()
+            .app_data(web::Data::new(services.mongo_server.clone()))
             .app_data(web::Data::new(services.grant_client.clone()))
             .app_data(web::Data::new(services.login_client.clone()))
             .app_data(web::Data::new(services.game_server.clone()))

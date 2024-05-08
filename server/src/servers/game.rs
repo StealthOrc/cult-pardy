@@ -10,6 +10,7 @@ use actix_web::error::ErrorInternalServerError;
 use actix_web::rt::System;
 use chrono::TimeDelta;
 use futures::executor::block_on;
+use futures::StreamExt;
 use oauth2::basic::{BasicClient, BasicTokenResponse};
 use oauth2::reqwest::async_http_client;
 use oauth2::TokenResponse;
@@ -24,7 +25,10 @@ use cult_common::WebsocketError::{LobbyNotFound, SessionNotFound};
 use cult_common::WebsocketEvent::{WebsocketDisconnected, WebsocketJoined};
 use crate::authentication::discord::{DiscordME, LoginDiscordAuth};
 use crate::servers::authentication::{AuthenticationServer, CheckAdminAccess, RedeemAdminAccessToken};
-use crate::servers::game;
+use crate::servers::{game,  StartingServices};
+use crate::servers::db::DBDatabase::CultPardy;
+use crate::servers::db::UserCollection;
+use crate::servers::db::UserCollection::{UserSessionCollection};
 use crate::servers::game::GameState::Waiting;
 use crate::ws::session::UserData;
 
@@ -171,9 +175,7 @@ impl actix::Message for GrandAdminAccess {
 /// Implementation is very naïve.
 #[derive(Debug)]
 pub struct GameServer {
-    pub login_discord_auth: LoginDiscordAuth,
-    pub authentication_server: Addr<AuthenticationServer>,
-    pub rng: ThreadRng,
+    pub starting_services: StartingServices,
     pub user_sessions: HashMap<UserSessionId, UserSession>,
     pub lobbies: HashMap<LobbyId, Lobby>
 }
@@ -210,7 +212,7 @@ pub struct WebsocketSession{
 
 
 
-#[derive(Debug, Clone,Serialize)]
+#[derive(Debug, Clone,Serialize, Deserialize)]
 pub struct DiscordData {
     pub(crate) discord_user:Option<DiscordUser>,
     #[serde(skip_serializing)]
@@ -318,14 +320,8 @@ pub enum GameState{
 
 
 
-
-
-
-
-
 impl GameServer {
-    pub fn new(login_discord_auth: LoginDiscordAuth, authentication_server: Addr<AuthenticationServer>) -> GameServer {
-
+    pub fn new(starting_services: StartingServices) -> GameServer {
         let name =  LobbyId::from_str("main");
         let main = Lobby{
             creator: DiscordID::server(),
@@ -340,18 +336,29 @@ impl GameServer {
         let mut lobbies = HashMap::new();
         lobbies.insert(name.clone(), main);
 
-
         println!("Game lobby's: {:?}", &lobbies.values().map(|lobby| lobby.lobby_id.clone()).collect::<Vec<_>>());
         GameServer {
-            login_discord_auth,
-            authentication_server,
-            rng: rand::thread_rng(),
+            starting_services,
             user_sessions: HashMap::new(),
             lobbies,
         }
     }
-}
-impl GameServer {
+
+    fn get_discord_id(&self, user_session_id: &UserSessionId) -> Option<DiscordID>{
+        let user_session = match self.user_sessions.get(user_session_id) {
+            None => return None,
+            Some(data) => data,
+        };
+        let discord_data = match &user_session.discord_auth {
+            None => return None,
+            Some(data) => data,
+        };
+        let discord_user = match &discord_data.discord_user {
+            None => return None,
+            Some(data) => data,
+        };
+        Some(discord_user.discord_id.clone())
+    }
 
 
     fn new_session(&mut self) -> UserSession {
@@ -360,7 +367,11 @@ impl GameServer {
             session = UserSession::random();
         }
         self.user_sessions.insert(session.user_session_id.clone(), session.clone());
-        println!("Added User-session {:?}", session);
+        println!("Added User-session {:?}", session.clone());
+
+        let t = self.starting_services.mongo_server.collection::<UserSession>(CultPardy(UserSessionCollection));
+        t.insert_one(&session, None).expect("??????");
+        println!("{:?}", t);
         session
     }
 
@@ -700,22 +711,13 @@ impl Handler<LobbyClick> for GameServer {
     type Result = ();
 
     fn handle(&mut self, msg: LobbyClick, _ctx: &mut Self::Context) -> Self::Result {
-        let user_session = match self.user_sessions.get(&msg.user_data.user_session_id) {
+        let discord_id = match self.get_discord_id(&msg.user_data.user_session_id) {
             None => return,
             Some(data) => data,
         };
-        let discord_data = match &user_session.discord_auth {
-            None => return,
-            Some(data) => data,
-        };
-        let discord_user = match &discord_data.discord_user {
-            None => return,
-            Some(data) => data,
-        };
-        let id = discord_user.discord_id.clone();
 
-        let fut = self.authentication_server.send(CheckAdminAccess {
-            discord_id: discord_user.clone().discord_id,
+        let fut = self.starting_services.authentication_server.send(CheckAdminAccess {
+            discord_id: discord_id.clone(),
         })
             .into_actor(self)
             .then(move |is_admin, msg2, ctx| {
@@ -724,12 +726,12 @@ impl Handler<LobbyClick> for GameServer {
                     None => return fut::ready(()),
                     Some(lobby) => lobby
                 };
-                if &lobby.creator.eq(&id) | &is_admin {
-                    let category = match lobby.jeopardy_board.categories.get(msg.vector_2d.x as usize) {
+                if &lobby.creator.eq(&discord_id) | &is_admin {
+                    let category = match lobby.jeopardy_board.categories.get(msg.vector_2d.x) {
                         None => return fut::ready(()),
                         Some(data) => data,
                     };
-                    let question = match category.questions.get(msg.vector_2d.y as usize) {
+                    let question = match category.questions.get(msg.vector_2d.y) {
                         None => return fut::ready(()),
                         Some(data) => data,
                     };
@@ -745,6 +747,8 @@ impl Handler<LobbyClick> for GameServer {
                 fut::ready(())
             });
             _ctx.wait(fut);
+
+
         return;
     }
 }
@@ -753,22 +757,12 @@ impl Handler<LobbyBackClick> for GameServer {
     type Result = ();
 
     fn handle(&mut self, msg: LobbyBackClick, _ctx: &mut Self::Context) -> Self::Result {
-        let user_session = match self.user_sessions.get(&msg.user_data.user_session_id) {
+        let discord_id = match self.get_discord_id(&msg.user_data.user_session_id) {
             None => return,
             Some(data) => data,
         };
-        let discord_data = match &user_session.discord_auth {
-            None => return,
-            Some(data) => data,
-        };
-        let discord_user = match &discord_data.discord_user {
-            None => return,
-            Some(data) => data,
-        };
-        let id = discord_user.discord_id.clone();
-
-        let fut = self.authentication_server.send(CheckAdminAccess {
-            discord_id: discord_user.clone().discord_id,
+        let fut = self.starting_services.authentication_server.send(CheckAdminAccess {
+            discord_id: discord_id.clone(),
         })
             .into_actor(self)
             .then(move |is_admin, msg2, ctx| {
@@ -777,7 +771,7 @@ impl Handler<LobbyBackClick> for GameServer {
                     None => return fut::ready(()),
                     Some(lobby) => lobby
                 };
-                if &lobby.creator.eq(&id) | &is_admin {
+                if &lobby.creator.eq(&discord_id) | &is_admin {
                     lobby.jeopardy_board.current = None;
                     let board = lobby.jeopardy_board.clone();
                     let event = WebsocketServerEvents::Board(CurrentBoard(board.dto()),
@@ -790,6 +784,7 @@ impl Handler<LobbyBackClick> for GameServer {
         return;
     }
 }
+
 
 
 

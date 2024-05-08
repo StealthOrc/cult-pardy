@@ -107,10 +107,51 @@ pub struct DtoJeopardyBoard {
     pub current: Option<Vector2D>,
 }
 
+impl DtoJeopardyBoard{
+
+    pub fn get_question(self, vector2d: Vector2D) -> Option<DtoQuestion> {
+        if let Some(categories) = self.categories.get(vector2d.x) {
+            if let Some(question) = categories.questions.get(vector2d.y) {
+                return Some(question.clone())
+            }
+        }
+        None
+    }
+
+    pub fn get_mut_question(mut self, vector2d: Vector2D) -> Option<DtoQuestion> {
+        if let Some(categories) = self.categories.get_mut(vector2d.x) {
+            if let Some(question) = categories.questions.get_mut(vector2d.y) {
+                return Some(question.clone())
+            }
+        }
+        None
+    }
+
+    pub fn get_current(mut self) -> Option<DtoQuestion> {
+        if let Some(current) = self.current {
+            if let Some(question) = self.get_question(current) {
+                return Some(question.clone())
+            }
+        }
+        None
+    }
+
+    pub fn get_mut_current(mut self) -> Option<DtoQuestion> {
+        if let Some(current) = self.current {
+            if let Some(question) = self.get_mut_question(current) {
+                return Some(question.clone())
+            }
+        }
+        None
+    }
+
+}
+
+
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq, Default)]
 pub struct Vector2D {
-    pub x: u8,
-    pub y: u8,
+    pub x: usize,
+    pub y: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -513,7 +554,7 @@ impl JeopardyBoard {
                 match self.current {
                     None => question.clone().dto(false),
                     Some(vec) => {
-                        let current = Vector2D{x: row_index as u8, y: col_index as u8};
+                        let current = Vector2D{x: row_index, y: col_index};
                         question.clone().dto(vec.eq(&current))
                     }
                 }
@@ -533,6 +574,45 @@ impl JeopardyBoard {
             current: self.current,
         }
     }
+
+
+    pub fn get_question(self, vector2d: Vector2D) -> Option<Question> {
+        if let Some(categories) = self.categories.get(vector2d.x) {
+            if let Some(question) = categories.questions.get(vector2d.y) {
+                return Some(question.clone())
+            }
+        }
+        None
+    }
+
+    pub fn get_mut_question(mut self, vector2d: Vector2D) -> Option<Question> {
+        if let Some(categories) = self.categories.get_mut(vector2d.x) {
+            if let Some(question) = categories.questions.get_mut(vector2d.y) {
+                return Some(question.clone())
+            }
+        }
+        None
+    }
+
+    pub fn get_current(mut self) -> Option<Question> {
+        if let Some(current) = self.current {
+            if let Some(question) = self.get_question(current) {
+                return Some(question.clone())
+            }
+        }
+        None
+    }
+
+    pub fn get_mut_current(mut self) -> Option<Question> {
+        if let Some(current) = self.current {
+            if let Some(question) = self.get_mut_question(current) {
+                return Some(question.clone())
+            }
+        }
+        None
+    }
+
+
 }
 
 impl Serialize for UserSessionId {
