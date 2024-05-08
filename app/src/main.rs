@@ -3,7 +3,6 @@ mod board;
 mod boardbutton;
 mod boardquestion;
 mod file;
-mod game;
 mod mainpage;
 mod service;
 mod types;
