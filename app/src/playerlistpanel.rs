@@ -1,14 +1,13 @@
-use std::collections::HashMap;
-use gloo_console::log;
 use yew::prelude::*;
-use cult_common::{DiscordUser, UserSessionId};
 
 use crate::playerpanel::*;
-use crate::types::UserList;
+use crate::types::{OptionalWebsocketCallback, UserList};
 
 #[derive(Properties, PartialEq)]
 pub struct PlayerListPanelProperties {
     pub user_list: UserList,
+    #[prop_or(None)]
+    pub add_user_score: OptionalWebsocketCallback,
 }
 
 pub struct PlayerListPanel {}
@@ -23,22 +22,12 @@ impl Component for PlayerListPanel {
     }
 
     fn view(&self, ctx: &Context<Self>) -> Html {
-        let player_list = ctx.props().user_list.values()
-            .filter_map(|user| user.clone())
-            .collect::<Vec<DiscordUser>>();
-
-
-        log!(format!(
-            "PlayerListPanel view(): player_list: {:?}",
-            player_list
-        ));
-
-
         html! {
             <div>
                 {
-                    player_list.iter().map(|player|{
-                        html!{<PlayerPanel player={player.clone()}/>}
+                    ctx.props().user_list.values().map(|player|{
+                        let add_user_score = ctx.props().add_user_score.clone();
+                        html!{<PlayerPanel player={player.clone()} {add_user_score}/>}
                     }).collect::<Html>()
                 }
             </div>

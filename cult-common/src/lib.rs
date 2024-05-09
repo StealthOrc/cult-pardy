@@ -133,7 +133,7 @@ impl DtoJeopardyBoard {
         None
     }
 
-    pub fn get_current(mut self) -> Option<DtoQuestion> {
+    pub fn get_current(self) -> Option<DtoQuestion> {
         if let Some(current) = self.current {
             if let Some(question) = self.get_question(current) {
                 return Some(question.clone());
@@ -142,7 +142,7 @@ impl DtoJeopardyBoard {
         None
     }
 
-    pub fn get_mut_current(mut self) -> Option<DtoQuestion> {
+    pub fn get_mut_current(self) -> Option<DtoQuestion> {
         if let Some(current) = self.current {
             if let Some(question) = self.get_mut_question(current) {
                 return Some(question.clone());

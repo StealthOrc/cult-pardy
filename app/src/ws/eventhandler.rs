@@ -1,48 +1,41 @@
+use crate::app::App;
+use crate::types::AppMsg;
+use cult_common::{BoardEvent, SessionEvent, WebsocketServerEvents};
 use gloo_console::log;
 use serde::de::Unexpected::Option;
 use yew::Callback;
-use cult_common::{BoardEvent, SessionEvent, WebsocketServerEvents};
-use crate::app::{App};
-use crate::types::AppMsg;
 
-
-
-pub fn handleEvent(app: &mut App, event: WebsocketServerEvents) -> bool{
+pub fn handleEvent(app: &mut App, event: WebsocketServerEvents) -> bool {
     log!(format!("Event received -> {}", event.clone().event_name()));
     match event {
-        WebsocketServerEvents::Board(event) => handle_board(app,event),
+        WebsocketServerEvents::Board(event) => handle_board(app, event),
         WebsocketServerEvents::Websocket(_) => false,
-        WebsocketServerEvents::Session(event) => handle_session(app,event),
+        WebsocketServerEvents::Session(event) => handle_session(app, event),
         WebsocketServerEvents::Error(_) => false,
         WebsocketServerEvents::Text(_) => false,
     }
 }
 
-fn handle_board(mut app: &mut App,board_event: BoardEvent)  -> bool {
+fn handle_board(mut app: &mut App, board_event: BoardEvent) -> bool {
     match board_event {
         BoardEvent::CurrentBoard(board) => {
             log!("board received!");
             app.jp_board_dto = Some(board);
             return true;
         }
-        BoardEvent::CurrentQuestion(vector2d, dto_question) => {
-            match &mut app.jp_board_dto {
-                Some(board) => {
-                    board.current = Some(vector2d);
-                    let mut cat = board.categories.get_mut(vector2d.x).expect(
-                        format!(
-                            "could not get category {} as mutable.",
-                            vector2d.x
-                        )
-                            .as_str(),
-                    );
+        BoardEvent::CurrentQuestion(vector2d, dto_question) => match &mut app.jp_board_dto {
+            Some(board) => {
+                board.current = Some(vector2d);
+                let mut cat = board
+                    .categories
+                    .get_mut(vector2d.x)
+                    .expect(format!("could not get category {} as mutable.", vector2d.x).as_str());
 
-                    let _ = std::mem::replace(&mut cat.questions[vector2d.y], dto_question);
-                    return true
-                }
-                None => todo!(),
+                let _ = std::mem::replace(&mut cat.questions[vector2d.y], dto_question);
+                return true;
             }
-        }
+            None => todo!(),
+        },
     }
 }
 
@@ -50,18 +43,19 @@ fn handle_session(mut app: &mut App, session_event: SessionEvent) -> bool {
     match session_event {
         SessionEvent::CurrentSessions(session_vec) => {
             for dto_session in session_vec {
-                app.user_list.insert(dto_session.user_session_id, dto_session.discord_user);
+                app.user_list
+                    .insert(dto_session.user_session_id.clone(), dto_session);
             }
             true
         }
         SessionEvent::SessionJoined(session) => {
-            app.user_list.insert(session.user_session_id, session.discord_user);
+            app.user_list
+                .insert(session.user_session_id.clone(), session);
             true
-        },
+        }
         SessionEvent::SessionDisconnected(session_id) => {
             app.user_list.remove(&session_id);
             true
         }
     }
-
 }

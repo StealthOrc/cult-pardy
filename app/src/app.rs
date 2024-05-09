@@ -1,18 +1,21 @@
-use cult_common::{compress, parse_addr_str, BoardEvent, DiscordUser, DtoJeopardyBoard, DtoQuestion, Vector2D, WebsocketServerEvents, LOCATION, UserSessionId};
+use cult_common::{
+    compress, parse_addr_str, BoardEvent, DTOSession, DiscordUser, DtoJeopardyBoard, DtoQuestion,
+    UserSessionId, Vector2D, WebsocketServerEvents, LOCATION,
+};
 use futures::StreamExt;
 use gloo_console::log;
 use gloo_net::websocket::Message;
-use std::{borrow::Borrow, cell::RefCell, rc::Rc};
 use std::collections::HashMap;
+use std::{borrow::Borrow, cell::RefCell, rc::Rc};
 use wasm_cookies::cookies::*;
 use web_sys::HtmlDocument;
 use yew::html::Scope;
 use yew::prelude::*;
 
 use crate::types::{AppMsg, UserList};
+use crate::ws::eventhandler::handleEvent;
 use crate::ws::websocket::WebsocketService;
 use crate::{board::*, boardquestion::*, playerlistpanel::*};
-use crate::ws::eventhandler::{handleEvent};
 
 // testing purposes
 fn document() -> HtmlDocument {
@@ -34,9 +37,8 @@ pub(crate) fn cookie_string() -> String {
 pub struct App {
     pub ws_service: WebsocketService,
     pub jp_board_dto: Option<DtoJeopardyBoard>,
-    pub user_list: HashMap<UserSessionId, Option<DiscordUser>>,
+    pub user_list: HashMap<UserSessionId, DTOSession>,
 }
-
 
 impl Component for App {
     type Message = AppMsg;
@@ -57,7 +59,8 @@ impl Component for App {
             lobby_id.as_str(),
             usr_session_id.as_str(),
             session_token.as_str(),
-            ctx.link().callback(|event: WebsocketServerEvents| AppMsg::HandleWebsocketEvent(event)),
+            ctx.link()
+                .callback(|event: WebsocketServerEvents| AppMsg::HandleWebsocketEvent(event)),
         );
 
         App {
@@ -91,15 +94,13 @@ impl Component for App {
                 };
                 false
             }
-            AppMsg::HandleWebsocketEvent(event) => {
-                handleEvent(self, event)
-            },
+            AppMsg::HandleWebsocketEvent(event) => handleEvent(self, event),
         }
     }
 
     fn view(&self, ctx: &Context<Self>) -> Html {
         let board = self.jp_board_dto.clone();
-        let user_list =  self.user_list.clone();
+        let user_list = self.user_list.clone();
         log!(format!("view() {:?}", board));
         let board = match board {
             None => {
@@ -114,11 +115,12 @@ impl Component for App {
         match board.current {
             Some(current) => {
                 let onclick = ctx.link().callback(AppMsg::SendWebsocketMessage);
+                let cb_add_user_score = ctx.link().callback(AppMsg::SendWebsocketMessage);
                 let question = board.categories[current.x].questions[current.y].clone();
                 html! {
                     <div>
                         <BoardQuestion {question} {onclick}/>
-                        <PlayerListPanel {user_list}/>
+                        <PlayerListPanel {user_list} add_user_score={cb_add_user_score}/>
                     </div>
                 }
             }
@@ -127,20 +129,13 @@ impl Component for App {
                 html! {
                     <div>
                         <Board board={board} {onclick}/>
-                        <PlayerListPanel {user_list}/>
+                        <PlayerListPanel {user_list} />
                     </div>
                 }
             }
         }
     }
 }
-
-
-
-
-
-
-
 
 pub(crate) fn get_game_id_from_url() -> Option<String> {
     let window = web_sys::window().expect("No global `window` exists.");
