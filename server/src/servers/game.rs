@@ -527,17 +527,20 @@ impl Handler<WebsocketConnect> for GameServer {
             lobby_id: msg.lobby_id.clone(),
         });
 
+        let board = lobby.jeopardy_board.clone();
+
         if new_session {
             lobby.user_score.insert(msg.user_session_id.clone(), 0);
+            {
             let dto_session = user_session.clone().dto(&0);
             println!("Someone joined: {:?}{:?}", &msg, &websocket_session_id.clone());
             self.send_lobby_message(&msg.lobby_id.clone(), WebsocketServerEvents::Session(SessionEvent::SessionJoined(dto_session)));
+            }
         }
 
 
-        let lobby = lobby.clone();
         self.send_lobby_message(&msg.lobby_id, WebsocketServerEvents::Websocket(WebsocketJoined(websocket_session_id.clone())));
-        self.send_websocket_session_message(&msg.lobby_id, &websocket_session_id, WebsocketServerEvents::Board(CurrentBoard(lobby.jeopardy_board.dto())));
+        self.send_websocket_session_message(&msg.lobby_id, &websocket_session_id, WebsocketServerEvents::Board(CurrentBoard(board.dto())));
 
 
         self.send_lobby_message(&msg.lobby_id.clone(), WebsocketServerEvents::Session(CurrentSessions(Vec::from_iter(self.get_dto_sessions(&msg.lobby_id)))));
@@ -568,13 +571,13 @@ impl Handler<WebsocketDisconnect> for GameServer {
             Some(lobby) => lobby
         };
         println!("Someone disconnect: {:?}", user_session.clone().to_session_data());
-        let multi_sessions = !user_session.websocket_connections.values().any(|ws | ws.lobby_id.eq(&msg.user_data.lobby_id));
-        if multi_sessions {
+        let not_multi_sessions = !user_session.websocket_connections.values().any(|ws | ws.lobby_id.eq(&msg.user_data.lobby_id));
+        if not_multi_sessions && !lobby.game_state.eq(&Waiting){
             &lobby.user_session.remove(&msg.user_data.user_session_id);
             &lobby.user_score.remove(&msg.user_data.user_session_id);
         }
         self.send_lobby_message(&msg.user_data.lobby_id, WebsocketServerEvents::Websocket(WebsocketDisconnected(websocket_session_id.clone())));
-        if multi_sessions {
+        if not_multi_sessions {
             self.send_lobby_message(&msg.user_data.lobby_id, WebsocketServerEvents::Session(SessionDisconnected(msg.user_data.user_session_id.clone())));
         }
     }
