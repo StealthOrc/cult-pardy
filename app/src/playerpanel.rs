@@ -22,7 +22,7 @@ impl Component for PlayerPanel {
         html! {
             <div class={classes!("player-panel")}>
                 <p>{ctx.props().player.username.clone()}</p>
-                <img src={player.clone().avatar_image_url()}/>
+                <img src={player.avatar_image_url()}/>
             </div>
         }
     }

@@ -10,7 +10,13 @@ use std::hash::{Hash, Hasher};
 use std::io;
 use std::io::{Read, Write};
 use std::net::SocketAddr;
+use std::string::ToString;
 use strum::Display;
+
+pub const WS_PROTOCOL: &'static str = "ws://";
+pub const PROTOCOL: &'static str = "http://";
+pub const LOCATION: &'static str = "localhost:8000";
+
 
 pub fn parse_addr_str(domain: &str, port: usize) -> SocketAddr {
     let addr = format!("{}:{}", domain, port);

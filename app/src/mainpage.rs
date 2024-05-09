@@ -1,14 +1,10 @@
-
-
-
-
-
+use std::fmt::format;
 use wasm_cookies::cookies::get;
 use web_sys::{window};
 use yew::{html, Callback, Component, Html, Context, Properties};
 
 use yew_router::prelude::RouterScopeExt;
-use cult_common::LobbyId;
+use cult_common::{LobbyId, LOCATION, PROTOCOL};
 use crate::app;
 
 #[derive(Properties, PartialEq)]
@@ -28,7 +24,7 @@ impl Component for MainPage {
     type Properties = ();
 
     fn create(_ctx: &Context<Self>) -> Self {
-        let _request_url = "http://localhost:800/api/discord_session";
+        let _request_url = format!("{}/api/discord_session", format!("{}{}",PROTOCOL,LOCATION));
         let _usr_session_id: String = get(&app::cookie_string(), "user-session-id")
             .expect("could not get cookie")
             .expect("could not get cookie from user");

@@ -1,10 +1,10 @@
 
-use actix::{Addr};
+use actix::{ActorStreamExt, Addr};
 use actix_files::NamedFile;
 use actix_web::{get, web, HttpRequest, HttpResponse};
 use std::env;
 use std::path::PathBuf;
-use cult_common::LobbyId;
+use cult_common::{LobbyId, LOCATION, PROTOCOL};
 use crate::apis::api::{get_session, remove_cookie, set_cookie, set_session_token_cookie};
 use crate::authentication::discord::{is_admin, to_main_page};
 use crate::servers::authentication::{AuthenticationServer, CheckAdminAccessToken};
@@ -54,7 +54,7 @@ async fn grant_admin_access(
 
     let user_session = get_session(&req, &srv).await;
     let mut response = HttpResponse::Found()
-        .append_header(("Location", "http://localhost:8000/discord?type=grant"))
+        .append_header(("Location", format!("{}{}/discord?type=grant",  PROTOCOL,LOCATION)))
         .finish();
 
     if is_admin(user_session.clone(), auth.clone()).await {
@@ -72,7 +72,7 @@ async fn grant_admin_access(
 
     if let Some(discord_data) = user_session.clone().discord_auth {
         if discord_data.discord_user.is_some() {
-            response = HttpResponse::Found().append_header(("Location", "http://localhost:8000/grant")).finish();
+            response = HttpResponse::Found().append_header(("Location", format!("{}{}/grant", PROTOCOL, LOCATION))).finish();
         }
     }
 

@@ -12,7 +12,7 @@ use oauth2::reqwest::{async_http_client};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use strum::{Display};
-use cult_common::{DiscordID, DiscordUser, get_false, get_true, JsonPrinter};
+use cult_common::{DiscordID, DiscordUser, get_false, get_true, JsonPrinter, LOCATION, PROTOCOL};
 use crate::apis::api::{get_session, get_token, remove_cookie, set_cookie, set_session_token_cookie};
 use crate::apis::data::{extract_value};
 use crate::authentication::discord::DiscordRedirectURL::{Grant, Login};
@@ -85,7 +85,7 @@ trait DiscordAuth{
             Some(ClientSecret::new(env::var("CULT_PARDY_CLIENT_SECRET").unwrap_or_else(|_| "NOT SET".to_string()))),
             AuthUrl::new(Self::AUTHORIZATION_URL.to_owned()).expect("AuthUrl"),
             Some(TokenUrl::new(Self::TOKEN_URL.to_owned()).expect("TokenUrl"))
-        ).set_redirect_uri(RedirectUrl::new(format!("http://localhost:8000/{}",Self::REDIRECT_URL.to_string().to_lowercase())).expect("Invalid redirect URL"))
+        ).set_redirect_uri(RedirectUrl::new(format!("{}{}/{}",PROTOCOL,LOCATION,Self::REDIRECT_URL.to_string().to_lowercase())).expect("Invalid redirect URL"))
     }
 
 }
@@ -295,7 +295,7 @@ pub async fn login_only(
     let user_session = get_session(&req, &srv).await;
 
     let mut response = HttpResponse::Found()
-        .append_header(("Location", "http://localhost:8000/"))
+        .append_header(("Location", format!("{}{}",PROTOCOL,LOCATION)))
         .finish();
     if let Some(discord_data) = user_session.clone().discord_auth {
         if discord_data.discord_user.is_some() {
@@ -324,7 +324,7 @@ fn to_response(mut response: HttpResponse, req: &actix_web::HttpRequest, user_se
 pub fn to_main_page(user_session: &UserSession, req:&actix_web::HttpRequest) -> anyhow::Result<HttpResponse, actix_web::Error> {
     println!("TO MAIN PAGE");
     let mut response = HttpResponse::Found()
-        .append_header(("Location", "http://localhost:8000/"))
+        .append_header(("Location", format!("{}{}",PROTOCOL,LOCATION)))
         .finish();
     set_session_token_cookie(&mut response, &req, &user_session);
     Ok(response)

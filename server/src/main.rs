@@ -4,6 +4,7 @@ mod ws;
 mod authentication;
 mod servers;
 
+use std::borrow::ToOwned;
 use crate::apis::api::{board, create_game_lobby, discord_session, has_authorization, join_game};
 use crate::apis::api::session_request;
 
@@ -19,17 +20,18 @@ use crate::servers::input::{InputServer};
 use crate::servers::Services;
 use crate::ws::gamewebsocket;
 
+
+
+
+
 #[actix_web::main]
 async fn main() -> Result<()> {
 
-    let addr = "127.0.0.1";
+    let addr = "0.0.0.0";
     let port = 8000;
     let addr = parse_addr_str(addr, port);
 
     let services = Services::init().await;
-
-
-
 
 
 
@@ -74,7 +76,7 @@ async fn main() -> Result<()> {
 
 async fn not_found() -> std::result::Result<HttpResponse, actix_web::Error> {
     let response = HttpResponse::PermanentRedirect()
-        .append_header(("Location", "http://localhost:8000/"))
+        .append_header(("Location", format!("{}{}",PROTOCOL,LOCATION)))
         .finish();
     Ok(response)
 }

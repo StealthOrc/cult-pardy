@@ -1,4 +1,4 @@
-use cult_common::{compress, decompress, WebsocketServerEvents};
+use cult_common::{compress, decompress, WebsocketServerEvents, WS_PROTOCOL};
 
 use crate::types::AppMsg;
 use futures::{channel::mpsc::Sender, SinkExt, StreamExt};
@@ -33,7 +33,7 @@ impl WebsocketService {
         F: FnMut(WebsocketServerEvents, Callback<AppMsg>) + 'static,
     {
         let ws = WebSocket::open(
-            format!("ws://{addr}/ws?lobby-id={lobby_id}&user-session-id={user_session_id}&session-token={session_token}")
+            format!("{WS_PROTOCOL}{addr}/ws?lobby-id={lobby_id}&user-session-id={user_session_id}&session-token={session_token}")
                 .as_str(),
         )
             .unwrap();

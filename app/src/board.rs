@@ -1,3 +1,4 @@
+use web_sys::window;
 use cult_common::{DtoJeopardyBoard, Vector2D, WebsocketSessionEvent};
 use yew::prelude::*;
 
@@ -25,7 +26,6 @@ impl Component for Board {
 
     fn view(&self, ctx: &Context<Self>) -> Html {
         let num_categories = ctx.props().board.categories.len();
-
         let grid_columns = format!("repeat({}, 1fr)", num_categories);
 
         html! {

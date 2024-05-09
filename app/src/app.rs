@@ -1,7 +1,4 @@
-use cult_common::{
-    compress, parse_addr_str, BoardEvent, DiscordUser, DtoJeopardyBoard, DtoQuestion, Vector2D,
-    WebsocketServerEvents,
-};
+use cult_common::{compress, parse_addr_str, BoardEvent, DiscordUser, DtoJeopardyBoard, DtoQuestion, Vector2D, WebsocketServerEvents, LOCATION};
 use futures::StreamExt;
 use gloo_console::log;
 use gloo_net::websocket::Message;
@@ -119,7 +116,7 @@ impl Component for App {
         ));
 
         let wss = WebsocketService::new(
-            parse_addr_str("127.0.0.1", 8000).to_string().as_str(),
+            LOCATION,
             lobby_id.as_str(),
             usr_session_id.as_str(),
             session_token.as_str(),
