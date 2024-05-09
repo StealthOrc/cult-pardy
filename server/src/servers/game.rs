@@ -517,10 +517,7 @@ impl Handler<WebsocketConnect> for GameServer {
             Some(lobby) => lobby,
         };
         lobby.user_session.insert(msg.user_session_id.clone());
-        lobby.websocket_session_id.insert(websocket_session_id.clone());
-        lobby.user_score.insert(msg.user_session_id.clone(), 0);
 
-        let lobby = lobby.clone();
 
         let new_session = !user_session.websocket_connections.values().any(|websocket_session| websocket_session.lobby_id.eq(&msg.lobby_id));
 
@@ -531,11 +528,14 @@ impl Handler<WebsocketConnect> for GameServer {
         });
 
         if new_session {
+            lobby.user_score.insert(msg.user_session_id.clone(), 0);
             let dto_session = user_session.clone().dto(&0);
             println!("Someone joined: {:?}{:?}", &msg, &websocket_session_id.clone());
             self.send_lobby_message(&msg.lobby_id.clone(), WebsocketServerEvents::Session(SessionEvent::SessionJoined(dto_session)));
         }
 
+
+        let lobby = lobby.clone();
         self.send_lobby_message(&msg.lobby_id, WebsocketServerEvents::Websocket(WebsocketJoined(websocket_session_id.clone())));
         self.send_websocket_session_message(&msg.lobby_id, &websocket_session_id, WebsocketServerEvents::Board(CurrentBoard(lobby.jeopardy_board.dto())));
 
@@ -819,8 +819,8 @@ impl Handler<AddLobbySessionScore> for GameServer {
                 if &lobby.creator.eq(&discord_id) | &is_admin {
                     let current_question = lobby.jeopardy_board.get_mut_current();
                     if let Some(question) = current_question {
-                        if let Some(score) = lobby.user_score.get_mut(&msg.grant_score_user_session_id){
-                            *score + question.value;
+                        if let Some(score) = lobby.user_score.get(&msg.grant_score_user_session_id){
+                            &lobby.user_score.insert(msg.grant_score_user_session_id, score + question.value);
                         }
                     }
                     lobby.jeopardy_board.current = None;
