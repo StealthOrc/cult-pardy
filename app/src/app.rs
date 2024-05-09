@@ -51,19 +51,13 @@ impl Component for App {
             .expect("could not get cookie from user");
 
         let lobby_id = get_game_id_from_url().expect("SomeData?");
-        let on_read = {
-            move |event: WebsocketServerEvents, callback: Callback<AppMsg>| {
-                callback.emit(AppMsg::HandleWebsocketEvent(event));
-            }
-        };
 
         let wss = WebsocketService::new(
             LOCATION,
             lobby_id.as_str(),
             usr_session_id.as_str(),
             session_token.as_str(),
-            on_read,
-            ctx.link().callback(|msg: AppMsg| msg),
+            ctx.link().callback(|event: WebsocketServerEvents| AppMsg::HandleWebsocketEvent(event)),
         );
 
         App {

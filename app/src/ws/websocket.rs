@@ -21,17 +21,13 @@ impl PartialEq for WebsocketService {
 
 impl WebsocketService {
     // add code here
-    pub fn new<F>(
+    pub fn new(
         addr: &str,
         lobby_id: &str,
         user_session_id: &str,
         session_token: &str,
-        mut on_read: F,
-        callback: Callback<AppMsg>,
-    ) -> Self
-    where
-        F: FnMut(WebsocketServerEvents, Callback<AppMsg>) + 'static,
-    {
+        callback: Callback<WebsocketServerEvents>,
+    ) -> Self {
         let ws = WebSocket::open(
             format!("{WS_PROTOCOL}{addr}/ws?lobby-id={lobby_id}&user-session-id={user_session_id}&session-token={session_token}")
                 .as_str(),
@@ -69,7 +65,7 @@ impl WebsocketService {
                         if let Ok(bytes) = decompress(&data) {
                             match serde_json::from_slice::<WebsocketServerEvents>(&bytes) {
                                 Ok(event) => {
-                                    on_read(event, callback.clone());
+                                    callback.emit(event);
                                 }
                                 Err(err) => {
                                     log!(
