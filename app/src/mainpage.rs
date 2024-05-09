@@ -1,11 +1,16 @@
 use std::fmt::format;
+use futures::TryFutureExt;
+use gloo_console::log;
+use gloo_net::{Error, http};
+use gloo_net::http::{Headers, Request, Response};
 use wasm_cookies::cookies::get;
-use web_sys::{window};
+use web_sys::window;
 use yew::{html, Callback, Component, Html, Context, Properties};
 
 use yew_router::prelude::RouterScopeExt;
-use cult_common::{LobbyId, LOCATION, PROTOCOL};
+use cult_common::{DiscordUser, get_false, LobbyId, LOCATION, PROTOCOL, WebsocketServerEvents};
 use crate::app;
+use crate::types::AppMsg;
 
 #[derive(Properties, PartialEq)]
 pub struct MainPage {
@@ -15,6 +20,7 @@ pub struct MainPage {
 }
 
 pub enum Msg {
+    Loaded(bool),
     Login,
     CreateGame,
 }
@@ -24,18 +30,41 @@ impl Component for MainPage {
     type Properties = ();
 
     fn create(_ctx: &Context<Self>) -> Self {
-        let _request_url = format!("{}/api/discord_session", format!("{}{}",PROTOCOL,LOCATION));
-        let _usr_session_id: String = get(&app::cookie_string(), "user-session-id")
-            .expect("could not get cookie")
-            .expect("could not get cookie from user");
-        let _session_token: String = get(&app::cookie_string(), "session-token")
-            .expect("could not get cookie")
-            .expect("could not get cookie from user");
 
-        let _cookies = vec![
-            ("usr-session-id", "1"),
-            ("session-token", "2"),
-        ];
+        _ctx.link().send_future(async {
+            // use the data from above
+
+            let _request_url = format!("{}/api/discord_session", format!("{}{}",PROTOCOL,LOCATION));
+            let _usr_session_id: String = get(&app::cookie_string(), "user-session-id")
+                .expect("could not get cookie")
+                .expect("could not get cookie from user");
+            let _session_token: String = get(&app::cookie_string(), "session-token")
+                .expect("could not get cookie")
+                .expect("could not get cookie from user");
+
+            let head = Headers::new();
+            head.append("Cookie", &format!("user-session-id={}", _usr_session_id));
+            head.append("Cookie", &format!("session-token={}", _session_token));
+
+
+            let resp = Request::get(&_request_url).headers(head).send().await;
+            match resp {
+                Ok(value) => {
+                    let test = value.json::<Option<DiscordUser>>().await;
+                    if let Ok(json) = test {
+                        log!(format!("Response {:#?}", json))
+                    }
+                },
+                Err(err) => log!(format!("error {:?}", err)),
+            }
+                Msg::Loaded(get_false())
+            }
+        );
+
+
+
+
+
 
         MainPage {
             is_logged_in: false,
@@ -49,12 +78,11 @@ impl Component for MainPage {
             Msg::Login => {
                 // Logic to handle login
                 self.is_logged_in = true;
-            }
-            Msg::CreateGame => {
-                // Logic to handle creating a game
-            }
+                true
+            },
+            Msg::CreateGame => true,
+            Msg::Loaded(va) => true,
         }
-        true
     }
 
     fn view(&self, _ctx: &Context<Self>) -> Html {
