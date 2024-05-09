@@ -183,13 +183,13 @@ pub struct DiscordME {
     pub flags: i64,
     pub banner: Value,
     #[serde(rename = "accent_color")]
-    pub accent_color: i64,
+    pub accent_color: Option<i64>,
     #[serde(rename = "global_name")]
     pub global_name: String,
     #[serde(rename = "avatar_decoration_data")]
     pub avatar_decoration_data: Value,
     #[serde(rename = "banner_color")]
-    pub banner_color: String,
+    pub banner_color: Option<String>,
     pub clan: Value,
     #[serde(rename = "mfa_enabled")]
     pub mfa_enabled: bool,
@@ -230,7 +230,6 @@ impl DiscordME{
 impl DiscordME {
     pub async fn get(token: BasicTokenResponse) -> std::option::Option<Self> {
         let request_url = "https://discord.com/api/users/@me";
-
         let request = attohttpc::RequestBuilder::new(Method::GET, request_url).bearer_auth(token.access_token().secret());
         let respone = match request.send() {
             Ok(resonse) => resonse,
@@ -241,7 +240,10 @@ impl DiscordME {
         };
         let discord_me = match respone.json() {
             Ok(me) => me,
-            Err(_) => return None,
+            Err(error) =>  {
+                println!("Something wrong: {:?}", error);
+                return None
+            }
         };
         Some(discord_me)
     }
@@ -291,9 +293,10 @@ pub async fn login_only(
 ) -> anyhow::Result<HttpResponse, actix_web::Error> {
 
     let user_session = get_session(&req, &srv).await;
-    let mut response = HttpResponse::InternalServerError().finish();
-    let mut printer = JsonPrinter::new();
 
+    let mut response = HttpResponse::Found()
+        .append_header(("Location", "http://localhost:8000/"))
+        .finish();
     if let Some(discord_data) = user_session.clone().discord_auth {
         if discord_data.discord_user.is_some() {
             return to_main_page(&user_session,&req)
@@ -303,9 +306,7 @@ pub async fn login_only(
 
     if let Some(discord_token) = get_discord_token(&oauth_client.client, code.into_inner()).await {
         if let Some(discord_me) = DiscordME::get(discord_token.clone()).await {
-            let added = add_discord_account(srv, user_session.clone(), discord_me.to_discord_user(), discord_token).await;
-            printer.add("Added Discord Account to session", added);
-            response = HttpResponse::Found().json(&printer)
+            add_discord_account(srv, user_session.clone(), discord_me.to_discord_user(), discord_token).await;
         }
     }
 
