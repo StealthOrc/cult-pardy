@@ -1,15 +1,18 @@
-use cult_common::{DiscordUser, WebsocketSessionEvent};
+use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
+use std::rc::Rc;
+use cult_common::{DiscordUser, UserSessionId, WebsocketServerEvents, WebsocketSessionEvent};
 use yew::Callback;
 
 // Message for Yew App
 #[derive(Clone)]
 pub enum AppMsg {
     SendWebsocketMessage(WebsocketSessionEvent),
+    HandleWebsocketEvent(WebsocketServerEvents),
     BoardUnloaded,
     BoardLoaded,
-    ShowQuestion,
-    UpdateUserInfo(Vec<DiscordUser>),
 }
 
 pub type WebsocketCallback = Callback<WebsocketSessionEvent>;
-pub type DiscordUserList = Option<Vec<DiscordUser>>;
+
+pub type UserList = HashMap<UserSessionId, Option<DiscordUser>>;
