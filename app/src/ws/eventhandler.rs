@@ -42,6 +42,7 @@ fn handle_board(mut app: &mut App, board_event: BoardEvent) -> bool {
 fn handle_session(mut app: &mut App, session_event: SessionEvent) -> bool {
     match session_event {
         SessionEvent::CurrentSessions(session_vec) => {
+            log!(format!("{:#?}", session_vec));
             for dto_session in session_vec {
                 app.user_list
                     .insert(dto_session.user_session_id.clone(), dto_session);

@@ -516,8 +516,8 @@ impl Handler<WebsocketConnect> for GameServer {
             }
             Some(lobby) => lobby,
         };
+        lobby.websocket_session_id.insert(websocket_session_id.clone());
         lobby.user_session.insert(msg.user_session_id.clone());
-
 
         let new_session = !user_session.websocket_connections.values().any(|websocket_session| websocket_session.lobby_id.eq(&msg.lobby_id));
 
@@ -531,13 +531,11 @@ impl Handler<WebsocketConnect> for GameServer {
 
         if new_session {
             lobby.user_score.insert(msg.user_session_id.clone(), 0);
-            {
             let dto_session = user_session.clone().dto(&0);
+
             println!("Someone joined: {:?}{:?}", &msg, &websocket_session_id.clone());
             self.send_lobby_message(&msg.lobby_id.clone(), WebsocketServerEvents::Session(SessionEvent::SessionJoined(dto_session)));
-            }
         }
-
 
         self.send_lobby_message(&msg.lobby_id, WebsocketServerEvents::Websocket(WebsocketJoined(websocket_session_id.clone())));
         self.send_websocket_session_message(&msg.lobby_id, &websocket_session_id, WebsocketServerEvents::Board(CurrentBoard(board.dto())));
@@ -572,7 +570,7 @@ impl Handler<WebsocketDisconnect> for GameServer {
         };
         println!("Someone disconnect: {:?}", user_session.clone().to_session_data());
         let not_multi_sessions = !user_session.websocket_connections.values().any(|ws | ws.lobby_id.eq(&msg.user_data.lobby_id));
-        if not_multi_sessions && !lobby.game_state.eq(&Waiting){
+        if not_multi_sessions{
             &lobby.user_session.remove(&msg.user_data.user_session_id);
             &lobby.user_score.remove(&msg.user_data.user_session_id);
         }
