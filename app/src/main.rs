@@ -4,6 +4,8 @@ mod boardbutton;
 mod boardquestion;
 mod file;
 mod mainpage;
+mod playerlistpanel;
+mod playerpanel;
 mod service;
 mod types;
 mod ws;
