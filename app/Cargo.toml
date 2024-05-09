@@ -27,3 +27,4 @@ serde_json = "1.0.116"
 tokio = "1.37.0"
 chrono = { version = "0.4.38", features = ["serde"] }
 flate2 = "1.0.30"
+ritelinked = "0.3.2"

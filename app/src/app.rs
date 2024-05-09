@@ -7,6 +7,7 @@ use gloo_console::log;
 use gloo_net::websocket::Message;
 use std::collections::HashMap;
 use std::{borrow::Borrow, cell::RefCell, rc::Rc};
+use ritelinked::LinkedHashMap;
 use wasm_cookies::cookies::*;
 use web_sys::HtmlDocument;
 use yew::html::Scope;
@@ -37,7 +38,7 @@ pub(crate) fn cookie_string() -> String {
 pub struct App {
     pub ws_service: WebsocketService,
     pub jp_board_dto: Option<DtoJeopardyBoard>,
-    pub user_list: HashMap<UserSessionId, DTOSession>,
+    pub user_list: LinkedHashMap<UserSessionId, DTOSession>,
 }
 
 impl Component for App {
@@ -66,7 +67,7 @@ impl Component for App {
         App {
             ws_service: wss,
             jp_board_dto: None,
-            user_list: HashMap::new(),
+            user_list: LinkedHashMap::new(),
         }
     }
 

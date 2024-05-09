@@ -11,10 +11,12 @@ use actix_web::rt::System;
 use chrono::TimeDelta;
 use futures::executor::block_on;
 use futures::StreamExt;
+use mongodb::options::IndexVersion::V1;
 use oauth2::basic::{BasicClient, BasicTokenResponse};
 use oauth2::reqwest::async_http_client;
 use oauth2::TokenResponse;
 use rand::rngs::ThreadRng;
+use ritelinked::{LinkedHashMap, LinkedHashSet};
 use serde::{Deserialize, Serialize};
 use strum::{Display, EnumIter};
 use cult_common::{BoardEvent, DiscordID, DiscordUser, DTOSession, JeopardyBoard, LobbyCreateResponse, LobbyId, SessionEvent, SessionToken, UserSessionId, Vector2D, WebsocketServerEvents, WebsocketSessionId};
@@ -183,7 +185,7 @@ impl actix::Message for GrandAdminAccess {
 #[derive(Debug)]
 pub struct GameServer {
     pub starting_services: StartingServices,
-    pub user_sessions: HashMap<UserSessionId, UserSession>,
+    pub user_sessions: LinkedHashMap<UserSessionId, UserSession>,
     pub lobbies: HashMap<LobbyId, Lobby>
 }
 
@@ -307,14 +309,14 @@ impl UserSession {
 
 
 
-
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+//TODO ADD CUSTOM Serialize / Deserialize
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Lobby{
     creator: DiscordID,
     lobby_id: LobbyId,
     user_score: HashMap<UserSessionId, i32>,
-    user_session: HashSet<UserSessionId>,
-    websocket_session_id: HashSet<WebsocketSessionId>,
+    user_session: LinkedHashSet<UserSessionId>,
+    websocket_session_id: LinkedHashSet<WebsocketSessionId>,
     game_state: GameState,
     jeopardy_board: JeopardyBoard,
 }
@@ -336,8 +338,8 @@ impl GameServer {
             creator: DiscordID::server(),
             lobby_id: name.clone(),
             user_score: HashMap::new(),
-            user_session: HashSet::new(),
-            websocket_session_id: HashSet::new(),
+            user_session: LinkedHashSet::new(),
+            websocket_session_id: LinkedHashSet::new(),
             game_state: GameState::Waiting,
             jeopardy_board: JeopardyBoard::default(NORMAL),
         };
@@ -349,7 +351,7 @@ impl GameServer {
         println!("Game lobby's: {:?}", &lobbies.values().map(|lobby| lobby.lobby_id.clone()).collect::<Vec<_>>());
         GameServer {
             starting_services,
-            user_sessions: HashMap::new(),
+            user_sessions: LinkedHashMap::new(),
             lobbies,
         }
     }
@@ -394,8 +396,8 @@ impl GameServer {
             creator: discord_id,
             lobby_id:lobby_id.clone(),
             user_score: HashMap::new(),
-            user_session: HashSet::new(),
-            websocket_session_id: HashSet::new(),
+            user_session: LinkedHashSet::new(),
+            websocket_session_id: LinkedHashSet::new(),
             game_state: GameState::Waiting,
             jeopardy_board,
         };
@@ -404,8 +406,8 @@ impl GameServer {
         lobby
     }
 
-    fn get_dto_sessions(&self, lobby_id: &LobbyId) -> HashSet<DTOSession> {
-        let mut sessions = HashSet::new();
+    fn get_dto_sessions(&self, lobby_id: &LobbyId) -> LinkedHashSet<DTOSession> {
+        let mut sessions = LinkedHashSet::new();
         if let Some(lobby) = self.lobbies.get(&lobby_id){
             for session_id in &lobby.user_session {
                 if let Some(session) = self.user_sessions.get(&session_id){
@@ -465,7 +467,7 @@ impl GameServer {
     #[allow(dead_code)]
     fn disconnect(&mut self, user_id:&UserSessionId, lobby_id:&LobbyId) {
         if let Some(lobby) = self.lobbies.get(lobby_id) {
-            if let Some(user_session) = lobby.user_session.get(user_id) {
+            if let Some(user_session) = lobby.user_session.get(&user_id) {
                 if let Some(user_session) = self.user_sessions.get(user_session) {
                     for websockets in &lobby.websocket_session_id {
                         if let Some(websocket_session) = user_session.websocket_connections.get(&websockets) {

@@ -4,6 +4,7 @@ use cult_common::{
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
+use ritelinked::LinkedHashMap;
 use yew::Callback;
 
 // Message for Yew App
@@ -18,4 +19,4 @@ pub enum AppMsg {
 pub type WebsocketCallback = Callback<WebsocketSessionEvent>;
 pub type OptionalWebsocketCallback = Option<WebsocketCallback>;
 
-pub type UserList = HashMap<UserSessionId, DTOSession>;
+pub type UserList = LinkedHashMap<UserSessionId, DTOSession>;

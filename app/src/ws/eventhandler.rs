@@ -2,6 +2,7 @@ use crate::app::App;
 use crate::types::AppMsg;
 use cult_common::{BoardEvent, SessionEvent, WebsocketServerEvents};
 use gloo_console::log;
+use ritelinked::LinkedHashMap;
 use serde::de::Unexpected::Option;
 use yew::Callback;
 
@@ -42,11 +43,11 @@ fn handle_board(mut app: &mut App, board_event: BoardEvent) -> bool {
 fn handle_session(mut app: &mut App, session_event: SessionEvent) -> bool {
     match session_event {
         SessionEvent::CurrentSessions(session_vec) => {
-            log!(format!("{:#?}", session_vec));
+            let mut session = LinkedHashMap::new();
             for dto_session in session_vec {
-                app.user_list
-                    .insert(dto_session.user_session_id.clone(), dto_session);
+                session.insert(dto_session.user_session_id.clone(), dto_session);
             }
+            app.user_list = session;
             true
         }
         SessionEvent::SessionJoined(session) => {
