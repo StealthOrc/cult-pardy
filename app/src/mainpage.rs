@@ -22,7 +22,6 @@ pub struct MainPage {
 pub enum Msg {
     Loaded(bool),
     Login,
-    CreateGame,
 }
 
 impl Component for MainPage {
@@ -52,12 +51,12 @@ impl Component for MainPage {
                 Ok(value) => {
                     let test = value.json::<Option<DiscordUser>>().await;
                     if let Ok(json) = test {
-                        log!(format!("Response {:#?}", json))
+                        return Msg::Loaded(json.is_some())
                     }
                 },
                 Err(err) => log!(format!("error {:?}", err)),
             }
-                Msg::Loaded(get_false())
+            Msg::Loaded(get_false())
             }
         );
 
@@ -80,8 +79,12 @@ impl Component for MainPage {
                 self.is_logged_in = true;
                 true
             },
-            Msg::CreateGame => true,
-            Msg::Loaded(va) => true,
+            Msg::Loaded(va) => {
+                if va {
+                    self.is_logged_in = true
+                };
+                true
+            }
         }
     }
 

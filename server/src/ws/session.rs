@@ -168,7 +168,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                 if let Ok(bytes) = decompress(&data) {
                     match serde_json::from_slice::<WebsocketSessionEvent>(&bytes) {
                         Ok(event) => {
-                            match event {
+                            match event.clone() {
                                 WebsocketSessionEvent::Click(vector2d) => {
                                     self.handler.do_send(game::LobbyClick {
                                         vector_2d: vector2d,

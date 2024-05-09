@@ -404,7 +404,7 @@ impl GameServer {
         lobby
     }
 
-    fn get_dto_sessions(&self, lobby_id: LobbyId) -> HashSet<DTOSession> {
+    fn get_dto_sessions(&self, lobby_id: &LobbyId) -> HashSet<DTOSession> {
         let mut sessions = HashSet::new();
         if let Some(lobby) = self.lobbies.get(&lobby_id){
             for session_id in &lobby.user_session {
@@ -540,7 +540,7 @@ impl Handler<WebsocketConnect> for GameServer {
         self.send_websocket_session_message(&msg.lobby_id, &websocket_session_id, WebsocketServerEvents::Board(CurrentBoard(lobby.jeopardy_board.dto())));
 
 
-        self.send_lobby_message(&msg.lobby_id.clone(), WebsocketServerEvents::Session(CurrentSessions(Vec::from_iter(self.get_dto_sessions(msg.lobby_id)))));
+        self.send_lobby_message(&msg.lobby_id.clone(), WebsocketServerEvents::Session(CurrentSessions(Vec::from_iter(self.get_dto_sessions(&msg.lobby_id)))));
 
         Some(websocket_session_id)
     }
@@ -819,15 +819,16 @@ impl Handler<AddLobbySessionScore> for GameServer {
                 if &lobby.creator.eq(&discord_id) | &is_admin {
                     let current_question = lobby.jeopardy_board.get_mut_current();
                     if let Some(question) = current_question {
-                        let score = lobby.user_score.get_mut(&msg.grant_score_user_session_id).unwrap_or(&mut 0);
-                        *score + question.value;
+                        if let Some(score) = lobby.user_score.get_mut(&msg.grant_score_user_session_id){
+                            *score + question.value;
+                        }
                     }
                     lobby.jeopardy_board.current = None;
                     let board = lobby.jeopardy_board.clone();
 
                     let event = WebsocketServerEvents::Board(CurrentBoard(board.dto()));
                     msg2.send_lobby_message(&msg.user_data.lobby_id, event);
-                    let event = WebsocketServerEvents::Session(CurrentSessions(Vec::from_iter(self.get_dto_sessions(msg.user_data.lobby_id))));
+                    let event = WebsocketServerEvents::Session(CurrentSessions(Vec::from_iter(msg2.get_dto_sessions(&msg.user_data.lobby_id))));
                     msg2.send_lobby_message(&msg.user_data.lobby_id, event);
                 }
                 fut::ready(())
