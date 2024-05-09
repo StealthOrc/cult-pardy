@@ -107,12 +107,11 @@ pub struct DtoJeopardyBoard {
     pub current: Option<Vector2D>,
 }
 
-impl DtoJeopardyBoard{
-
+impl DtoJeopardyBoard {
     pub fn get_question(self, vector2d: Vector2D) -> Option<DtoQuestion> {
         if let Some(categories) = self.categories.get(vector2d.x) {
             if let Some(question) = categories.questions.get(vector2d.y) {
-                return Some(question.clone())
+                return Some(question.clone());
             }
         }
         None
@@ -121,7 +120,7 @@ impl DtoJeopardyBoard{
     pub fn get_mut_question(mut self, vector2d: Vector2D) -> Option<DtoQuestion> {
         if let Some(categories) = self.categories.get_mut(vector2d.x) {
             if let Some(question) = categories.questions.get_mut(vector2d.y) {
-                return Some(question.clone())
+                return Some(question.clone());
             }
         }
         None
@@ -130,7 +129,7 @@ impl DtoJeopardyBoard{
     pub fn get_current(mut self) -> Option<DtoQuestion> {
         if let Some(current) = self.current {
             if let Some(question) = self.get_question(current) {
-                return Some(question.clone())
+                return Some(question.clone());
             }
         }
         None
@@ -139,14 +138,12 @@ impl DtoJeopardyBoard{
     pub fn get_mut_current(mut self) -> Option<DtoQuestion> {
         if let Some(current) = self.current {
             if let Some(question) = self.get_mut_question(current) {
-                return Some(question.clone())
+                return Some(question.clone());
             }
         }
         None
     }
-
 }
-
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq, Default)]
 pub struct Vector2D {
@@ -549,25 +546,33 @@ impl JeopardyBoard {
     }
 
     pub fn dto(self) -> DtoJeopardyBoard {
-        let cat = self.categories.iter().enumerate().map(|(row_index, category)| {
-            let questions = category.questions.iter().enumerate().map(|(col_index, question)| {
-                match self.current {
-                    None => question.clone().dto(false),
-                    Some(vec) => {
-                        let current = Vector2D{x: row_index, y: col_index};
-                        question.clone().dto(vec.eq(&current))
-                    }
+        let cat = self
+            .categories
+            .iter()
+            .enumerate()
+            .map(|(row_index, category)| {
+                let questions = category
+                    .questions
+                    .iter()
+                    .enumerate()
+                    .map(|(col_index, question)| match self.current {
+                        None => question.clone().dto(false),
+                        Some(vec) => {
+                            let current = Vector2D {
+                                x: row_index,
+                                y: col_index,
+                            };
+                            question.clone().dto(vec.eq(&current))
+                        }
+                    })
+                    .collect::<Vec<DtoQuestion>>();
+
+                DtoCategory {
+                    title: category.clone().title,
+                    questions,
                 }
-
-            }).collect::<Vec<DtoQuestion>>();
-
-            DtoCategory{
-                title: category.clone().title,
-                questions,
-            }
-
-        }).collect::<Vec<DtoCategory>>();
-
+            })
+            .collect::<Vec<DtoCategory>>();
 
         DtoJeopardyBoard {
             categories: cat,
@@ -575,11 +580,10 @@ impl JeopardyBoard {
         }
     }
 
-
     pub fn get_question(self, vector2d: Vector2D) -> Option<Question> {
         if let Some(categories) = self.categories.get(vector2d.x) {
             if let Some(question) = categories.questions.get(vector2d.y) {
-                return Some(question.clone())
+                return Some(question.clone());
             }
         }
         None
@@ -588,7 +592,7 @@ impl JeopardyBoard {
     pub fn get_mut_question(mut self, vector2d: Vector2D) -> Option<Question> {
         if let Some(categories) = self.categories.get_mut(vector2d.x) {
             if let Some(question) = categories.questions.get_mut(vector2d.y) {
-                return Some(question.clone())
+                return Some(question.clone());
             }
         }
         None
@@ -597,7 +601,7 @@ impl JeopardyBoard {
     pub fn get_current(mut self) -> Option<Question> {
         if let Some(current) = self.current {
             if let Some(question) = self.get_question(current) {
-                return Some(question.clone())
+                return Some(question.clone());
             }
         }
         None
@@ -606,13 +610,11 @@ impl JeopardyBoard {
     pub fn get_mut_current(mut self) -> Option<Question> {
         if let Some(current) = self.current {
             if let Some(question) = self.get_mut_question(current) {
-                return Some(question.clone())
+                return Some(question.clone());
             }
         }
         None
     }
-
-
 }
 
 impl Serialize for UserSessionId {

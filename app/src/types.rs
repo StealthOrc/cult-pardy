@@ -1,13 +1,15 @@
-use cult_common::{Vector2D, WebsocketEvent, WebsocketSessionEvent};
+use cult_common::{DiscordUser, WebsocketSessionEvent};
 use yew::Callback;
 
 // Message for Yew App
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub enum AppMsg {
     SendWebsocketMessage(WebsocketSessionEvent),
     BoardUnloaded,
     BoardLoaded,
     ShowQuestion,
+    UpdateUserInfo(Vec<DiscordUser>),
 }
 
 pub type WebsocketCallback = Callback<WebsocketSessionEvent>;
+pub type DiscordUserList = Option<Vec<DiscordUser>>;

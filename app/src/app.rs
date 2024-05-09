@@ -1,5 +1,5 @@
 use cult_common::{
-    compress, parse_addr_str, BoardEvent, DtoJeopardyBoard, DtoQuestion, Vector2D,
+    compress, parse_addr_str, BoardEvent, DiscordUser, DtoJeopardyBoard, DtoQuestion, Vector2D,
     WebsocketServerEvents,
 };
 use futures::StreamExt;
@@ -11,9 +11,9 @@ use web_sys::HtmlDocument;
 use yew::html::Scope;
 use yew::prelude::*;
 
-use crate::types::AppMsg;
+use crate::types::{AppMsg, DiscordUserList};
 use crate::ws::websocket::WebsocketService;
-use crate::{board::*, boardbutton::*, boardquestion::*};
+use crate::{board::*, boardquestion::*, playerlistpanel::*};
 
 // testing purposes
 fn document() -> HtmlDocument {
@@ -37,6 +37,7 @@ type SharedStateDtoJeopardyBoard = Rc<RefCell<Option<DtoJeopardyBoard>>>;
 pub struct App {
     ws_service: WebsocketService,
     jp_board_dto: SharedStateDtoJeopardyBoard,
+    user_list: DiscordUserList,
 }
 
 impl Component for App {
@@ -71,19 +72,15 @@ impl Component for App {
                                 Some(board) => {
                                     //got new data, so replace our current model with the new data
                                     board.current = Some(vector2d);
-                                    let mut cat =
-                                        board.categories.get_mut(vector2d.x).expect(
-                                            format!(
-                                                "could not get category {} as mutable.",
-                                                vector2d.x
-                                            )
-                                            .as_str(),
-                                        );
-
-                                    std::mem::replace(
-                                        &mut cat.questions[vector2d.y],
-                                        dto_question,
+                                    let mut cat = board.categories.get_mut(vector2d.x).expect(
+                                        format!(
+                                            "could not get category {} as mutable.",
+                                            vector2d.x
+                                        )
+                                        .as_str(),
                                     );
+
+                                    std::mem::replace(&mut cat.questions[vector2d.y], dto_question);
                                     callback.emit(AppMsg::ShowQuestion);
                                 }
                                 None => todo!(),
@@ -91,7 +88,25 @@ impl Component for App {
                         }
                     },
                     WebsocketServerEvents::Websocket(_) => {}
-                    WebsocketServerEvents::Session(_) => {}
+                    WebsocketServerEvents::Session(event) => match event {
+                        cult_common::SessionEvent::CurrentSessions(session_vec) => {
+                            let mut user_list: Vec<DiscordUser> = vec![];
+                            for (i, session) in session_vec.iter().enumerate() {
+                                if let Some(user) = session.clone().discord_user {
+                                    user_list.push(user);
+                                };
+                            }
+                            log!(format!(
+                                "WebsocketServerEvents::Session: user_list: {:?}",
+                                user_list
+                            ));
+                            callback.emit(AppMsg::UpdateUserInfo(user_list));
+                        }
+                        cult_common::SessionEvent::SessionJoined(_) => log!("someone joined"),
+                        cult_common::SessionEvent::SessionDisconnected(_) => {
+                            log!("someone disconnected")
+                        }
+                    },
                     WebsocketServerEvents::Error(_) => {}
                     WebsocketServerEvents::Text(_) => {}
                 }
@@ -115,10 +130,11 @@ impl Component for App {
         App {
             ws_service: wss,
             jp_board_dto: dto,
+            user_list: None,
         }
     }
 
-    fn update(&mut self, _ctx: &Context<Self>, msg: Self::Message) -> bool {
+    fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
             AppMsg::BoardUnloaded => {
                 log!("Board is not yet loaded!");
@@ -143,6 +159,11 @@ impl Component for App {
                 false
             }
             AppMsg::ShowQuestion => true,
+            AppMsg::UpdateUserInfo(user_list) => {
+                self.user_list = Some(user_list);
+                log!(format!("UpdateUserInfo: {:?}", self.user_list));
+                true
+            }
         }
     }
 
@@ -162,16 +183,21 @@ impl Component for App {
         match board.current {
             Some(current) => {
                 let onclick = ctx.link().callback(AppMsg::SendWebsocketMessage);
-                let question =
-                    board.categories[current.x].questions[current.y].clone();
+                let question = board.categories[current.x].questions[current.y].clone();
                 html! {
-                    <BoardQuestion {question} {onclick}/>
+                    <div>
+                        <BoardQuestion {question} {onclick}/>
+                        <PlayerListPanel user_list={self.user_list.clone()}/>
+                    </div>
                 }
             }
             None => {
                 let onclick = ctx.link().callback(AppMsg::SendWebsocketMessage);
                 html! {
-                    <Board board={board} {onclick}/>
+                    <div>
+                        <Board board={board} {onclick}/>
+                        <PlayerListPanel user_list={self.user_list.clone()}/>
+                    </div>
                 }
             }
         }
