@@ -45,6 +45,7 @@ impl DiscordUser {
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash)]
 pub struct DTOSession {
     pub user_session_id: UserSessionId,
+    pub score: i32,
     pub discord_user: Option<DiscordUser>,
 }
 
@@ -427,10 +428,11 @@ pub enum SessionEvent {
     SessionDisconnected(UserSessionId),
 }
 
-#[derive(Debug, Copy, Clone, Serialize, Deserialize, Display)]
+#[derive(Debug, Clone, Serialize, Deserialize, Display)]
 pub enum WebsocketSessionEvent {
     Click(Vector2D),
     Back,
+    AddUserSessionScore(UserSessionId)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Display)]
@@ -595,7 +597,7 @@ impl JeopardyBoard {
         None
     }
 
-    pub fn get_mut_question(mut self, vector2d: Vector2D) -> Option<Question> {
+    pub fn get_mut_question(&mut self, vector2d: Vector2D) -> Option<Question> {
         if let Some(categories) = self.categories.get_mut(vector2d.x) {
             if let Some(question) = categories.questions.get_mut(vector2d.y) {
                 return Some(question.clone());
@@ -604,7 +606,7 @@ impl JeopardyBoard {
         None
     }
 
-    pub fn get_current(mut self) -> Option<Question> {
+    pub fn get_current(self) -> Option<Question> {
         if let Some(current) = self.current {
             if let Some(question) = self.get_question(current) {
                 return Some(question.clone());
@@ -613,7 +615,7 @@ impl JeopardyBoard {
         None
     }
 
-    pub fn get_mut_current(mut self) -> Option<Question> {
+    pub fn get_mut_current(&mut self) -> Option<Question> {
         if let Some(current) = self.current {
             if let Some(question) = self.get_mut_question(current) {
                 return Some(question.clone());

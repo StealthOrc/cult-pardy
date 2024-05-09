@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 use actix::prelude::*;
 
 use crate::servers::game;
-use crate::servers::game::{SessionDisconnect, SessionMessageType};
+use crate::servers::game::{WebsocketDisconnect, SessionMessageType};
 use actix_web::web;
 use actix_web_actors::ws;
 use actix_web_actors::ws::WebsocketContext;
@@ -81,7 +81,7 @@ impl Actor for WsSession {
         self.hb(ctx);
         let addr = ctx.address();
         self.handler
-            .send(game::Connect {
+            .send(game::WebsocketConnect {
                 lobby_id: self.player.lobby_id.clone(),
                 user_session_id: self.player.user_session_id.clone(),
                 addr: addr.recipient(),
@@ -105,7 +105,7 @@ impl Actor for WsSession {
     }
 
     fn stopping(&mut self, _: &mut Self::Context) -> Running {
-        self.handler.do_send(SessionDisconnect {
+        self.handler.do_send(WebsocketDisconnect {
             user_data: self.player.clone(),
         });
         Running::Stop
@@ -178,6 +178,12 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                                 WebsocketSessionEvent::Back => {
                                     self.handler.do_send(game::LobbyBackClick{
                                         user_data: self.player.clone(),
+                                    });
+                                }
+                                WebsocketSessionEvent::AddUserSessionScore(grant_score_user_session_id) => {
+                                    self.handler.do_send(game::AddLobbySessionScore{
+                                        user_data: self.player.clone(),
+                                        grant_score_user_session_id,
                                     });
                                 }
                             }
