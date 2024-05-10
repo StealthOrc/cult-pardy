@@ -31,7 +31,7 @@ use crate::servers::{game,  StartingServices};
 use crate::servers::db::DBDatabase::CultPardy;
 use crate::servers::db::UserCollection;
 use crate::servers::db::UserCollection::{UserSessionCollection};
-use crate::servers::game::GameState::Waiting;
+use crate::servers::game::GameState::{Playing, Waiting};
 use crate::ws::session::UserData;
 
 /// Chat server sends this messages to session
@@ -315,11 +315,25 @@ pub struct Lobby{
     creator: DiscordID,
     lobby_id: LobbyId,
     user_score: HashMap<UserSessionId, i32>,
-    user_session: LinkedHashSet<UserSessionId>,
+    connected_user_session: LinkedHashSet<UserSessionId>,
+    allowed_user_session: LinkedHashSet<UserSessionId>,
     websocket_session_id: LinkedHashSet<WebsocketSessionId>,
     game_state: GameState,
     jeopardy_board: JeopardyBoard,
 }
+
+impl Lobby{
+    pub fn connected_user_score(&self) -> LinkedHashMap<UserSessionId, i32>{
+        let mut map = LinkedHashMap::new();
+        for session in self.connected_user_session.clone() {
+            map.insert(session.clone(), self.user_score.get(&session).unwrap_or(&0).clone());
+        }
+        map
+    }
+
+}
+
+
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, EnumIter, Display)]
 pub enum GameState{
@@ -327,6 +341,23 @@ pub enum GameState{
     Starting,
     Playing,
     End
+}
+
+impl GameState{
+
+    pub fn open(&self) -> bool {
+        match self {
+            Waiting => true,
+            GameState::Starting => false,
+            Playing => false,
+            GameState::End => true,
+        }
+
+
+
+    }
+
+
 }
 
 
@@ -338,7 +369,8 @@ impl GameServer {
             creator: DiscordID::server(),
             lobby_id: name.clone(),
             user_score: HashMap::new(),
-            user_session: LinkedHashSet::new(),
+            connected_user_session: LinkedHashSet::new(),
+            allowed_user_session: LinkedHashSet::new(),
             websocket_session_id: LinkedHashSet::new(),
             game_state: GameState::Waiting,
             jeopardy_board: JeopardyBoard::default(NORMAL),
@@ -396,7 +428,8 @@ impl GameServer {
             creator: discord_id,
             lobby_id:lobby_id.clone(),
             user_score: HashMap::new(),
-            user_session: LinkedHashSet::new(),
+            connected_user_session: LinkedHashSet::new(),
+            allowed_user_session: LinkedHashSet::new(),
             websocket_session_id: LinkedHashSet::new(),
             game_state: GameState::Waiting,
             jeopardy_board,
@@ -409,7 +442,7 @@ impl GameServer {
     fn get_dto_sessions(&self, lobby_id: &LobbyId) -> LinkedHashSet<DTOSession> {
         let mut sessions = LinkedHashSet::new();
         if let Some(lobby) = self.lobbies.get(&lobby_id){
-            for session_id in &lobby.user_session {
+            for session_id in &lobby.connected_user_session {
                 if let Some(session) = self.user_sessions.get(&session_id){
                     sessions.insert(session.clone().dto(lobby.user_score.get(&session_id).unwrap_or(&0)));
                 }
@@ -450,7 +483,7 @@ impl GameServer {
     }
     fn send_websocket_session_message(&self, lobby_id: &LobbyId, websocket_session_id: &WebsocketSessionId,message: WebsocketServerEvents) {
         if let Some(lobby) = self.lobbies.get(lobby_id) {
-            for user_session_id in  lobby.user_session.clone() {
+            for user_session_id in  lobby.connected_user_session.clone() {
                 if let Some(user_session) = self.user_sessions.get(&user_session_id){
                     if let Some(web_socket_session) = user_session.websocket_connections.get(websocket_session_id) {
                     web_socket_session.addr.do_send(SessionMessageType::Data(message));
@@ -467,7 +500,7 @@ impl GameServer {
     #[allow(dead_code)]
     fn disconnect(&mut self, user_id:&UserSessionId, lobby_id:&LobbyId) {
         if let Some(lobby) = self.lobbies.get(lobby_id) {
-            if let Some(user_session) = lobby.user_session.get(&user_id) {
+            if let Some(user_session) = lobby.connected_user_session.get(&user_id) {
                 if let Some(user_session) = self.user_sessions.get(user_session) {
                     for websockets in &lobby.websocket_session_id {
                         if let Some(websocket_session) = user_session.websocket_connections.get(&websockets) {
@@ -518,9 +551,8 @@ impl Handler<WebsocketConnect> for GameServer {
             }
             Some(lobby) => lobby,
         };
-        lobby.websocket_session_id.insert(websocket_session_id.clone());
-        lobby.user_session.insert(msg.user_session_id.clone());
 
+        lobby.websocket_session_id.insert(websocket_session_id.clone());
         let new_session = !user_session.websocket_connections.values().any(|websocket_session| websocket_session.lobby_id.eq(&msg.lobby_id));
 
         user_session.websocket_connections.insert(websocket_session_id.clone(), WebsocketSession {
@@ -532,7 +564,12 @@ impl Handler<WebsocketConnect> for GameServer {
         let board = lobby.jeopardy_board.clone();
 
         if new_session {
-            lobby.user_score.insert(msg.user_session_id.clone(), 0);
+            lobby.connected_user_session.insert(msg.user_session_id.clone());
+            let allowed_user = lobby.allowed_user_session.contains(&user_session.user_session_id);
+            if !allowed_user {
+                lobby.allowed_user_session.insert(msg.user_session_id.clone());
+                lobby.user_score.insert(msg.user_session_id.clone(), 0);
+            }
             let dto_session = user_session.clone().dto(&0);
 
             println!("Someone joined: {:?}{:?}", &msg, &websocket_session_id.clone());
@@ -570,14 +607,19 @@ impl Handler<WebsocketDisconnect> for GameServer {
             None => return,
             Some(lobby) => lobby
         };
-        println!("Someone disconnect: {:?}", user_session.clone().to_session_data());
-        let not_multi_sessions = !user_session.websocket_connections.values().any(|ws | ws.lobby_id.eq(&msg.user_data.lobby_id));
-        if not_multi_sessions{
-            &lobby.user_session.remove(&msg.user_data.user_session_id);
-            &lobby.user_score.remove(&msg.user_data.user_session_id);
+
+        let multi_sessions = user_session.websocket_connections.values().any(|ws | ws.lobby_id.eq(&msg.user_data.lobby_id));
+        println!("Someone disconnect: {:?} multisession: {:?}?", user_session.clone().to_session_data(), multi_sessions);
+        if !multi_sessions {
+            &lobby.connected_user_session.remove(&msg.user_data.user_session_id);
+            // ! NEED TO BE REMOVED AFTER GAME CAN SWITCH TO OTHER STATES
+            if !lobby.game_state.open() {
+                &lobby.allowed_user_session.remove(&msg.user_data.user_session_id);
+                &lobby.user_score.remove(&msg.user_data.user_session_id);
+            }
         }
         self.send_lobby_message(&msg.user_data.lobby_id, WebsocketServerEvents::Websocket(WebsocketDisconnected(websocket_session_id.clone())));
-        if not_multi_sessions {
+        if !multi_sessions {
             self.send_lobby_message(&msg.user_data.lobby_id, WebsocketServerEvents::Session(SessionDisconnected(msg.user_data.user_session_id.clone())));
         }
     }
@@ -716,10 +758,10 @@ impl Handler<CanJoinLobby> for GameServer {
             None => return false,
             Some(lobby) => lobby
         };
-        if lobby.game_state.eq(&Waiting){
+        if lobby.game_state.open(){
             return true
         }
-        lobby.user_session.contains(&msg.user_session_id)
+        lobby.allowed_user_session.contains(&msg.user_session_id)
     }
 }
 

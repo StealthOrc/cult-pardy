@@ -9,6 +9,7 @@ mod playerpanel;
 mod service;
 mod types;
 mod ws;
+mod profilepanel;
 
 use yew::prelude::*;
 use yew_router::prelude::*;

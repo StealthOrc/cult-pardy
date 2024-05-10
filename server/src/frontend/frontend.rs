@@ -36,6 +36,9 @@ async fn find_game(
 
     let can_join = srv.send(game::CanJoinLobby { user_session_id: user_session.user_session_id.clone(), lobby_id: LobbyId::of(lobby_id.clone())}).await.expect("No Lobby found!");
     println!("HasLobby?{}", can_join);
+    if !can_join {
+        return to_main_page(&user_session, &req)
+    }
     let mut response = index_response(&req);
     set_session_token_cookie(&mut response, &req, &user_session);
     Ok(response)
