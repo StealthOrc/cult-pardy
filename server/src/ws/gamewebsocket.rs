@@ -3,9 +3,10 @@ use actix_web::{HttpRequest, HttpResponse, web};
 use actix_web_actors::ws;
 use chrono::Local;
 use serde_json::json;
-use cult_common::{LobbyId, SessionToken, UserSessionId};
+use cult_common::{LobbyId,UserSessionId};
 use crate::apis::data::{extract_value, get_internal_server_error_json};
 use crate::servers::game;
+use crate::servers::game::SessionToken;
 use crate::ws::session::WsSession;
 
 pub async fn start_ws(req: HttpRequest, stream: web::Payload, srv: web::Data<Addr<game::GameServer>>) -> Result<HttpResponse, actix_web::Error> {

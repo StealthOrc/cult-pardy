@@ -1,8 +1,13 @@
+use std::error::Error;
 use mongodb::bson::doc;
 use mongodb::options::{ClientOptions, ServerApi, ServerApiVersion};
-use mongodb::sync::{Client, Collection};
+use mongodb::sync::{Client, Collection, Cursor};
 use strum::{Display, EnumIter};
-
+use cult_common::{UserSessionId, WebsocketServerEvents};
+use cult_common::WebsocketError::SessionNotFound;
+use crate::servers::db::DBDatabase::CultPardy;
+use crate::servers::db::UserCollection::UserSessions;
+use crate::servers::game::UserSession;
 
 
 #[derive(Copy,Clone,EnumIter,Display, Debug, Default)]
@@ -17,7 +22,7 @@ pub enum DBDatabase{
 #[derive(Copy,Clone,EnumIter,Display,Debug, Default)]
 pub enum UserCollection{
     #[default]
-    UserSessionCollection,
+    UserSessions,
 }
 
 
@@ -53,5 +58,24 @@ impl MongoServer{
         }
 
     }
+
+    pub fn find_user_session(&self, user_session_id: &UserSessionId) -> Option<UserSession> {
+        let result = self.collection::<UserSession>(CultPardy(UserSessions)).find_one(doc! {"user_session_id": &user_session_id.id}, None);
+        match result {
+            Err(e) => {
+                return None;
+            }
+            Ok(data) => data,
+        }
+    }
+
+    pub fn has_user_session(&self, user_session_id: &UserSessionId) -> bool {
+         match self.find_user_session(&user_session_id){
+            None => false,
+            Some(_) => true,
+        }
+    }
+
+
 
 }

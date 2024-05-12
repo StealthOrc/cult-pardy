@@ -1,7 +1,4 @@
-use cult_common::{
-    compress, parse_addr_str, BoardEvent, DTOSession, DiscordUser, DtoJeopardyBoard, DtoQuestion,
-    UserSessionId, Vector2D, WebsocketServerEvents, LOCATION,
-};
+use cult_common::{compress, parse_addr_str, BoardEvent, DtoJeopardyBoard, DtoQuestion, UserSessionId, Vector2D, WebsocketServerEvents, LOCATION, DTOSession};
 use futures::StreamExt;
 use gloo_console::log;
 use gloo_net::websocket::Message;
@@ -118,19 +115,22 @@ impl Component for App {
                 let onclick = ctx.link().callback(AppMsg::SendWebsocketMessage);
                 let cb_add_user_score = ctx.link().callback(AppMsg::SendWebsocketMessage);
                 let question = board.categories[current.x].questions[current.y].clone();
+                let creator = board.creator;
                 html! {
                     <div>
                         <BoardQuestion {question} {onclick}/>
-                        <PlayerListPanel {user_list} add_user_score={cb_add_user_score}/>
+                        <PlayerListPanel {creator} {user_list} add_user_score={cb_add_user_score}/>
                     </div>
                 }
             }
             None => {
                 let onclick = ctx.link().callback(AppMsg::SendWebsocketMessage);
+                let creator = board.creator.clone();
+                log!(format!("CREATOR{:?}", creator));
                 html! {
                     <div>
                         <Board board={board} {onclick}/>
-                        <PlayerListPanel {user_list} />
+                        <PlayerListPanel {creator} {user_list} />
                     </div>
                 }
             }

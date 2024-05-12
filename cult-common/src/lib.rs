@@ -24,6 +24,16 @@ pub fn parse_addr_str(domain: &str, port: usize) -> SocketAddr {
     addr
 }
 
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash)]
+pub struct DTOSession {
+    pub user_session_id: UserSessionId,
+    pub score: i32,
+    pub discord_user: Option<DiscordUser>,
+    pub is_admin: bool,
+}
+
+
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash)]
 pub struct DiscordUser {
     pub discord_id: DiscordID,
@@ -32,6 +42,8 @@ pub struct DiscordUser {
     pub discriminator: String,
     pub global_name: String,
 }
+
+
 
 impl DiscordUser {
     pub fn avatar_image_url(self) -> String {
@@ -42,12 +54,6 @@ impl DiscordUser {
     }
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash)]
-pub struct DTOSession {
-    pub user_session_id: UserSessionId,
-    pub score: i32,
-    pub discord_user: Option<DiscordUser>,
-}
 
 #[derive(Clone, Copy)]
 pub enum JeopardyMode {
@@ -110,6 +116,7 @@ impl<'de> Deserialize<'de> for JeopardyBoard {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct DtoJeopardyBoard {
+    pub creator: UserSessionId,
     pub categories: Vec<DtoCategory>,
     pub current: Option<Vector2D>,
 }
@@ -202,7 +209,7 @@ impl Category {
     }
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Default, Debug,Clone, PartialEq, Eq, Hash)]
 pub struct UserSessionId {
     pub id: String,
 }
@@ -241,41 +248,6 @@ impl ApiResponse {
     }
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
-pub struct SessionToken {
-    pub token: String,
-    pub create: DateTime<Local>,
-}
-
-impl SessionToken {
-    pub fn new() -> SessionToken {
-        let token = Self::new_token();
-        SessionToken {
-            token,
-            create: Local::now(),
-        }
-    }
-
-    pub fn random() -> SessionToken {
-        let token = Self::new_token();
-        SessionToken {
-            token,
-            create: Local::now(),
-        }
-    }
-
-    pub fn update(&mut self) {
-        self.create = Local::now();
-        self.token = Self::new_token();
-    }
-    fn new_token() -> String {
-        rand::thread_rng()
-            .sample_iter(&Alphanumeric)
-            .take(30)
-            .map(char::from)
-            .collect()
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Default)]
 pub struct JsonPrinter {
@@ -313,6 +285,11 @@ impl UserSessionId {
         UserSessionId { id: id.to_string() }
     }
 
+    pub fn server() -> Self {
+        UserSessionId {
+            id: "000000000000000".to_string(),
+        }
+    }
     pub fn random() -> Self {
         UserSessionId {
             id: random::<usize>().to_string(),
@@ -553,7 +530,7 @@ impl JeopardyBoard {
         }
     }
 
-    pub fn dto(self) -> DtoJeopardyBoard {
+    pub fn dto(self, creator:UserSessionId) -> DtoJeopardyBoard {
         let cat = self
             .categories
             .iter()
@@ -583,6 +560,7 @@ impl JeopardyBoard {
             .collect::<Vec<DtoCategory>>();
 
         DtoJeopardyBoard {
+            creator,
             categories: cat,
             current: self.current,
         }

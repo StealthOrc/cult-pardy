@@ -1,11 +1,15 @@
+use ritelinked::LinkedHashMap;
 use yew::prelude::*;
+use cult_common::{DTOSession, UserSessionId};
 
 use crate::playerpanel::*;
+use crate::playerpanel::_PlayerPanelProperties::player;
 use crate::types::{OptionalWebsocketCallback, UserList};
 
 #[derive(Properties, PartialEq)]
 pub struct PlayerListPanelProperties {
-    pub user_list: UserList,
+    pub creator:UserSessionId,
+    pub user_list: LinkedHashMap<UserSessionId, DTOSession>,
     #[prop_or(None)]
     pub add_user_score: OptionalWebsocketCallback,
 }
@@ -22,16 +26,21 @@ impl Component for PlayerListPanel {
     }
 
     fn view(&self, ctx: &Context<Self>) -> Html {
-        html! {
-            <div>
-                {
-                    ctx.props().user_list.values().map(|player|{
-                        let add_user_score = ctx.props().add_user_score.clone();
-                        html!{<PlayerPanel player={player.clone()} {add_user_score}/>}
-                    }).collect::<Html>()
-                }
-            </div>
+        let mut html = Vec::<Html>::new();
+        for session in ctx.props().user_list.values() {
+            let add_user_score = ctx.props().add_user_score.clone();
+            let creator = ctx.props().creator.eq(&session.user_session_id);
+            html.push(
+                html! {
+                    <PlayerPanel creator={creator} player={session.clone()} add_user_score={add_user_score} />});
         }
+
+        html!
+        {
+        <div>
+            { for html.into_iter() }
+        </div>
+    }
     }
     // add code here
 }

@@ -10,6 +10,8 @@ pub struct PlayerPanelProperties {
     pub player: DTOSession,
     #[prop_or(None)]
     pub add_user_score: OptionalWebsocketCallback,
+    #[prop_or(false)]
+    pub creator: bool
 }
 #[derive(Debug)]
 pub struct PlayerPanel {
@@ -27,6 +29,7 @@ impl Component for PlayerPanel {
 
     fn view(&self, ctx: &Context<Self>) -> Html {
         let player = ctx.props().player.clone();
+        let creator = ctx.props().creator.clone();
         let session_id = player.user_session_id.clone();
         let onclick = match ctx.props().add_user_score.clone() {
             Some(callback) => callback.reform(move |_| {
@@ -51,6 +54,14 @@ impl Component for PlayerPanel {
                 );
             }
         };
+        if player.is_admin{
+            username = username + " [ADMIN] "
+        }
+
+        if creator{
+            username = username + " [CREATOR] "
+        }
+
         html! {
             <div class={(self.is_locked_in).then(||classes!("player-panel-locked-in")).unwrap_or(classes!("player-panel"))}>
                 <p>{username}</p>

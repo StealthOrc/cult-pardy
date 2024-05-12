@@ -1,4 +1,4 @@
-use crate::servers::game::{CreateLobby, GetUserSession};
+use crate::servers::game::{CreateLobby, GetUserSession, SessionToken};
 use actix::{Addr};
 
 use actix_web::cookie::{Cookie};
@@ -7,7 +7,7 @@ use chrono::Local;
 use serde::Serialize;
 use serde_json::json;
 use cult_common::JeopardyMode::{SHORT};
-use cult_common::{ApiResponse, JeopardyBoard, LobbyId, SessionToken, UserSessionId};
+use cult_common::{ApiResponse, JeopardyBoard, LobbyId, UserSessionId};
 use crate::apis::data::{extract_header_string, extract_value};
 use crate::authentication::discord::is_admin;
 use crate::servers::authentication::AuthenticationServer;

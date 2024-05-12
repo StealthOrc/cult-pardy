@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs::{File};
 use std::io::{BufReader, BufWriter, Write};
 use std::path::Path;
@@ -7,7 +7,7 @@ use actix::{Actor, Addr, Context, Handler, Message, MessageResult};
 use futures::AsyncWriteExt;
 use rand::{random};
 use serde::{Deserialize, Serialize};
-use cult_common::DiscordID;
+use cult_common::{DiscordID, UserSessionId};
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Hash, Clone)]
 struct Admin{
@@ -77,6 +77,11 @@ pub struct CheckAdminAccess{
 }
 impl actix::Message for CheckAdminAccess {
     type Result = bool;
+}
+
+pub struct GetAdminAccess {}
+impl actix::Message for GetAdminAccess {
+    type Result = Vec<DiscordID>;
 }
 
 
@@ -233,5 +238,13 @@ impl Handler<CheckAdminAccessToken> for AuthenticationServer {
 
     fn handle(&mut self, _msg: CheckAdminAccessToken, _ctx: &mut Self::Context) -> Self::Result {
         return self.admin_token.iter().any(|token | token.token.eq(&_msg.token))
+    }
+}
+
+impl Handler<GetAdminAccess> for AuthenticationServer {
+    type Result = Vec<DiscordID>;
+
+    fn handle(&mut self, _msg: GetAdminAccess, _ctx: &mut Self::Context) -> Self::Result {
+        self.admin.iter().map(|admin| admin.discord_id.clone()).collect::<Vec<DiscordID>>()
     }
 }
