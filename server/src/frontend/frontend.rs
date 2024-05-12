@@ -112,11 +112,6 @@ async fn assets(
     cexe.push(path);
     let final_path = cexe.into_os_string().into_string().unwrap();
     let named_file = NamedFile::open(final_path).expect("File not found");
-
-    let user_session = get_session(&req, &srv).await;
-
-    let mut response = named_file.into_response(&req);
-    set_session_token_cookie(&mut response, &req, &user_session);
-    Ok(response)
+    Ok(named_file.into_response(&req))
 }
 

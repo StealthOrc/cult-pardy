@@ -1,13 +1,16 @@
+use std::str::FromStr;
 use crate::servers::game::{CreateLobby, GetUserSession, SessionToken};
 use actix::{Addr};
 
 use actix_web::cookie::{Cookie};
 use actix_web::{get, HttpRequest, HttpResponse, post, web};
 use chrono::Local;
+use oauth2::http::header::COOKIE;
+use oauth2::http::{HeaderName, HeaderValue};
 use serde::Serialize;
 use serde_json::json;
 use cult_common::JeopardyMode::{SHORT};
-use cult_common::{ApiResponse, JeopardyBoard, LobbyId, UserSessionId};
+use cult_common::{ApiResponse, JeopardyBoard, LobbyId, LOCATION, PROTOCOL, UserSessionId};
 use crate::apis::data::{extract_header_string, extract_value};
 use crate::authentication::discord::is_admin;
 use crate::servers::authentication::AuthenticationServer;
@@ -84,6 +87,8 @@ pub fn get_token(req: &HttpRequest) -> Option<usize> {
 
 
 pub fn set_cookie(res: &mut HttpResponse,req: &HttpRequest, cookie_name: &str, value: &String){
+    let cookie = format!("{}={}", cookie_name, value);
+    res.headers_mut().append(COOKIE, HeaderValue::from_str(&cookie).unwrap());
    //let expiration_time = SystemTime::now() + Duration::from_secs(60);
     let _cookie = Cookie::build(cookie_name, value)
         .path("/")
@@ -110,6 +115,8 @@ pub fn set_cookie(res: &mut HttpResponse,req: &HttpRequest, cookie_name: &str, v
 pub fn set_session_token_cookie(response: &mut HttpResponse, req: &HttpRequest, user_session: &UserSession){
     set_cookie(response, &req, "user-session-id", &user_session.user_session_id.id.to_string());
     set_cookie(response, &req, "session-token", &user_session.session_token.token);
+
+
 }
 
 

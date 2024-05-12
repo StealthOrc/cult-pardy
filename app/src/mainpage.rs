@@ -1,16 +1,16 @@
-use std::fmt::format;
+use std::path::Path;
 use futures::TryFutureExt;
 use gloo_console::log;
-use gloo_net::{Error, http};
-use gloo_net::http::{Headers, Request, Response};
-use wasm_cookies::cookies::get;
+use gloo_net::http::{Headers, Request};
+use wasm_cookies::CookieOptions;
+use wasm_cookies::cookies::{get, set};
 use web_sys::window;
 use yew::{html, Callback, Component, Html, Context, Properties};
 
 use yew_router::prelude::RouterScopeExt;
-use cult_common::{DiscordUser, get_false, LobbyId, LOCATION, PROTOCOL, WebsocketServerEvents};
+use cult_common::{DiscordUser, get_false, LobbyId, LOCATION, PROTOCOL, UserSessionId, WebsocketServerEvents};
 use crate::app;
-use crate::types::AppMsg;
+use crate::types::{process_cookies};
 
 #[derive(Properties, PartialEq)]
 pub struct MainPage {
@@ -31,26 +31,25 @@ impl Component for MainPage {
     fn create(_ctx: &Context<Self>) -> Self {
 
         _ctx.link().send_future(async {
-            // use the data from above
 
             let _request_url = format!("{}/api/discord_session", format!("{}{}",PROTOCOL,LOCATION));
-            let _usr_session_id: String = get(&app::cookie_string(), "user-session-id")
+            let user_session_id = UserSessionId::from_string(get(&app::cookie_string(), "user-session-id")
                 .expect("could not get cookie")
-                .expect("could not get cookie from user");
-            let _session_token: String = get(&app::cookie_string(), "session-token")
+                .expect("could not get cookie from user"));
+            let session_token = get(&app::cookie_string(), "session-token")
                 .expect("could not get cookie")
                 .expect("could not get cookie from user");
 
             let head = Headers::new();
-            head.append("Cookie", &format!("user-session-id={}", _usr_session_id));
-            head.append("Cookie", &format!("session-token={}", _session_token));
-
+            head.append("Cookie", &format!("user-session-id={:?}", user_session_id));
+            head.append("Cookie", &format!("session-token={}", session_token));
 
             let resp = Request::get(&_request_url).headers(head).send().await;
             match resp {
                 Ok(value) => {
-                    let test = value.json::<Option<DiscordUser>>().await;
-                    if let Ok(json) = test {
+                    process_cookies(&value, session_token, &user_session_id);
+                    let result = value.json::<Option<DiscordUser>>().await;
+                    if let Ok(json) = result {
                         return Msg::Loaded(json.is_some())
                     }
                 },

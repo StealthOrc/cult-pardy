@@ -25,6 +25,7 @@ pub fn parse_addr_str(domain: &str, port: usize) -> SocketAddr {
 }
 
 
+
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash)]
 pub struct DTOSession {
     pub user_session_id: UserSessionId,

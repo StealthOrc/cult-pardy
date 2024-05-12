@@ -808,8 +808,7 @@ impl Handler<GetUserSession> for GameServer {
             Some(data) => data,
         };
         
-        
-        if user_session.clone().session_token.token.eq(&token.token) {
+         if user_session.clone().session_token.token.eq(&token.token) {
             if token.create.signed_duration_since(user_session.session_token.create) >TimeDelta::seconds(60*5){
                 user_session.session_token.update(); 
                 self.starting_services.mongo_server.collection::<UserSession>(CultPardy(UserSessions)).update_one(
