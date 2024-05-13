@@ -1,9 +1,8 @@
 use ritelinked::LinkedHashMap;
 use yew::prelude::*;
 use cult_common::{DTOSession, UserSessionId};
+use crate::game::playerpanel::PlayerPanel;
 
-use crate::playerpanel::*;
-use crate::playerpanel::_PlayerPanelProperties::player;
 use crate::types::{OptionalWebsocketCallback, UserList};
 
 #[derive(Properties, PartialEq)]

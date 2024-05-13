@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use strum::{Display};
 use cult_common::{DiscordID, DiscordUser, get_false, get_true, JsonPrinter, LOCATION, PROTOCOL};
-use crate::apis::api::{get_session, get_token, remove_cookie, set_cookie, set_session_token_cookie};
+use crate::apis::api::{get_updated_session, get_token, remove_cookie, set_cookie, set_session_token_cookie};
 use crate::apis::data::{extract_value};
 use crate::authentication::discord::DiscordRedirectURL::{Grant, Login};
 use crate::servers::authentication::{AuthenticationServer, CheckAdminAccess, RedeemAdminAccessToken};
@@ -112,7 +112,7 @@ pub async fn discord_oauth(
     login: web::Data<LoginDiscordAuth>,
     srv: web::Data<Addr<GameServer>>,
 ) -> anyhow::Result<HttpResponse, actix_web::Error> {
-    let user_session = get_session(&req, &srv).await;
+    let user_session = get_updated_session(&req, &srv).await;
 
     if let Some(discord_data) = user_session.clone().discord_auth {
         if discord_data.discord_user.is_some() {
@@ -292,7 +292,7 @@ pub async fn login_only(
     oauth_client: web::Data<LoginDiscordAuth>,
 ) -> anyhow::Result<HttpResponse, actix_web::Error> {
 
-    let user_session = get_session(&req, &srv).await;
+    let user_session = get_updated_session(&req, &srv).await;
 
     let mut response = HttpResponse::Found()
         .append_header(("Location", format!("{}{}",PROTOCOL,LOCATION)))
@@ -342,7 +342,7 @@ pub async fn grant_access(
     auth: web::Data<Addr<AuthenticationServer>>,
 ) -> anyhow::Result<HttpResponse, actix_web::Error> {
     let mut response = HttpResponse::NotFound().finish();
-    let user_session = get_session(&req, &srv).await;
+    let user_session = get_updated_session(&req, &srv).await;
     let mut printer = JsonPrinter::new();
 
     let token = match get_token(&req){

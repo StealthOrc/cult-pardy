@@ -1,10 +1,13 @@
 use std::str::FromStr;
-use crate::servers::game::{CreateLobby, GetUserSession, SessionToken};
+use std::time::{Duration, SystemTime};
+use crate::servers::game::{CreateLobby, GetUserAndUpdateSession, GetUserSession, SessionToken};
 use actix::{Addr};
 
-use actix_web::cookie::{Cookie};
+use actix_web::cookie::{Cookie, Expiration};
 use actix_web::{get, HttpRequest, HttpResponse, post, web};
-use chrono::Local;
+use actix_web::cookie::time::{OffsetDateTime};
+use chrono::{Local, NaiveDateTime, Utc};
+use mongodb::bson::Bson::DateTime;
 use oauth2::http::header::COOKIE;
 use oauth2::http::{HeaderName, HeaderValue};
 use serde::Serialize;
@@ -54,22 +57,18 @@ async fn session_request(req: HttpRequest, srv: web::Data<Addr<game::GameServer>
     Ok(response)
 }
 
-pub async fn get_session(req: &HttpRequest, srv: &web::Data<Addr<game::GameServer>>) -> UserSession {
-    let mut user_session_id = None;
-    let mut session_token = None;
-    if let Some(cookie) = req.cookie("user-session-id"){
-        if let Ok(id) =  cookie.value().parse::<usize>(){
-            user_session_id = Some(UserSessionId::of(id));
-        }
-    }
-    if let Some(cookie) = req.cookie("session-token"){
-        session_token = Some(SessionToken {
-            token:cookie.value().to_string(),
-            create: Local::now(),
-        })
-    };
-    srv.send(GetUserSession{user_session_id, session_token}).await.expect("Something happens by getting the user")
+pub async fn get_updated_session(req: &HttpRequest, srv: &web::Data<Addr<game::GameServer>>) -> UserSession {
+    let mut user_session_id = get_user_id_from_cookie(&req);
+    let mut session_token = get_session_token_from_cookie(&req);
+    srv.send(GetUserAndUpdateSession {user_session_id, session_token}).await.expect("Something happens by getting the user")
 }
+
+pub async fn get_session(req: &HttpRequest, srv: &web::Data<Addr<game::GameServer>>) -> UserSession {
+    let mut user_session_id = get_user_id_from_value(&req).or(get_user_id_from_cookie(&req));
+    let mut session_token = get_session_token_from_value(&req).or(get_session_token_from_cookie(&req));
+    srv.send(GetUserSession {user_session_id, session_token}).await.expect("Something happens by getting the user")
+}
+
 
 pub fn get_token(req: &HttpRequest) -> Option<usize> {
     let cookie = match req.cookie("token") {
@@ -89,34 +88,25 @@ pub fn get_token(req: &HttpRequest) -> Option<usize> {
 pub fn set_cookie(res: &mut HttpResponse,req: &HttpRequest, cookie_name: &str, value: &String){
     let cookie = format!("{}={}", cookie_name, value);
     res.headers_mut().append(COOKIE, HeaderValue::from_str(&cookie).unwrap());
-   //let expiration_time = SystemTime::now() + Duration::from_secs(60);
     let _cookie = Cookie::build(cookie_name, value)
         .path("/")
+        .permanent()
         .secure(true)
-        //TODO Do we need this?
-        //.expires(Expiration::DateTime(OffsetDateTime::from(expiration_time)))
         .finish();
-    if let Some(cookie) = req.cookie(cookie_name) {
+    /*if let Some(cookie) = req.cookie(cookie_name) {
         if cookie.value().eq(value) {
-            return;
-        }
+                return;
+            }
     }
-    let cookie = Cookie::build(cookie_name, value)
-        .path("/")
-        .secure(true)
-        //TODO Do we need this?
-        //.expires(Expiration::DateTime(OffsetDateTime::from(expiration_time)))
-        .finish();
-    println!("UPDATED!! {}", cookie_name.to_string());
-    res.add_cookie(&cookie).expect("Can´t add cookies to the Response");
+     println!("UPDATED!! {}", cookie_name.to_string() + "");
+     */
+    res.add_cookie(&_cookie).expect("Can´t add cookies to the Response");
 }
 
 
 pub fn set_session_token_cookie(response: &mut HttpResponse, req: &HttpRequest, user_session: &UserSession){
     set_cookie(response, &req, "user-session-id", &user_session.user_session_id.id.to_string());
     set_cookie(response, &req, "session-token", &user_session.session_token.token);
-
-
 }
 
 
@@ -193,3 +183,40 @@ async fn board() -> HttpResponse {
 }
 
 
+pub fn get_user_id_from_cookie(req: &HttpRequest) -> Option<UserSessionId> {
+    if let Some(cookie) = req.cookie("user-session-id"){
+        if let Ok(id) =  cookie.value().parse::<usize>(){
+            return Some(UserSessionId::of(id));
+        }
+    }
+    None
+}
+
+pub fn get_session_token_from_cookie(req: &HttpRequest) -> Option<SessionToken> {
+    if let Some(cookie) = req.cookie("session-token"){
+        return Some(SessionToken {
+            token:cookie.value().to_string(),
+            create: Local::now(),
+        })
+    };
+    None
+}
+
+pub fn get_user_id_from_value(req: &HttpRequest) -> Option<UserSessionId> {
+    if let Ok(cookie) = extract_value(&req,"user-session-id"){
+        if let Ok(id) =  cookie.parse::<usize>(){
+            return Some(UserSessionId::of(id));
+        }
+    }
+    None
+}
+
+pub fn get_session_token_from_value(req: &HttpRequest) -> Option<SessionToken> {
+    if let Ok(cookie) = extract_value(&req,"session-token"){
+        return Some(SessionToken {
+            token:cookie,
+            create: Local::now(),
+        })
+    };
+    None
+}

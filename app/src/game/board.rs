@@ -1,8 +1,9 @@
 use web_sys::window;
 use cult_common::{DtoJeopardyBoard, Vector2D, WebsocketSessionEvent};
 use yew::prelude::*;
+use crate::game::boardbutton::BoardButton;
+use crate::types::WebsocketCallback;
 
-use crate::{boardbutton::BoardButton, types::WebsocketCallback};
 
 #[derive(Properties, PartialEq, Debug)]
 pub struct BoardProps {

@@ -117,7 +117,7 @@ pub struct CanJoinLobby {
 
 #[derive(Message)]
 #[rtype(result = "UserSession")]
-pub struct GetUserSession {
+pub struct GetUserAndUpdateSession {
     pub user_session_id: Option<UserSessionId>,
     pub session_token: Option<SessionToken>,
 }
@@ -134,7 +134,7 @@ pub struct CreateLobby {
 
 #[derive(Message)]
 #[rtype(result = "UserSession")]
-pub struct HasSessionForWebSocket {
+pub struct GetUserSession {
     pub user_session_id: Option<UserSessionId>,
     pub session_token: Option<SessionToken>,
 }
@@ -790,10 +790,10 @@ impl Handler<HasLobby> for GameServer {
     }
 }
 
-impl Handler<GetUserSession> for GameServer {
-    type Result = MessageResult<GetUserSession>;
+impl Handler<GetUserAndUpdateSession> for GameServer {
+    type Result = MessageResult<GetUserAndUpdateSession>;
 
-    fn handle(&mut self, msg: GetUserSession, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: GetUserAndUpdateSession, _ctx: &mut Self::Context) -> Self::Result {
         let user_session  = match msg.user_session_id {
             None => return MessageResult(self.new_session()),
             Some(data) => data,
@@ -807,7 +807,6 @@ impl Handler<GetUserSession> for GameServer {
             None => return MessageResult(self.new_session()),
             Some(data) => data,
         };
-        
          if user_session.clone().session_token.token.eq(&token.token) {
             if token.create.signed_duration_since(user_session.session_token.create) >TimeDelta::seconds(60*5){
                 user_session.session_token.update(); 
@@ -819,17 +818,19 @@ impl Handler<GetUserSession> for GameServer {
             }
             return return MessageResult(user_session.clone())
             
-        }
+        } else{
+             println!("Session token not eq user_token:{:?}={:?}", user_session.clone().session_token.token,&token.token )
+         }
         MessageResult(self.new_session())
     }
 }
 
 
 
-impl Handler<HasSessionForWebSocket> for GameServer {
-    type Result = MessageResult<HasSessionForWebSocket>;
+impl Handler<GetUserSession> for GameServer {
+    type Result = MessageResult<GetUserSession>;
 
-    fn handle(&mut self, msg: HasSessionForWebSocket, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: GetUserSession, _ctx: &mut Self::Context) -> Self::Result {
         let user_session  = match msg.user_session_id {
             None => return MessageResult(self.new_session()),
             Some(data) => data,
@@ -1010,6 +1011,7 @@ impl Handler<AddLobbySessionScore> for GameServer {
                     lobby.jeopardy_board.current = None;
                     let board = lobby.jeopardy_board.clone();
                     let lobby_id = lobby.lobby_id.clone();
+
 
                     let event = WebsocketServerEvents::Board(CurrentBoard(board.dto(lobby.creator.clone())));
                     &game_server.send_lobby_message(&msg.user_data.lobby_id, event);

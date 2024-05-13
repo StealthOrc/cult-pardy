@@ -9,11 +9,13 @@ use wasm_cookies::cookies::*;
 use web_sys::HtmlDocument;
 use yew::html::Scope;
 use yew::prelude::*;
+use crate::game::board::Board;
+use crate::game::boardquestion::BoardQuestion;
+use crate::game::playerlistpanel::PlayerListPanel;
 
 use crate::types::{AppMsg, UserList};
 use crate::ws::eventhandler::handleEvent;
 use crate::ws::websocket::WebsocketService;
-use crate::{board::*, boardquestion::*, playerlistpanel::*};
 
 // testing purposes
 fn document() -> HtmlDocument {

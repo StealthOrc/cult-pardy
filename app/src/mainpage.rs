@@ -9,8 +9,7 @@ use yew::{html, Callback, Component, Html, Context, Properties};
 
 use yew_router::prelude::RouterScopeExt;
 use cult_common::{DiscordUser, get_false, LobbyId, LOCATION, PROTOCOL, UserSessionId, WebsocketServerEvents};
-use crate::app;
-use crate::types::{process_cookies};
+use crate::game::app;
 
 #[derive(Properties, PartialEq)]
 pub struct MainPage {
@@ -32,22 +31,19 @@ impl Component for MainPage {
 
         _ctx.link().send_future(async {
 
-            let _request_url = format!("{}/api/discord_session", format!("{}{}",PROTOCOL,LOCATION));
+
+
+
             let user_session_id = UserSessionId::from_string(get(&app::cookie_string(), "user-session-id")
                 .expect("could not get cookie")
                 .expect("could not get cookie from user"));
             let session_token = get(&app::cookie_string(), "session-token")
                 .expect("could not get cookie")
                 .expect("could not get cookie from user");
-
-            let head = Headers::new();
-            head.append("Cookie", &format!("user-session-id={:?}", user_session_id));
-            head.append("Cookie", &format!("session-token={}", session_token));
-
-            let resp = Request::get(&_request_url).headers(head).send().await;
+            let _request_url = format!("{}/api/discord_session?user-session-id={}&session-token={}", format!("{}{}",PROTOCOL,LOCATION), user_session_id.id,session_token);
+            let resp = Request::get(&_request_url).send().await;
             match resp {
                 Ok(value) => {
-                    process_cookies(&value, session_token, &user_session_id);
                     let result = value.json::<Option<DiscordUser>>().await;
                     if let Ok(json) = result {
                         return Msg::Loaded(json.is_some())

@@ -17,7 +17,6 @@ pub const WS_PROTOCOL: &'static str = "ws://";
 pub const PROTOCOL: &'static str = "http://";
 pub const LOCATION: &'static str = "localhost:8000";
 
-
 pub fn parse_addr_str(domain: &str, port: usize) -> SocketAddr {
     let addr = format!("{}:{}", domain, port);
     let addr = addr.parse::<SocketAddr>().expect("Failed to parse address");
@@ -391,6 +390,8 @@ impl WebsocketServerEvents {
 pub enum BoardEvent {
     CurrentBoard(DtoJeopardyBoard),
     CurrentQuestion(Vector2D, DtoQuestion),
+    UpdateCurrentQuestion(Option<Vector2D>),
+    UpdateSessionScore(UserSessionId, i32),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Display)]

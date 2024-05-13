@@ -1,22 +1,15 @@
-mod app;
-mod board;
-mod boardbutton;
-mod boardquestion;
-mod file;
 mod mainpage;
-mod playerlistpanel;
-mod playerpanel;
-mod service;
 mod types;
 mod ws;
 mod profilepanel;
+mod game;
 
 use yew::prelude::*;
 use yew_router::prelude::*;
 //testing purposes
-use crate::app::App;
 use crate::mainpage::MainPage;
 use gloo_storage::Storage;
+use crate::game::app::App;
 
 #[derive(Clone, Routable, PartialEq)]
 pub enum Route {

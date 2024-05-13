@@ -30,7 +30,7 @@ pub async fn start_ws(req: HttpRequest, stream: web::Payload, srv: web::Data<Add
 
     let request_session_id= UserSessionId::from_string(session_id.clone());
 
-    let user_session = match srv.send(game::HasSessionForWebSocket {
+    let user_session = match srv.send(game::GetUserSession {
         user_session_id: Some(request_session_id),
         session_token: Some(SessionToken {
             token,

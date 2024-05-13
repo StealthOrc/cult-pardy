@@ -1,10 +1,10 @@
-use crate::app::App;
 use crate::types::AppMsg;
 use cult_common::{BoardEvent, SessionEvent, WebsocketServerEvents};
 use gloo_console::log;
 use ritelinked::LinkedHashMap;
 use serde::de::Unexpected::Option;
 use yew::Callback;
+use crate::game::app::App;
 
 pub fn handleEvent(app: &mut App, event: WebsocketServerEvents) -> bool {
     log!(format!("Event received -> {}", event.clone().event_name()));
@@ -37,6 +37,8 @@ fn handle_board(mut app: &mut App, board_event: BoardEvent) -> bool {
             }
             None => todo!(),
         },
+        BoardEvent::UpdateCurrentQuestion(_) => {false},
+        BoardEvent::UpdateSessionScore(_,_) => false
     }
 }
 

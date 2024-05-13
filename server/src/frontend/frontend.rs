@@ -5,7 +5,7 @@ use actix_web::{get, web, HttpRequest, HttpResponse};
 use std::env;
 use std::path::PathBuf;
 use cult_common::{LobbyId, LOCATION, PROTOCOL};
-use crate::apis::api::{get_session, remove_cookie, set_cookie, set_session_token_cookie};
+use crate::apis::api::{get_updated_session, remove_cookie, set_cookie, set_session_token_cookie};
 use crate::authentication::discord::{is_admin, to_main_page};
 use crate::servers::authentication::{AuthenticationServer, CheckAdminAccessToken};
 use crate::servers::{game};
@@ -31,7 +31,7 @@ async fn find_game(
     lobby_id: web::Path<String>,
     srv: web::Data<Addr<GameServer>>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    let user_session = get_session(&req, &srv).await;
+    let user_session = get_updated_session(&req, &srv).await;
     let lobby_id = lobby_id.into_inner();
 
     let can_join = srv.send(game::CanJoinLobby { user_session_id: user_session.user_session_id.clone(), lobby_id: LobbyId::of(lobby_id.clone())}).await.expect("No Lobby found!");
@@ -55,7 +55,7 @@ async fn grant_admin_access(
     auth: web::Data<Addr<AuthenticationServer>>,
 ) -> Result<HttpResponse, actix_web::Error> {
 
-    let user_session = get_session(&req, &srv).await;
+    let user_session = get_updated_session(&req, &srv).await;
     let mut response = HttpResponse::Found()
         .append_header(("Location", format!("{}{}/discord?type=grant",  PROTOCOL,LOCATION)))
         .finish();
@@ -89,7 +89,7 @@ async fn index(
     req: HttpRequest,
     srv: web::Data<Addr<GameServer>>,
 ) -> actix_web::Result<HttpResponse> {
-    let user_session = get_session(&req, &srv).await;
+    let user_session = get_updated_session(&req, &srv).await;
     let mut response = index_response(&req);
     remove_cookie(&mut response, &req, "token");
     set_session_token_cookie(&mut response, &req, &user_session);
