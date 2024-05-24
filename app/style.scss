@@ -7,7 +7,7 @@
   width: 200px;
   height: 120px;
   font-size: 48px;
-  background-color: #4CAF50;
+  background-color: #4caf50;
   color: white;
   border: none;
   border-radius: 5px;
@@ -58,4 +58,15 @@
   grid-gap: 10px;
   max-width: 90%;
   max-height: 90%;
+}
+
+.yt-player-container {
+  width: 1280;
+  height: 720;
+}
+
+//youtube iframe/player
+.yt-player-container iframe {
+  width: 100%;
+  height: 100%;
 }
