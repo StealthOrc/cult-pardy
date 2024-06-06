@@ -1,15 +1,17 @@
-use std::path::Path;
 use futures::TryFutureExt;
 use gloo_console::log;
 use gloo_net::http::{Headers, Request};
-use wasm_cookies::CookieOptions;
+use std::path::Path;
 use wasm_cookies::cookies::{get, set};
+use wasm_cookies::CookieOptions;
 use web_sys::window;
-use yew::{html, Callback, Component, Html, Context, Properties};
+use yew::{html, Callback, Component, Context, Html, Properties};
 
-use yew_router::prelude::RouterScopeExt;
-use cult_common::{DiscordUser, get_false, LobbyId, LOCATION, PROTOCOL, UserSessionId, WebsocketServerEvents};
 use crate::game::app;
+use cult_common::{
+    get_false, DiscordUser, LobbyId, UserSessionId, WebsocketServerEvents, LOCATION, PROTOCOL,
+};
+use yew_router::prelude::RouterScopeExt;
 
 #[derive(Properties, PartialEq)]
 pub struct MainPage {
@@ -28,37 +30,33 @@ impl Component for MainPage {
     type Properties = ();
 
     fn create(_ctx: &Context<Self>) -> Self {
-
         _ctx.link().send_future(async {
-
-
-
-
-            let user_session_id = UserSessionId::from_string(get(&app::cookie_string(), "user-session-id")
-                .expect("could not get cookie")
-                .expect("could not get cookie from user"));
+            let user_session_id = UserSessionId::from_string(
+                get(&app::cookie_string(), "user-session-id")
+                    .expect("could not get cookie")
+                    .expect("could not get cookie from user"),
+            );
             let session_token = get(&app::cookie_string(), "session-token")
                 .expect("could not get cookie")
                 .expect("could not get cookie from user");
-            let _request_url = format!("{}/api/discord_session?user-session-id={}&session-token={}", format!("{}{}",PROTOCOL,LOCATION), user_session_id.id,session_token);
+            let _request_url = format!(
+                "{}/api/discord_session?user-session-id={}&session-token={}",
+                format!("{}{}", PROTOCOL, LOCATION),
+                user_session_id.id,
+                session_token
+            );
             let resp = Request::get(&_request_url).send().await;
             match resp {
                 Ok(value) => {
                     let result = value.json::<Option<DiscordUser>>().await;
                     if let Ok(json) = result {
-                        return Msg::Loaded(json.is_some())
+                        return Msg::Loaded(json.is_some());
                     }
-                },
+                }
                 Err(err) => log!(format!("error {:?}", err)),
             }
             Msg::Loaded(get_false())
-            }
-        );
-
-
-
-
-
+        });
 
         MainPage {
             is_logged_in: false,
@@ -73,7 +71,7 @@ impl Component for MainPage {
                 // Logic to handle login
                 self.is_logged_in = true;
                 true
-            },
+            }
             Msg::Loaded(va) => {
                 if va {
                     self.is_logged_in = true
@@ -111,12 +109,11 @@ impl Component for MainPage {
     }
 }
 impl MainPage {
-
     fn view_login_button(&self) -> Html {
         let onclick = Callback::from(move |_| {
             if let Some(window) = window() {
-                    if let Ok(_) = window.location().set_href("discord") {
-                        return ();
+                if window.location().set_href("discord").is_ok() {
+                    return;
                 }
             }
             panic!("Failed to redirect to Discord.");
@@ -124,15 +121,12 @@ impl MainPage {
 
         let input = Callback::from(move |_| {
             if let Some(window) = window() {
-                if let Ok(_) = window.location().set_href("/game/main") {
-                    return ();
+                if window.location().set_href("/game/main").is_ok() {
+                    return;
                 }
             }
             panic!("Failed to redirect to Discord.");
         });
-
-
-
 
         if self.is_logged_in {
             html! {
@@ -155,3 +149,4 @@ impl MainPage {
         }
     }
 }
+
