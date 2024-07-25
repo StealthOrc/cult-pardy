@@ -11,7 +11,7 @@ pub struct PlayerPanelProperties {
     #[prop_or(None)]
     pub add_user_score: OptionalWebsocketCallback,
     #[prop_or(false)]
-    pub creator: bool
+    pub creator: bool,
 }
 #[derive(Debug)]
 pub struct PlayerPanel {
@@ -54,11 +54,11 @@ impl Component for PlayerPanel {
                 );
             }
         };
-        if player.is_admin{
+        if player.is_admin {
             username = username + " [ADMIN] "
         }
 
-        if creator{
+        if creator {
             username = username + " [CREATOR] "
         }
 
@@ -66,9 +66,7 @@ impl Component for PlayerPanel {
             <div class={(self.is_locked_in).then(||classes!("player-panel-locked-in")).unwrap_or(classes!("player-panel"))}>
                 <p>{username}</p>
                 <p>{format!("Score:{}",player.score)}</p>
-                <button {onclick}>
-                    <img src={avatar_url}/>
-                </button>
+                    <img src={avatar_url} {onclick}/>
             </div>
         }
     }
