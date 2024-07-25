@@ -32,6 +32,8 @@ impl Component for BoardQuestion {
         let onclick = props
             .onclick
             .reform(move |_| WebsocketSessionEvent::Back);
+
+
         return html! {
             <button onclick={onclick.clone()}>{format!("Disabled: {}€",question_text) }</button>
         }
