@@ -121,9 +121,12 @@ impl Handler<game::SessionMessageType> for WsSession {
             SessionMessageType::SelfDisconnect => ctx.stop(),
             SessionMessageType::Data(data) => {
                 let binary = serde_json::to_vec(&data).expect("Can´t convert to vec");
-                if let Ok(bytes) = compress(&binary) {
-                    ctx.binary(bytes)
-                }
+
+                ctx.binary(binary);
+                //TODO: make deflate alogithm de-/activatable again for development
+                //if let Ok(bytes) = compress(&binary) {
+                //    ctx.binary(bytes)
+                //}
             }
         }
     }
@@ -165,8 +168,9 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                 }
             }
             ws::Message::Binary(data) => {
-                if let Ok(bytes) = decompress(&data) {
-                    match serde_json::from_slice::<WebsocketSessionEvent>(&bytes) {
+                //TODO: make deflate alogithm de-/activatable again for development
+                //if let Ok(bytes) = decompress(&data) {
+                    match serde_json::from_slice::<WebsocketSessionEvent>(&data) {
                         Ok(event) => {
                             match event.clone() {
                                 WebsocketSessionEvent::Click(vector2d) => {
@@ -193,7 +197,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                             println!("Error deserializing JSON data:  {:?}", err);
                         }
                     }
-                }
+                //}
             }
             ws::Message::Close(reason) => {
                 ctx.close(reason);
