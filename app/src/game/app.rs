@@ -2,11 +2,11 @@ use cult_common::{compress, parse_addr_str, BoardEvent, DtoJeopardyBoard, DtoQue
 use futures::StreamExt;
 use gloo_console::log;
 use gloo_net::websocket::Message;
+use web_sys::HtmlDocument;
 use std::collections::HashMap;
 use std::{borrow::Borrow, cell::RefCell, rc::Rc};
 use ritelinked::LinkedHashMap;
 use wasm_cookies::cookies::*;
-use web_sys::HtmlDocument;
 use yew::html::Scope;
 use yew::prelude::*;
 use crate::game::board::Board;
