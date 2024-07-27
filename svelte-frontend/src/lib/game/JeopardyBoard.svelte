@@ -5,6 +5,8 @@
     import {webSocket} from "rxjs/webSocket";
     import cookies,{updateCookies} from "$lib/stores/cookies.js";
 
+    export let lobbyId: string = "main";	
+
     updateCookies();
     console.log("cookies:", $cookies)
 
@@ -13,12 +15,12 @@
     };
 
     let gameData: GameData = {
-        categories: {},
+        creator: "",
+        categories: [],
+        current: null,
     };
-
-    const lobbyId = "main";
-    const userSessionId = cookies["user-session-id"];
-    const sessionToken = cookies["session-token"];
+    const userSessionId: string = $cookies["user-session-id"];
+    const sessionToken: string = $cookies["session-token"];
 
     const socket = webSocket({
         url: `ws://localhost:8000/ws?lobby-id=${lobbyId}&user-session-id=${userSessionId}&session-token=${sessionToken}`,

@@ -1,6 +1,9 @@
 import { writable } from "svelte/store";
 
-const cookies = writable({});
+const cookies = writable({
+    "user-session-id": "", 
+    "session-token": "" 
+});
 
 export function updateCookies() {
     cookies.set(getCookies());
