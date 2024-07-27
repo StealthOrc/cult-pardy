@@ -1,5 +1,7 @@
 <script lang="ts">
-    export let question: Question;
+	import type { DtoQuestion } from "$lib/cult_common";
+
+    export let question: DtoQuestion;
     let showOverlay = false;
 
     function handleClick() {

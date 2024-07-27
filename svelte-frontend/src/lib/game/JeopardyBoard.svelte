@@ -1,29 +1,36 @@
 <script lang="ts">
+    export const prerender = false;
     import JeopardyCategory from './JeopardyCategory.svelte';
     import PlayerCard from './PlayerCard.svelte';
     import { onMount } from 'svelte';
     import {webSocket} from "rxjs/webSocket";
-    import cookies,{updateCookies} from "$lib/stores/cookies.js";
+    import { getCookies, type cookies } from "$lib/stores/cookies.js";
+    import { match, P } from 'ts-pattern';
+	import type { DtoJeopardyBoard, DTOSession, WebsocketServerEvents } from '$lib/cult_common';
 
     export let lobbyId: string = "main";	
 
-    updateCookies();
-    console.log("cookies:", $cookies)
+    const cookies : cookies = getCookies();
+    
+
+
+
+
+    console.log("cookies:", cookies)
 
     let dto = {
         "test-data": "test-data",
     };
+    
+    let gameData: DtoJeopardyBoard;
+    let currrentSessions: DTOSession[];
 
-    let gameData: GameData = {
-        creator: "",
-        categories: [],
-        current: null,
-    };
-    const userSessionId: string = $cookies["user-session-id"];
-    const sessionToken: string = $cookies["session-token"];
+
+    console.log("userSessionId:", cookies.userSessionId);
+    console.log("sessionToken:", cookies.sessionToken);
 
     const socket = webSocket({
-        url: `ws://localhost:8000/ws?lobby-id=${lobbyId}&user-session-id=${userSessionId}&session-token=${sessionToken}`,
+        url: `ws://localhost:8000/ws?lobby-id=${lobbyId}&user-session-id=${cookies.userSessionId}&session-token=${cookies.sessionToken}`,
         deserializer: (e) => e.data.text(),
     })
 
@@ -40,37 +47,70 @@
 
         socket.subscribe({
             next: (message) => {
-                message.then((data) => {
-                    const parsed = JSON.parse(data);
-                    console.log("message:", parsed);
-                    if(parsed.hasOwnProperty("Board")) {
-                        gameData = parsed.Board.CurrentBoard;
-                        console.log("gameData:", gameData);
-                        updateGridColumns();
-                        //console.log(message)
-                    } else {
-                        //console.log(message)
-                    }
-                });
+                message.then((data: string) => {
+                    const parsed : WebsocketServerEvents = JSON.parse(data);
+
+
+                    match(parsed)
+                        //BoardEvents
+                        .with({ Board: P.select() }, (boardEvent) => {
+                            console.log("Event found:", boardEvent);
+                            //CurrentBoard
+                            match(boardEvent)
+                                .with({ CurrentBoard: P.select() }, (currentBoard) => {
+                                    console.log("Event found: ", currentBoard);
+                                    gameData = currentBoard;
+                                    console.log("gameData:", gameData);
+                                    updateGridColumns();
+
+                                 //Currently no added events
+                                }).otherwise(() => {
+                                    console.log("Event not found: ",message)
+                                });
+                        })
+
+                        //SessionEvents
+                        .with({Session: P.select() }, (boardEvent) => {
+                            console.log("Event found:", boardEvent);
+                            match(boardEvent)
+                                .with({ CurrentSessions: P.select() }, (CurrentSessions) => {
+                                    console.log("Event found: ", CurrentSessions);
+                                    currrentSessions = CurrentSessions;
+                                    updateGridColumns();
+
+                                //Currently no added events
+                                }).otherwise(() => {
+                                    console.log("Event not found: ",message)
+                                });
+                        })
+                        //Currently no added events
+                        .otherwise(() => {
+                            console.log("Event not found: ",message)
+                        });
+                    });
+
+
+
             },
             error: (error) => {
                 console.log(error);
                 //console.error('WebSocket error:', error);
             }
         });
+
     });
 </script>
 
 <div class="jeopardy-container">
     <div class="jeopardy-board">
-        {#if Object.keys(gameData).length > 0}
+        {#if gameData != null && gameData.categories != null}
             {#each gameData.categories as category}
                 <JeopardyCategory {category} />
             {/each}
         {/if}
     </div>
 </div>
-<PlayerCard />
+<PlayerCard {currrentSessions} />
 
 <style>
     .jeopardy-container {

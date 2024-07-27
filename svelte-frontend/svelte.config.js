@@ -16,7 +16,7 @@ const config = {
 			// these options are set automatically — see below
 			pages: 'build',
 			assets: 'build',
-			fallback: undefined,
+			fallback: 'index.html', // This will be used as the fallback for dynamic routes
 			precompress: false,
 			strict: true
 		}),
