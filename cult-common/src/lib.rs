@@ -12,6 +12,7 @@ use std::io::{Read, Write};
 use std::net::SocketAddr;
 use std::string::ToString;
 use strum::Display;
+use tsify::Tsify;
 
 pub const WS_PROTOCOL: &'static str = "ws://";
 pub const PROTOCOL: &'static str = "http://";
@@ -25,7 +26,7 @@ pub fn parse_addr_str(domain: &str, port: usize) -> SocketAddr {
 
 
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash)]
+#[derive(Tsify,Default, Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash)]
 pub struct DTOSession {
     pub user_session_id: UserSessionId,
     pub score: i32,
@@ -34,7 +35,8 @@ pub struct DTOSession {
 }
 
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash)]
+#[derive(Tsify,Default, Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct DiscordUser {
     pub discord_id: DiscordID,
     pub username: String,
@@ -55,7 +57,7 @@ impl DiscordUser {
 }
 
 
-#[derive(Clone, Copy)]
+#[derive(Tsify,Clone, Copy)]
 pub enum JeopardyMode {
     //3x3
     SHORT,
@@ -74,13 +76,13 @@ impl JeopardyMode {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Eq, PartialEq)]
+#[derive(Tsify,Debug, Clone, Serialize, Eq, PartialEq)]
 pub enum LobbyCreateResponse {
     Created(LobbyId),
     Error(String),
 }
 
-#[derive(Debug, Clone, Serialize, Eq, PartialEq)]
+#[derive(Tsify,Debug, Clone, Serialize, Eq, PartialEq)]
 pub struct JeopardyBoard {
     pub title: String,
     pub categories: Vec<Category>,
@@ -114,7 +116,7 @@ impl<'de> Deserialize<'de> for JeopardyBoard {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Tsify,Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct DtoJeopardyBoard {
     pub creator: UserSessionId,
     pub categories: Vec<DtoCategory>,
@@ -159,19 +161,19 @@ impl DtoJeopardyBoard {
     }
 }
 
-#[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq, Default)]
+#[derive(Tsify,Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq, Default)]
 pub struct Vector2D {
     pub x: usize,
     pub y: usize,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Tsify,Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct DtoCategory {
     pub title: String,
     pub questions: Vec<DtoQuestion>,
 }
 
-#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Tsify,PartialEq, Eq, Debug, Clone, Serialize, Deserialize, Default)]
 pub struct DtoQuestion {
     pub question_type: QuestionType,
     pub question_text: Option<String>,
@@ -186,7 +188,7 @@ impl crate::DtoCategory {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Tsify,Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Category {
     pub title: String,
     pub questions: Vec<Question>,
@@ -209,11 +211,11 @@ impl Category {
     }
 }
 
-#[derive(Default, Debug,Clone, PartialEq, Eq, Hash)]
+#[derive(Tsify,Default, Debug,Clone, PartialEq, Eq, Hash)]
 pub struct UserSessionId {
     pub id: String,
 }
-#[derive(Default, Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Tsify,Default, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct DiscordID {
     pub id: String,
 }
@@ -234,7 +236,7 @@ impl DiscordID {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Tsify,Serialize, Deserialize)]
 pub struct ApiResponse {
     pub success: bool,
 }
@@ -249,7 +251,7 @@ impl ApiResponse {
 }
 
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Default)]
+#[derive(Tsify,Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Default)]
 pub struct JsonPrinter {
     pub results: HashMap<String, bool>,
 }
@@ -297,7 +299,7 @@ impl UserSessionId {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Eq, PartialEq)]
+#[derive(Tsify,Debug, Clone, Serialize, Eq, PartialEq)]
 pub struct Question {
     pub question_type: QuestionType,
     pub question: String,
@@ -335,7 +337,7 @@ impl<'de> Deserialize<'de> for Question {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Default)]
+#[derive(Tsify,Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Default)]
 pub enum QuestionType {
     Media(String),
     #[default]
@@ -362,7 +364,7 @@ impl Question {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Display)]
+#[derive(Tsify,Debug, Clone, Serialize, Deserialize, Display)]
 pub enum WebsocketServerEvents {
     Board(BoardEvent),
     Websocket(WebsocketEvent),
@@ -386,7 +388,7 @@ impl WebsocketServerEvents {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Display)]
+#[derive(Tsify,Debug, Clone, Serialize, Deserialize, Display)]
 pub enum BoardEvent {
     CurrentBoard(DtoJeopardyBoard),
     CurrentQuestion(Vector2D, DtoQuestion),
@@ -394,27 +396,27 @@ pub enum BoardEvent {
     UpdateSessionScore(UserSessionId, i32),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Display)]
+#[derive(Tsify,Debug, Clone, Serialize, Deserialize, Display)]
 pub enum WebsocketEvent {
     WebsocketJoined(WebsocketSessionId),
     WebsocketDisconnected(WebsocketSessionId),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Display, Hash)]
+#[derive(Tsify, Debug, Clone, Serialize, Deserialize, Display, Hash)]
 pub enum SessionEvent {
     CurrentSessions(Vec<DTOSession>),
     SessionJoined(DTOSession),
     SessionDisconnected(UserSessionId),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Display)]
+#[derive(Tsify,Debug, Clone, Serialize, Deserialize, Display)]
 pub enum WebsocketSessionEvent {
     Click(Vector2D),
     Back,
     AddUserSessionScore(UserSessionId)
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Display)]
+#[derive(Tsify,Debug, Clone, Serialize, Deserialize, Display)]
 pub enum WebsocketError {
     LobbyNotFound(LobbyId),
     SessionNotFound(UserSessionId),
@@ -424,7 +426,7 @@ pub enum WebsocketError {
     UNKNOWN(String),
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+#[derive(Tsify,Debug, Clone, Hash, Eq, PartialEq)]
 pub struct WebsocketSessionId {
     id: String,
 }
@@ -451,7 +453,7 @@ impl WebsocketSessionId {
     }
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+#[derive(Tsify, Debug, Clone, Hash, Eq, PartialEq)]
 pub struct LobbyId {
     pub id: String,
 }
