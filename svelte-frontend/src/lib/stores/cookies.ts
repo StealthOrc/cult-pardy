@@ -1,6 +1,6 @@
 
 import Cookies from "js-cookie";
-import type { UserSessionId, WebsocketSessionId} from "$lib/cult_common";
+import type { UserSessionId, WebsocketSessionId} from 'cult-common';
 
 
 // fuction that returns the cookies and a type that represents the cookies

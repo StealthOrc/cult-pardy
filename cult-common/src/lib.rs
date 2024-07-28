@@ -4,6 +4,7 @@ use flate2::write::DeflateEncoder;
 use rand::distributions::Alphanumeric;
 use rand::{random, Rng};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use tsify_next::Tsify;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
@@ -12,7 +13,7 @@ use std::io::{Read, Write};
 use std::net::SocketAddr;
 use std::string::ToString;
 use strum::Display;
-use tsify::Tsify;
+use wasm_bindgen::prelude::*;
 
 pub const WS_PROTOCOL: &'static str = "ws://";
 pub const PROTOCOL: &'static str = "http://";
@@ -27,6 +28,7 @@ pub fn parse_addr_str(domain: &str, port: usize) -> SocketAddr {
 
 
 #[derive(Tsify,Default, Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct DTOSession {
     pub user_session_id: UserSessionId,
     pub score: i32,
@@ -46,9 +48,10 @@ pub struct DiscordUser {
 }
 
 
-
+#[wasm_bindgen]
 impl DiscordUser {
-    pub fn avatar_image_url(self) -> String {
+    #[wasm_bindgen]
+    pub fn avatar_image_url(self:DiscordUser) -> String {
         format!(
             "https://cdn.discordapp.com/avatars/{}/{}.jpg",
             self.discord_id.id, self.avatar_id
@@ -57,7 +60,8 @@ impl DiscordUser {
 }
 
 
-#[derive(Tsify,Clone, Copy)]
+#[derive(Tsify,Clone, Copy,Serialize,Deserialize)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
 pub enum JeopardyMode {
     //3x3
     SHORT,
@@ -66,8 +70,11 @@ pub enum JeopardyMode {
     //7x7
     LONG,
 }
+
+#[wasm_bindgen]
 impl JeopardyMode {
-    pub fn field_size(self) -> usize {
+    #[wasm_bindgen]
+    pub fn field_size(self: JeopardyMode) -> usize {
         match self {
             JeopardyMode::SHORT => 3,
             JeopardyMode::NORMAL => 5,
@@ -76,13 +83,15 @@ impl JeopardyMode {
     }
 }
 
-#[derive(Tsify,Debug, Clone, Serialize, Eq, PartialEq)]
+#[derive(Tsify,Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
 pub enum LobbyCreateResponse {
     Created(LobbyId),
     Error(String),
 }
 
 #[derive(Tsify,Debug, Clone, Serialize, Eq, PartialEq)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct JeopardyBoard {
     pub title: String,
     pub categories: Vec<Category>,
@@ -117,6 +126,7 @@ impl<'de> Deserialize<'de> for JeopardyBoard {
 }
 
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct DtoJeopardyBoard {
     pub creator: UserSessionId,
     pub categories: Vec<DtoCategory>,
@@ -162,18 +172,21 @@ impl DtoJeopardyBoard {
 }
 
 #[derive(Tsify,Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq, Default)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct Vector2D {
     pub x: usize,
     pub y: usize,
 }
 
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct DtoCategory {
     pub title: String,
     pub questions: Vec<DtoQuestion>,
 }
 
 #[derive(Tsify,PartialEq, Eq, Debug, Clone, Serialize, Deserialize, Default)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct DtoQuestion {
     pub question_type: QuestionType,
     pub question_text: Option<String>,
@@ -189,6 +202,7 @@ impl crate::DtoCategory {
 }
 
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct Category {
     pub title: String,
     pub questions: Vec<Question>,
@@ -212,10 +226,12 @@ impl Category {
 }
 
 #[derive(Tsify,Default, Debug,Clone, PartialEq, Eq, Hash)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct UserSessionId {
     pub id: String,
 }
 #[derive(Tsify,Default, Debug, Clone, PartialEq, Eq, Hash)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct DiscordID {
     pub id: String,
 }
@@ -237,6 +253,7 @@ impl DiscordID {
 }
 
 #[derive(Tsify,Serialize, Deserialize)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct ApiResponse {
     pub success: bool,
 }
@@ -252,6 +269,7 @@ impl ApiResponse {
 
 
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Default)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct JsonPrinter {
     pub results: HashMap<String, bool>,
 }
@@ -300,6 +318,7 @@ impl UserSessionId {
 }
 
 #[derive(Tsify,Debug, Clone, Serialize, Eq, PartialEq)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct Question {
     pub question_type: QuestionType,
     pub question: String,
@@ -338,6 +357,7 @@ impl<'de> Deserialize<'de> for Question {
 }
 
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Default)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
 pub enum QuestionType {
     Media(String),
     #[default]
@@ -365,6 +385,7 @@ impl Question {
 }
 
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, Display)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
 pub enum WebsocketServerEvents {
     Board(BoardEvent),
     Websocket(WebsocketEvent),
@@ -389,6 +410,7 @@ impl WebsocketServerEvents {
 }
 
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, Display)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
 pub enum BoardEvent {
     CurrentBoard(DtoJeopardyBoard),
     CurrentQuestion(Vector2D, DtoQuestion),
@@ -397,12 +419,14 @@ pub enum BoardEvent {
 }
 
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, Display)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
 pub enum WebsocketEvent {
     WebsocketJoined(WebsocketSessionId),
     WebsocketDisconnected(WebsocketSessionId),
 }
 
 #[derive(Tsify, Debug, Clone, Serialize, Deserialize, Display, Hash)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
 pub enum SessionEvent {
     CurrentSessions(Vec<DTOSession>),
     SessionJoined(DTOSession),
@@ -410,6 +434,7 @@ pub enum SessionEvent {
 }
 
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, Display)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
 pub enum WebsocketSessionEvent {
     Click(Vector2D),
     Back,
@@ -417,6 +442,7 @@ pub enum WebsocketSessionEvent {
 }
 
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, Display)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
 pub enum WebsocketError {
     LobbyNotFound(LobbyId),
     SessionNotFound(UserSessionId),
@@ -427,6 +453,7 @@ pub enum WebsocketError {
 }
 
 #[derive(Tsify,Debug, Clone, Hash, Eq, PartialEq)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct WebsocketSessionId {
     id: String,
 }
@@ -454,6 +481,7 @@ impl WebsocketSessionId {
 }
 
 #[derive(Tsify, Debug, Clone, Hash, Eq, PartialEq)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct LobbyId {
     pub id: String,
 }

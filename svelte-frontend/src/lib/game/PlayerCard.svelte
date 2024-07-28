@@ -1,17 +1,18 @@
 <script lang="ts">
-    import type { DTOSession, DiscordID} from '$lib/cult_common';
+    import type { DTOSession, DiscordID} from 'cult-common';
     export let currrentSessions :DTOSession[]
-
-
     let default_avatar = "https://cdn-icons-png.flaticon.com/512/149/149071.png"
     
     console.log("currrentSessions:", currrentSessions)
+
 
 
     function getAvatar(DTOSession: DTOSession) {
         if (DTOSession.discord_user === null) {
             return default_avatar
         }
+        DTOSession.discord_user
+
         let avatar_id = DTOSession.discord_user.avatar_id
         let discord_id = DTOSession.discord_user.discord_id
         return `https://cdn.discordapp.com/avatars/${discord_id}/${avatar_id}.png?size=64*8`

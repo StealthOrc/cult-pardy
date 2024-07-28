@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { DtoQuestion } from "$lib/cult_common";
+	import type { DtoQuestion } from 'cult-common';
 
     export let question: DtoQuestion;
     let showOverlay = false;

@@ -1,6 +1,6 @@
 <!-- JeopardyCategory.svelte -->
 <script lang="ts">
-	import type { DtoCategory } from '$lib/cult_common';
+	import type { DtoCategory }  from 'cult-common';
     import JeopardyQuestion from './JeopardyQuestion.svelte';
 
     export let category: DtoCategory;
@@ -12,7 +12,7 @@
     {#each category.questions as question: Question}
         
         <JeopardyQuestion {question} />
-    {/each} 
+    {/each}
 </div>
 
 <style>

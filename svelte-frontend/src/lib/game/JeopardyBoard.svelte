@@ -6,7 +6,13 @@
     import {webSocket} from "rxjs/webSocket";
     import { getCookies, type cookies } from "$lib/stores/cookies.js";
     import { match, P } from 'ts-pattern';
-	import type { DtoJeopardyBoard, DTOSession, WebsocketServerEvents } from '$lib/cult_common';
+	import type { DtoJeopardyBoard, DTOSession, WebsocketServerEvents } from 'cult-common';
+
+
+    //import * as dd from "cult_common";
+    
+    
+	//import type { DtoJeopardyBoard, DTOSession, WebsocketServerEvents } from 'cult_common';
 
     export let lobbyId: string = "main";	
 
@@ -14,7 +20,7 @@
     
 
 
-
+    
 
     console.log("cookies:", cookies)
 
@@ -77,6 +83,7 @@
                                     console.log("Event found: ", CurrentSessions);
                                     currrentSessions = CurrentSessions;
                                     updateGridColumns();
+                                    //console.log(message)
 
                                 //Currently no added events
                                 }).otherwise(() => {
