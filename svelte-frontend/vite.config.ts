@@ -19,5 +19,11 @@ export default {
     fs: {
       allow: [rootFolder],
     },
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+    }
   },
 };

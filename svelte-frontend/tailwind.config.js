@@ -3,7 +3,11 @@ export default {
 	content: ['./src/**/*.{html,js,svelte,ts}'],
 
 	theme: {
-		extend: {}
+		extend: {
+			colors: {
+				'discord-blue': '#5865F2',
+			}
+		}
 	},
 
 	plugins: []
