@@ -1,10 +1,8 @@
-use std::error::Error;
 use mongodb::bson::doc;
 use mongodb::options::{ClientOptions, ServerApi, ServerApiVersion};
-use mongodb::sync::{Client, Collection, Cursor};
+use mongodb::sync::{Client, Collection};
 use strum::{Display, EnumIter};
-use cult_common::{UserSessionId, WebsocketServerEvents};
-use cult_common::WebsocketError::SessionNotFound;
+use cult_common::wasm_lib::ids::usersession::UserSessionId;
 use crate::servers::db::DBDatabase::CultPardy;
 use crate::servers::db::UserCollection::UserSessions;
 use crate::servers::game::UserSession;

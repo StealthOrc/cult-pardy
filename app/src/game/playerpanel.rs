@@ -1,9 +1,9 @@
-use cult_common::{DTOSession, WebsocketSessionEvent};
-use cult_common::{DiscordUser, UserSessionId};
+
+use cult_common::{dto::DTOSession, wasm_lib::websocketevents::WebsocketSessionEvent};
 use gloo_console::log;
 use yew::prelude::*;
 
-use crate::types::{OptionalWebsocketCallback, WebsocketCallback};
+use crate::types::OptionalWebsocketCallback;
 
 #[derive(Properties, PartialEq)]
 pub struct PlayerPanelProperties {
@@ -41,7 +41,7 @@ impl Component for PlayerPanel {
             }),
         };
         let mut username: String;
-        let mut avatar_url: String;
+        let avatar_url: String;
         match player.discord_user {
             Some(discord_user) => {
                 username = discord_user.username.clone();

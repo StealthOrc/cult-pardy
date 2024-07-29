@@ -13,7 +13,7 @@ pub(crate) mod game;
 pub(crate) mod input;
 pub(crate) mod authentication;
 pub(crate) mod gamestructure;
-mod db;
+pub(crate) mod db;
 
 
 #[derive(Clone, Debug)]

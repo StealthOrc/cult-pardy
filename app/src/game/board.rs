@@ -1,5 +1,5 @@
-use web_sys::window;
-use cult_common::{DtoJeopardyBoard, Vector2D, WebsocketSessionEvent};
+use cult_common::dto::DtoJeopardyBoard;
+use cult_common::wasm_lib::Vector2D;
 use yew::prelude::*;
 use crate::game::boardbutton::BoardButton;
 use crate::types::WebsocketCallback;

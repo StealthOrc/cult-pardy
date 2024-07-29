@@ -7,35 +7,32 @@
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 use actix::{Actor, ActorFutureExt, Addr, AsyncContext, Context, ContextFutureSpawner, fut, Handler, MailboxError, Message, MessageResult, Recipient, WrapFuture};
-use actix_web::error::ErrorInternalServerError;
-use actix_web::rt::System;
 use chrono::{DateTime, Local, TimeDelta};
-use futures::executor::block_on;
+
+use cult_common::backend::{JeopardyBoard, LobbyCreateResponse};
+use cult_common::dto::DTOSession;
+use cult_common::wasm_lib::ids::discord::DiscordID;
+use cult_common::wasm_lib::ids::lobby::LobbyId;
+use cult_common::wasm_lib::ids::usersession::UserSessionId;
+use cult_common::wasm_lib::ids::websocketsession::WebsocketSessionId;
+use cult_common::wasm_lib::websocketevents::{BoardEvent, SessionEvent, WebsocketError, WebsocketEvent, WebsocketServerEvents};
+use cult_common::wasm_lib::{DiscordUser, JeopardyMode, Vector2D};
 use futures::StreamExt;
-use mongodb::bson;
 use mongodb::bson::{Bson, doc, Document};
-use mongodb::options::IndexVersion::V1;
-use oauth2::basic::{BasicClient, BasicTokenResponse, BasicTokenType};
+use oauth2::basic::{BasicClient, BasicTokenResponse};
 use oauth2::reqwest::async_http_client;
-use oauth2::{AccessToken, EmptyExtraTokenFields, RefreshToken, Scope, StandardTokenResponse, TokenResponse};
+use oauth2::TokenResponse;
 use rand::distributions::Alphanumeric;
 use rand::Rng;
-use rand::rngs::ThreadRng;
 use ritelinked::{LinkedHashMap, LinkedHashSet};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use strum::{Display, EnumIter};
-use cult_common::{BoardEvent, DiscordID, DiscordUser, DTOSession, JeopardyBoard, LobbyCreateResponse, LobbyId, SessionEvent, UserSessionId, Vector2D, WebsocketServerEvents, WebsocketSessionId};
-use cult_common::BoardEvent::CurrentBoard;
-use cult_common::JeopardyMode::NORMAL;
-use cult_common::SessionEvent::{CurrentSessions, SessionDisconnected};
-use cult_common::WebsocketError::{LobbyNotFound, SessionNotFound};
-use cult_common::WebsocketEvent::{WebsocketDisconnected, WebsocketJoined};
-use crate::authentication::discord::{DiscordME, LoginDiscordAuth};
-use crate::servers::authentication::{AuthenticationServer, CheckAdminAccess, GetAdminAccess, RedeemAdminAccessToken};
-use crate::servers::{game,  StartingServices};
+use crate::authentication::discord::DiscordME;
+use crate::servers::authentication::{CheckAdminAccess, GetAdminAccess, RedeemAdminAccessToken};
+use crate::servers::StartingServices;
 use crate::servers::db::DBDatabase::CultPardy;
-use crate::servers::db::{DBDatabase, MongoServer, UserCollection};
+use crate::servers::db::MongoServer;
 use crate::servers::db::UserCollection::{UserSessions};
 use crate::servers::game::GameState::{Playing, Waiting};
 use crate::ws::session::UserData;
@@ -484,7 +481,7 @@ impl GameServer {
             connected_user_session: LinkedHashSet::new(),
             allowed_user_session: LinkedHashSet::new(),
             game_state: GameState::Waiting,
-            jeopardy_board: JeopardyBoard::default(NORMAL),
+            jeopardy_board: JeopardyBoard::default(JeopardyMode::NORMAL),
             websocket_connections: HashMap::new(),
         };
 
@@ -524,7 +521,7 @@ impl GameServer {
             .into_actor(self)
             .then(move |admins:Result<Vec<DiscordID>, MailboxError>, game_server, ctx| {
                 let admins = admins.unwrap_or(Vec::new());
-                game_server.send_lobby_message(&lobby_id, WebsocketServerEvents::Session(CurrentSessions(Vec::from_iter(game_server.get_dto_sessions(&lobby_id, admins)))));
+                game_server.send_lobby_message(&lobby_id, WebsocketServerEvents::Session(SessionEvent::CurrentSessions(Vec::from_iter(game_server.get_dto_sessions(&lobby_id, admins)))));
                 fut::ready(())
             });
         ctx.wait(fut);
@@ -662,7 +659,7 @@ impl Handler<WebsocketConnect> for GameServer {
         let lobby = match self.lobbies.get_mut(&msg.lobby_id) {
             None => {
                 println!("Something happens2");
-                Self::send_message(&msg.addr, WebsocketServerEvents::Error(LobbyNotFound(msg.lobby_id)));
+                Self::send_message(&msg.addr, WebsocketServerEvents::Error(WebsocketError::LobbyNotFound(msg.lobby_id)));
                 return None;
             }
             Some(lobby) => lobby,
@@ -693,8 +690,8 @@ impl Handler<WebsocketConnect> for GameServer {
         }
         let lobby_id = msg.lobby_id.clone();
 
-        self.send_lobby_message(&lobby_id, WebsocketServerEvents::Websocket(WebsocketJoined(websocket_session_id.clone())));
-        self.send_websocket_session_message(&lobby_id, &websocket_session_id, WebsocketServerEvents::Board(CurrentBoard(board.dto(creator))));
+        self.send_lobby_message(&lobby_id, WebsocketServerEvents::Websocket(WebsocketEvent::WebsocketJoined(websocket_session_id.clone())));
+        self.send_websocket_session_message(&lobby_id, &websocket_session_id, WebsocketServerEvents::Board(BoardEvent::CurrentBoard(board.dto(creator))));
         self.send_current_sessions(lobby_id, ctx);
         Some(websocket_session_id)
     }
@@ -714,7 +711,7 @@ impl Handler<WebsocketDisconnect> for GameServer {
             Some(websocket_session_id) => websocket_session_id
         };
 
-        let mut lobby =  match self.lobbies.get_mut(&msg.user_data.lobby_id) {
+        let lobby =  match self.lobbies.get_mut(&msg.user_data.lobby_id) {
             None => return,
             Some(lobby) => lobby
         };
@@ -734,9 +731,9 @@ impl Handler<WebsocketDisconnect> for GameServer {
                 &lobby.user_score.remove(&msg.user_data.user_session_id);
             }
         }
-        self.send_lobby_message(&msg.user_data.lobby_id, WebsocketServerEvents::Websocket(WebsocketDisconnected(websocket_session_id.clone())));
+        self.send_lobby_message(&msg.user_data.lobby_id, WebsocketServerEvents::Websocket(WebsocketEvent::WebsocketDisconnected(websocket_session_id.clone())));
         if !multi_sessions {
-            self.send_lobby_message(&msg.user_data.lobby_id, WebsocketServerEvents::Session(SessionDisconnected(msg.user_data.user_session_id.clone())));
+            self.send_lobby_message(&msg.user_data.lobby_id, WebsocketServerEvents::Session(SessionEvent::SessionDisconnected(msg.user_data.user_session_id.clone())));
         }
     }
 }
@@ -840,7 +837,7 @@ impl Handler<GetUserSession> for GameServer {
             Some(data) => data,
         };
 
-        let mut user_session = match self.starting_services.mongo_server.find_user_session(&user_session) {
+        let user_session = match self.starting_services.mongo_server.find_user_session(&user_session) {
             None => return MessageResult(self.new_session()),
             Some(data) => data,
         };
@@ -919,7 +916,7 @@ impl Handler<LobbyClick> for GameServer {
             .into_actor(self)
             .then(move |is_admin, msg2, ctx| {
                 let is_admin = is_admin.unwrap_or(false);
-                let mut lobby = match msg2.lobbies.get_mut(&msg.user_data.lobby_id) {
+                let lobby = match msg2.lobbies.get_mut(&msg.user_data.lobby_id) {
                     None => return fut::ready(()),
                     Some(lobby) => lobby
                 };
@@ -964,14 +961,14 @@ impl Handler<LobbyBackClick> for GameServer {
             .into_actor(self)
             .then(move |is_admin, msg2, ctx| {
                 let is_admin = is_admin.unwrap_or(false);
-                let mut lobby = match msg2.lobbies.get_mut(&msg.user_data.lobby_id) {
+                let lobby = match msg2.lobbies.get_mut(&msg.user_data.lobby_id) {
                     None => return fut::ready(()),
                     Some(lobby) => lobby
                 };
                 if &lobby.creator.eq(&msg.user_data.user_session_id) | &is_admin {
                     lobby.jeopardy_board.current = None;
                     let board = lobby.jeopardy_board.clone();
-                    let event = WebsocketServerEvents::Board(CurrentBoard(board.dto(lobby.creator.clone())),
+                    let event = WebsocketServerEvents::Board(BoardEvent::CurrentBoard(board.dto(lobby.creator.clone())),
                     );
                     msg2.send_lobby_message(&msg.user_data.lobby_id, event);
                 }
@@ -997,7 +994,7 @@ impl Handler<AddLobbySessionScore> for GameServer {
             .into_actor(self)
             .then(move |is_admin, game_server, ctx| {
                 let is_admin = is_admin.unwrap_or(false);
-                let mut lobby = match game_server.lobbies.get_mut(&msg.user_data.lobby_id) {
+                let lobby = match game_server.lobbies.get_mut(&msg.user_data.lobby_id) {
                     None => return fut::ready(()),
                     Some(lobby) => lobby
                 };
@@ -1013,7 +1010,7 @@ impl Handler<AddLobbySessionScore> for GameServer {
                     let lobby_id = lobby.lobby_id.clone();
 
 
-                    let event = WebsocketServerEvents::Board(CurrentBoard(board.dto(lobby.creator.clone())));
+                    let event = WebsocketServerEvents::Board(BoardEvent::CurrentBoard(board.dto(lobby.creator.clone())));
                     &game_server.send_lobby_message(&msg.user_data.lobby_id, event);
                     game_server.send_current_sessions(lobby_id, ctx);
                 }

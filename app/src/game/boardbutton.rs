@@ -1,4 +1,4 @@
-use cult_common::{DtoQuestion, Vector2D, WebsocketSessionEvent};
+use cult_common::{dto::DtoQuestion, wasm_lib::{websocketevents::WebsocketSessionEvent, Vector2D}};
 use yew::prelude::*;
 
 use crate::types::*;

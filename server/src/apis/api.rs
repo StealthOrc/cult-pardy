@@ -1,19 +1,19 @@
 use std::str::FromStr;
-use std::time::{Duration, SystemTime};
 use crate::servers::game::{CreateLobby, GetUserAndUpdateSession, GetUserSession, SessionToken};
 use actix::{Addr};
 
-use actix_web::cookie::{Cookie, Expiration};
+use actix_web::cookie::Cookie;
 use actix_web::{get, HttpRequest, HttpResponse, post, web};
-use actix_web::cookie::time::{OffsetDateTime};
-use chrono::{Local, NaiveDateTime, Utc};
-use mongodb::bson::Bson::DateTime;
+use chrono::Local;
+use cult_common::wasm_lib::JeopardyMode;
+use cult_common::ApiResponse;
 use oauth2::http::header::COOKIE;
-use oauth2::http::{HeaderName, HeaderValue};
+use oauth2::http::HeaderValue;
 use serde::Serialize;
 use serde_json::json;
-use cult_common::JeopardyMode::{SHORT};
-use cult_common::{ApiResponse, JeopardyBoard, LobbyId, LOCATION, PROTOCOL, UserSessionId};
+use cult_common::backend::JeopardyBoard;
+use cult_common::wasm_lib::ids::lobby::LobbyId;
+use cult_common::wasm_lib::ids::usersession::UserSessionId;
 use crate::apis::data::{extract_header_string, extract_value};
 use crate::authentication::discord::is_admin;
 use crate::servers::authentication::AuthenticationServer;
@@ -58,14 +58,14 @@ async fn session_request(req: HttpRequest, srv: web::Data<Addr<game::GameServer>
 }
 
 pub async fn get_updated_session(req: &HttpRequest, srv: &web::Data<Addr<game::GameServer>>) -> UserSession {
-    let mut user_session_id = get_user_id_from_cookie(&req);
-    let mut session_token = get_session_token_from_cookie(&req);
+    let user_session_id = get_user_id_from_cookie(&req);
+    let session_token = get_session_token_from_cookie(&req);
     srv.send(GetUserAndUpdateSession {user_session_id, session_token}).await.expect("Something happens by getting the user")
 }
 
 pub async fn get_session(req: &HttpRequest, srv: &web::Data<Addr<game::GameServer>>) -> UserSession {
-    let mut user_session_id = get_user_id_from_value(&req).or(get_user_id_from_cookie(&req));
-    let mut session_token = get_session_token_from_value(&req).or(get_session_token_from_cookie(&req));
+    let user_session_id = get_user_id_from_value(&req).or(get_user_id_from_cookie(&req));
+    let session_token = get_session_token_from_value(&req).or(get_session_token_from_cookie(&req));
     srv.send(GetUserSession {user_session_id, session_token}).await.expect("Something happens by getting the user")
 }
 
@@ -178,7 +178,7 @@ async fn join_game(req: HttpRequest, srv: web::Data<Addr<game::GameServer>>) -> 
 
 #[get("/api/board")]
 async fn board() -> HttpResponse {
-    let response = HttpResponse::from(HttpResponse::Ok().json(JeopardyBoard::default(SHORT)));
+    let response = HttpResponse::from(HttpResponse::Ok().json(JeopardyBoard::default(JeopardyMode::SHORT)));
     response
 }
 

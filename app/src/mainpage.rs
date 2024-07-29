@@ -1,15 +1,15 @@
-use futures::TryFutureExt;
+use cult_common::wasm_lib::ids::lobby::LobbyId;
+use cult_common::wasm_lib::ids::usersession::UserSessionId;
+use cult_common::wasm_lib::DiscordUser;
 use gloo_console::log;
-use gloo_net::http::{Headers, Request};
-use std::path::Path;
-use wasm_cookies::cookies::{get, set};
-use wasm_cookies::CookieOptions;
+use gloo_net::http::Request;
+use wasm_cookies::cookies::get;
 use web_sys::window;
 use yew::{html, Callback, Component, Context, Html, Properties};
 
 use crate::game::app;
 use cult_common::{
-    get_false, DiscordUser, LobbyId, UserSessionId, WebsocketServerEvents, LOCATION, PROTOCOL,
+    get_false, LOCATION, PROTOCOL,
 };
 use yew_router::prelude::RouterScopeExt;
 

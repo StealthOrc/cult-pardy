@@ -1,4 +1,5 @@
-use cult_common::{DtoJeopardyBoard, DtoQuestion, WebsocketSessionEvent};
+
+use cult_common::{dto::DtoQuestion, wasm_lib::websocketevents::WebsocketSessionEvent};
 use yew::prelude::*;
 
 use crate::types::WebsocketCallback;

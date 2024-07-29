@@ -1,14 +1,8 @@
-use cult_common::{DTOSession, DiscordUser, UserSessionId, WebsocketServerEvents, WebsocketSessionEvent, PROTOCOL, LOCATION};
-use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
-use std::rc::Rc;
-use gloo_console::log;
-use gloo_net::http::{Headers, Response};
+use cult_common::dto::DTOSession;
+use cult_common::wasm_lib::ids::usersession::UserSessionId;
+use cult_common::wasm_lib::websocketevents::{WebsocketServerEvents, WebsocketSessionEvent};
 use ritelinked::LinkedHashMap;
-use wasm_cookies::CookieOptions;
-use wasm_cookies::cookies::{get, set};
 use yew::Callback;
-use crate::profilepanel::_PlayerPanelProperties::user_session_id;
 
 // Message for Yew App
 #[derive(Clone)]

@@ -1,9 +1,6 @@
-use crate::types::AppMsg;
-use cult_common::{BoardEvent, SessionEvent, WebsocketServerEvents};
+use cult_common::wasm_lib::websocketevents::{BoardEvent, SessionEvent, WebsocketServerEvents};
 use gloo_console::log;
 use ritelinked::LinkedHashMap;
-use serde::de::Unexpected::Option;
-use yew::Callback;
 use crate::game::app::App;
 
 pub fn handleEvent(app: &mut App, event: WebsocketServerEvents) -> bool {
@@ -17,7 +14,7 @@ pub fn handleEvent(app: &mut App, event: WebsocketServerEvents) -> bool {
     }
 }
 
-fn handle_board(mut app: &mut App, board_event: BoardEvent) -> bool {
+fn handle_board(app: &mut App, board_event: BoardEvent) -> bool {
     match board_event {
         BoardEvent::CurrentBoard(board) => {
             log!("board received!");
@@ -27,7 +24,7 @@ fn handle_board(mut app: &mut App, board_event: BoardEvent) -> bool {
         BoardEvent::CurrentQuestion(vector2d, dto_question) => match &mut app.jp_board_dto {
             Some(board) => {
                 board.current = Some(vector2d);
-                let mut cat = board
+                let cat = board
                     .categories
                     .get_mut(vector2d.x)
                     .expect(format!("could not get category {} as mutable.", vector2d.x).as_str());
@@ -42,7 +39,7 @@ fn handle_board(mut app: &mut App, board_event: BoardEvent) -> bool {
     }
 }
 
-fn handle_session(mut app: &mut App, session_event: SessionEvent) -> bool {
+fn handle_session(app: &mut App, session_event: SessionEvent) -> bool {
     match session_event {
         SessionEvent::CurrentSessions(session_vec) => {
             let mut session = LinkedHashMap::new();

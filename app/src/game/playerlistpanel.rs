@@ -1,9 +1,10 @@
+use cult_common::dto::DTOSession;
+use cult_common::wasm_lib::ids::usersession::UserSessionId;
 use ritelinked::LinkedHashMap;
 use yew::prelude::*;
-use cult_common::{DTOSession, UserSessionId};
 use crate::game::playerpanel::PlayerPanel;
 
-use crate::types::{OptionalWebsocketCallback, UserList};
+use crate::types::OptionalWebsocketCallback;
 
 #[derive(Properties, PartialEq)]
 pub struct PlayerListPanelProperties {

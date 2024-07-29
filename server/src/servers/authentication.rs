@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::fs::{File};
 use std::io::{BufReader, BufWriter, Write};
 use std::path::Path;
@@ -7,7 +7,7 @@ use actix::{Actor, Addr, Context, Handler, Message, MessageResult};
 use futures::AsyncWriteExt;
 use rand::{random};
 use serde::{Deserialize, Serialize};
-use cult_common::{DiscordID, UserSessionId};
+use cult_common::wasm_lib::ids::discord::DiscordID;
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Hash, Clone)]
 struct Admin{

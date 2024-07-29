@@ -13,7 +13,8 @@ use anyhow::Result;
 
 use tokio::runtime::Runtime;
 use cult_common::*;
-use cult_common::JeopardyMode::NORMAL;
+use cult_common::backend::JeopardyBoard;
+use wasm_lib::JeopardyMode;
 use crate::authentication::discord;
 use crate::frontend::frontend::{assets, find_game, grant_admin_access, index};
 use crate::servers::input::{InputServer};
@@ -85,7 +86,7 @@ async fn not_found() -> std::result::Result<HttpResponse, actix_web::Error> {
 
 #[get("/api/download")]
 async fn download(_req: HttpRequest) -> std::result::Result<HttpResponse, actix_web::Error> {
-    let json_data = serde_json::to_string_pretty(&JeopardyBoard::default(NORMAL)).expect("Test?");
+    let json_data = serde_json::to_string_pretty(&JeopardyBoard::default(JeopardyMode::NORMAL)).expect("Test?");
     Ok(HttpResponse::Ok()
         .content_type("application/json")
         .append_header(("Content-Disposition", "attachment; filename=test.json"))

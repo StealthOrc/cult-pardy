@@ -1,6 +1,5 @@
-use cult_common::{compress, decompress, WebsocketServerEvents, WS_PROTOCOL};
+use cult_common::{compress, decompress, wasm_lib::websocketevents::WebsocketServerEvents, WS_PROTOCOL};
 
-use crate::types::AppMsg;
 use futures::{channel::mpsc::Sender, SinkExt, StreamExt};
 use gloo_console::log;
 use gloo_net::websocket::{futures::WebSocket, Message};

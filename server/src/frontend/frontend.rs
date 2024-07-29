@@ -2,9 +2,10 @@
 use actix::{ActorStreamExt, Addr};
 use actix_files::NamedFile;
 use actix_web::{get, web, HttpRequest, HttpResponse};
+use cult_common::{LOCATION, PROTOCOL};
 use std::env;
 use std::path::PathBuf;
-use cult_common::{LobbyId, LOCATION, PROTOCOL};
+use cult_common::wasm_lib::ids::lobby::LobbyId;
 use crate::apis::api::{get_updated_session, remove_cookie, set_cookie, set_session_token_cookie};
 use crate::authentication::discord::{is_admin, to_main_page};
 use crate::servers::authentication::{AuthenticationServer, CheckAdminAccessToken};

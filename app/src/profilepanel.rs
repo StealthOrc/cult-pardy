@@ -1,9 +1,7 @@
-use cult_common::{DTOSession, WebsocketSessionEvent};
-use cult_common::{DiscordUser, UserSessionId};
-use gloo_console::log;
+
+use cult_common::wasm_lib::{ids::usersession::UserSessionId, DiscordUser};
 use yew::prelude::*;
 
-use crate::types::{OptionalWebsocketCallback, WebsocketCallback};
 
 #[derive(Properties, PartialEq)]
 pub struct PlayerPanelProperties {
@@ -24,8 +22,8 @@ impl Component for PlayerProfile {
 
     fn view(&self, ctx: &Context<Self>) -> Html {
         let player = ctx.props().discord_user.clone();
-        let mut username: String;
-        let mut avatar_url: String;
+        let username: String;
+        let avatar_url: String;
         match player {
             Some(discord_user) => {
                 username = discord_user.username.clone();

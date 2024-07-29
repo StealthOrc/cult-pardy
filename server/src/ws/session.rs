@@ -8,9 +8,10 @@ use actix_web::web;
 use actix_web_actors::ws;
 use actix_web_actors::ws::WebsocketContext;
 use chrono::{DateTime, Local, TimeDelta};
-use cult_common::{
-    compress, decompress, LobbyId, UserSessionId, WebsocketSessionEvent, WebsocketSessionId,
-};
+use cult_common::wasm_lib::ids::lobby::LobbyId;
+use cult_common::wasm_lib::ids::usersession::UserSessionId;
+use cult_common::wasm_lib::ids::websocketsession::WebsocketSessionId;
+use cult_common::wasm_lib::websocketevents::WebsocketSessionEvent;
 
 /// How often heartbeat pings are sent
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
