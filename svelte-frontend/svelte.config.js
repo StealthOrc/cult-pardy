@@ -16,10 +16,10 @@ const config = {
 			// these options are set automatically — see below
 			pages: 'build',
 			assets: 'build',
-			fallback: 'index.html', // This will be used as the fallback for dynamic routes
 			precompress: false,
 			strict: true
 		}),
+		
 		paths: {
 			//TODO: this has to become somehow relative so we remove localhost and the port!!
 			assets: 'http://localhost:8000/assets' || 'https://localhost:8000/assets',
