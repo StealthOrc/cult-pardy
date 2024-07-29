@@ -38,19 +38,6 @@ pub fn avatar_image_url2(discord_user: &DiscordUser) -> String {
 
 
 
-#[derive(Serialize, Deserialize)]
-pub struct ApiResponse {
-    pub success: bool,
-}
-
-impl ApiResponse {
-    pub fn new(success: bool) -> Self {
-        ApiResponse { success }
-    }
-    pub fn of(success: bool) -> Self {
-        ApiResponse { success }
-    }
-}
 
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Default)]

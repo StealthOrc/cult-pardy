@@ -20,10 +20,15 @@ export default {
       allow: [rootFolder],
     },
     proxy: {
+      // Proxy /api requests to the backend dev server running on a different port 
       '/api': {
         target: 'http://localhost:8000',
         changeOrigin: true,
       },
-    }
+      '/discord': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+    },
   },
 };
