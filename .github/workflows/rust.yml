@@ -34,28 +34,3 @@ jobs:
         run: |
           cd server
           cargo build --verbose
-
-  frontend:
-    name: Frontend Build
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        
-      - run: rustup toolchain install stable --profile minimal --no-self-update
-
-      - name: Cache Cargo dependencies
-        uses: Swatinem/rust-cache@v2.7.3
-        with:
-          workspaces: "app"
-
-      - name: Install Trunk and wasm32-unknown-unknown target
-        run: |
-          cargo install trunk
-          rustup target add wasm32-unknown-unknown
-
-      - name: Build Frontend
-        run: |
-          cd app
-          trunk build --release
