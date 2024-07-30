@@ -28,7 +28,6 @@ export type cookies = {
 export function getCookies() {
     cookies.userSessionId.id =  Cookies.get("user-session-id") || "";
     cookies.sessionToken = Cookies.get("session-token") || "";
-    console.log("Updated cookies", cookies.userSessionId.id, cookies.sessionToken);
     return cookies;
 }
 

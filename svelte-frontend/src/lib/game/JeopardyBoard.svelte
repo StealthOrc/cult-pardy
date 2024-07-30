@@ -5,31 +5,15 @@
     import {webSocket} from "rxjs/webSocket";
     import { getCookies, type cookies } from "$lib/stores/cookies.js";
     import { match, P } from 'ts-pattern';
-	import type { BoardEvent, DtoJeopardyBoard, DTOSession, SessionEvent, WebsocketServerEvents } from 'cult-common';
+	import type { BoardEvent, DtoJeopardyBoard, DTOSession, SessionEvent, WebsocketEvent, WebsocketServerEvents } from 'cult-common';
 	import Players from './Players.svelte';
-
-    //import * as dd from "cult_common";
-    
-    
-	//import type { DtoJeopardyBoard, DTOSession, WebsocketServerEvents } from 'cult_common';
 
     export let lobbyId: string = "main";	
 
     const cookies : cookies = getCookies();
-    
 
-    console.log("cookies:", cookies)
-
-    let dto = {
-        "test-data": "test-data",
-    };
-    
     let gameData: DtoJeopardyBoard;
-    let currrentSessions: DTOSession[];
-
-
-    console.log("userSessionId:", cookies.userSessionId);
-    console.log("sessionToken:", cookies.sessionToken);
+    let currentSessions: DTOSession[] = [];
 
     const socket = webSocket({
         url: `ws://localhost:8000/ws?lobby-id=${lobbyId}&user-session-id=${cookies.userSessionId.id}&session-token=${cookies.sessionToken}`,
@@ -37,40 +21,30 @@
     })
 
     function updateGridColumns() {
-        console.log("gameData:", gameData);
-
         if (gameData == null || gameData.categories == null) {
             return;
         }
-        console.log("gameData.categories:", gameData.categories);
-
-
         const categoriesSize = Object.keys(gameData.categories).length;
         const gridColumnTemplate = `repeat(${categoriesSize}, 1fr)`;
         document.documentElement.style.setProperty('--grid-columns', gridColumnTemplate);
     }
 
     onMount(() => {
-
-
-    socket.next(dto);
-
-    socket.subscribe({
-        next: (message) => {
-            message.then((data: string) => {
-                const parsed : WebsocketServerEvents = JSON.parse(data);
-                const updated = handleEvent(parsed);
-                if (updated) {
-                    updateGridColumns();
-                }
-            });
-        },
-        error: (error) => {
-            console.log(error);
-            //console.error('WebSocket error:', error);
-        }
-    });
-
+        socket.subscribe({
+            next: (message) => {
+                message.then((data: string) => {
+                    const parsed : WebsocketServerEvents = JSON.parse(data);
+                    const updated = handleEvent(parsed);
+                    if (updated) {
+                        updateGridColumns();
+                    }
+                });
+            },
+            error: (error) => {
+                console.log(error);
+                //console.error('WebSocket error:', error);
+            }
+        });
     });
 
     function handleEvent(event: WebsocketServerEvents): boolean {
@@ -79,7 +53,12 @@
         .with({ Board: P.select() }, (boardEvent) => handleBoardEvent(boardEvent))
         //SessionEvents
         .with({Session: P.select() }, (boardEvent) => handleSessionEvent(boardEvent))
-        //Currently no added events
+        //TextEvents
+        .with({ Text: P.select() }, (textEvent) => console.log('Websocket textEvent not implemented:', textEvent))
+        //ErrorEvents
+        .with({ Error: P.select() }, (errorEvent) => {console.error('Websocket errorEvent:', errorEvent)})
+        //WebsocketEvents
+        .with({ Websocket: P.select() }, (websocketEvent) => handleWebsocketEvent(websocketEvent))
         .otherwise(() => {
             console.log("Event not found: ",event)
         });
@@ -105,12 +84,41 @@
     function handleSessionEvent(sessionEvent: SessionEvent): boolean {
         match(sessionEvent)
         .with({ CurrentSessions: P.select() }, (data) => {
-            console.log("Event found: ", data);
-            currrentSessions = data;
+            console.log("CurrentSessions: ", data, currentSessions);
+            currentSessions = data;
             return true;
-        }).otherwise(() => {
-            console.log("Event not found: ",sessionEvent)
-        });
+        })
+        .with({ SessionJoined: P.select() }, (data) => {
+            console.log("Joined Session: ", data, currentSessions);
+            // search inside currentSessions for a object with the same user_session_id as data, if not: add data
+            currentSessions = currentSessions.filter(session => session.user_session_id != data.user_session_id);
+            currentSessions.push(data);
+            
+            console.log("Joined Session 2: ", data, currentSessions);
+            return true;
+        })
+        .with({ SessionDisconnected: P.select() }, (data) => {
+            console.log("Disconnected Session: ", data, currentSessions);
+            currentSessions = currentSessions.filter(session => session.user_session_id != data);
+            return true;
+        })
+        .exhaustive();
+        return true;
+    }
+
+    //handle websocket joined and disconnected event
+    function handleWebsocketEvent(websocketEvent: WebsocketEvent): boolean {
+        //match joined and disconnected
+        match(websocketEvent)
+        .with({ WebsocketJoined: P.select() }, (data) => {
+            console.log("Someone joined: ", data);
+            return true;
+        })
+        .with({ WebsocketDisconnected: P.select() }, (data) => {
+            console.log("Someone disconnected: ", data);
+            return true;
+        })
+        .exhaustive();
         return true;
     }
 </script>
@@ -124,7 +132,7 @@
         {/if}
     </div>
 </div>
-<Players {currrentSessions} />
+<Players {currentSessions} />
 
 <style>
     .jeopardy-container {
