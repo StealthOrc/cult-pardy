@@ -60,7 +60,7 @@ impl MongoServer{
     }
 
     pub fn find_user_session(&self, user_session_id: &UserSessionId) -> Option<UserSession> {
-        let result = self.collection::<UserSession>(CultPardy(UserSessions)).find_one(doc! {"user_session_id": &user_session_id.id}, None);
+        let result = self.collection::<UserSession>(CultPardy(UserSessions)).find_one(doc! {"user_session_id.id": &user_session_id.id}, None);
         match result {
             Err(e) => {
                 return None;

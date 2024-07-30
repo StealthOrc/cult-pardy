@@ -15,8 +15,8 @@ import { dev } from "$app/environment";
 // the update function is called with a function that gets the value of the cookie from the browser
 // the value of the cookie is the value of the cookie from the browser or an empty string
 
-const cookies: cookies = {
-    userSessionId: <UserSessionId>({ id: "" }),
+const default_cookies: cookies = {
+    userSessionId: <UserSessionId>({id: ""}),
     sessionToken: <string>(""),
 };
 
@@ -26,13 +26,14 @@ export type cookies = {
 };
 
 export function getCookies() {
+    const cookies = default_cookies;
     cookies.userSessionId.id =  Cookies.get("user-session-id") || "";
     cookies.sessionToken = Cookies.get("session-token") || "";
     console.log("Updated cookies", cookies.userSessionId.id, cookies.sessionToken);
     return cookies;
 }
+export const loaded: Writable<boolean> = writable(false);
 
-
-export const cookieStore = writable(getCookies());
+export const cookieStore : Writable<cookies> = writable(getCookies());
 
 export const dev_loaded : Writable<boolean> = writable(dev ? false : true);

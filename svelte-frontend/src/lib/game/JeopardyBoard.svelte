@@ -1,12 +1,15 @@
 <script lang="ts">
+    import Cookies from "js-cookie";
     export const prerender = false;
     import JeopardyCategory from './JeopardyCategory.svelte';
     import { onMount } from 'svelte';
-    import {webSocket} from "rxjs/webSocket";
-    import { getCookies, type cookies } from "$lib/stores/cookies.js";
+    import {webSocket, WebSocketSubject} from "rxjs/webSocket";
+    import { cookieStore, dev_loaded, getCookies, type cookies } from "$lib/stores/cookies.js";
     import { match, P } from 'ts-pattern';
 	import type { BoardEvent, DtoJeopardyBoard, DTOSession, SessionEvent, WebsocketServerEvents } from 'cult-common';
 	import Players from './Players.svelte';
+	import { dev } from '$app/environment';
+	import { session_data } from '$lib/api/ApiRequests';
 
     //import * as dd from "cult_common";
     
@@ -15,26 +18,21 @@
 
     export let lobbyId: string = "main";	
 
-    const cookies : cookies = getCookies();
-    
+    let cookies : cookies;
 
-    console.log("cookies:", cookies)
 
     let dto = {
         "test-data": "test-data",
     };
     
+    let is_dev_loaded = false
+
+
     let gameData: DtoJeopardyBoard;
     let currrentSessions: DTOSession[];
+;
 
-
-    console.log("userSessionId:", cookies.userSessionId);
-    console.log("sessionToken:", cookies.sessionToken);
-
-    const socket = webSocket({
-        url: `ws://localhost:8000/ws?lobby-id=${lobbyId}&user-session-id=${cookies.userSessionId.id}&session-token=${cookies.sessionToken}`,
-        deserializer: (e) => e.data.text(),
-    })
+    let socket : WebSocketSubject<any>;
 
     function updateGridColumns() {
         console.log("gameData:", gameData);
@@ -50,26 +48,63 @@
         document.documentElement.style.setProperty('--grid-columns', gridColumnTemplate);
     }
 
-    onMount(() => {
+    onMount(async () => {
+        dev_loaded.subscribe(value => {
+            is_dev_loaded = value;
+        })
+        cookieStore.subscribe(value => {
+            cookies = value;
+        });
 
-
-    socket.next(dto);
-
-    socket.subscribe({
-        next: (message) => {
-            message.then((data: string) => {
-                const parsed : WebsocketServerEvents = JSON.parse(data);
-                const updated = handleEvent(parsed);
-                if (updated) {
-                    updateGridColumns();
+        if (dev) {
+            let sessiondata = await session_data();
+            if (sessiondata) {
+                if (cookies.userSessionId.id != sessiondata.user_session_id.id) {
+                    console.log("USER SESSION ID CHANGED");
+                    Cookies.set("user-session-id", sessiondata.user_session_id.id);
+                    cookieStore.update(value => {
+                        value.userSessionId.id = sessiondata.user_session_id.id;
+                        return value;
+                    });
                 }
-            });
-        },
-        error: (error) => {
-            console.log(error);
-            //console.error('WebSocket error:', error);
+                if (cookies.sessionToken != sessiondata.session_token.token) {
+                    console.log("SESSION TOKEN CHANGED");
+                    Cookies.set("session-token", sessiondata.session_token.token);
+                    cookieStore.update(value => {
+                        value.sessionToken = sessiondata.session_token.token;
+                        return value;
+                    });
+                }
+                console.log("DATA", sessiondata);
+            }
+            dev_loaded.set(true);
         }
-    });
+
+
+        socket = webSocket({
+            url: `ws://localhost:8000/ws?lobby-id=${lobbyId}&user-session-id=${cookies.userSessionId.id}&session-token=${cookies.sessionToken}`,
+            deserializer: (e) => e.data.text(),
+        })
+
+        while(!is_dev_loaded) {
+            setTimeout(() => {}, 500);
+        }
+
+        socket.subscribe({
+            next: (message) => {
+                message.then((data: string) => {
+                    const parsed : WebsocketServerEvents = JSON.parse(data);
+                    const updated = handleEvent(parsed);
+                    if (updated) {
+                        updateGridColumns();
+                    }
+                });
+            },
+            error: (error) => {
+                console.log(error);
+                //console.error('WebSocket error:', error);
+            }
+        });
 
     });
 
@@ -115,12 +150,17 @@
     }
 </script>
 
+
 <div class="jeopardy-container">
     <div class="jeopardy-board">
-        {#if gameData != null && gameData.categories != null}
-            {#each gameData.categories as category}
-                <JeopardyCategory {category} />
-            {/each}
+        {#if dev_loaded}
+            {#if gameData != null && gameData.categories != null}
+                {#each gameData.categories as category}
+                    <JeopardyCategory {category} />
+                {/each}
+            {/if}
+        {:else}
+            <h1>Loading...</h1>
         {/if}
     </div>
 </div>

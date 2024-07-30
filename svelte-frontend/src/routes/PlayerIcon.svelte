@@ -14,8 +14,9 @@
     let cookies : cookies;
 
 
-    let isAdmin : ApiResponse = {success: false};
+    let isAdmin : ApiResponse | null
     let loaded = false;
+    console.log(discord_user)
 
     onMount( async () => {
         dev_loaded.subscribe(value => {
@@ -49,24 +50,25 @@
     }
 </script>
 
-<div class="fixed top-5 w-full flex justify-center items-center z-10">
-    <div class="relative bg-gray-700 p-4 rounded-lg flex items-center space-x-4 shadow-lg">
-        <!-- Shadow Overlay -->
-        <div class="absolute inset-0 bg-gray-900 opacity-50 rounded-lg z-[-1]"></div>
-        {#if loaded}
-            {#key discord_user}
-            <img src="{getAvatar()}" alt="Avatar" class="w-16 h-16 rounded-full">
-            <div class="text-white text-lg flex flex-col items-center">
-                {#if isAdmin.success}
-                    <span class="text-red-500 text-sm font-bold mb-1">[ADMIN]</span>
-                {/if}
-                <p class="text-center">{getUserName()}</p>
-                {#if discord_user}
-                    <p class="text-xs">{cookies.userSessionId.id}</p> <!-- Use custom class for smaller text -->
-                {/if}
-            </div>
-            {/key}
-        {/if}
-    </div>
-</div>
+{#if loaded && isAdmin}  
+    <div class="fixed top-5 w-full flex justify-center items-center z-10">
+        <div class="relative bg-gray-700 p-4 rounded-lg flex items-center space-x-4 shadow-lg">
+            <!-- Shadow Overlay -->  ´
+        
+                <div class="absolute inset-0 bg-gray-900 opacity-50 rounded-lg z-[-1]"></div>
+                {#key discord_user}
+                <img src="{getAvatar()}" alt="Avatar" class="w-16 h-16 rounded-full">
+                <div class="text-white text-lg flex flex-col items-center">
+                    {#if isAdmin.success}
+                        <span class="text-red-500 text-sm font-bold mb-1">[ADMIN]</span>
+                    {/if}
+                    <p class="text-center">{getUserName()}</p>
+                    {#if discord_user}
+                        <p class="text-xs">{cookies.userSessionId.id}</p> <!-- Use custom class for smaller text -->
+                    {/if}
+                </div>
+                {/key}
 
+        </div>
+    </div>
+{/if}

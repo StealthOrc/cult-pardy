@@ -5,7 +5,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use tsify_next::Tsify;
 use wasm_bindgen::prelude::wasm_bindgen;
 
-#[derive(Tsify, Debug, Clone, Hash, Eq, PartialEq)]
+#[derive(Tsify, Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 #[wasm_bindgen]
 pub struct LobbyId {
     #[wasm_bindgen(skip)]
@@ -45,21 +45,3 @@ impl Display for LobbyId {
     }
 }
 
-impl Serialize for LobbyId {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_str(&self.id)
-    }
-}
-
-impl<'de> Deserialize<'de> for LobbyId {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let id: String = Deserialize::deserialize(deserializer)?;
-        Ok(LobbyId { id })
-    }
-}

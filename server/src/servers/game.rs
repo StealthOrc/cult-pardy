@@ -454,6 +454,22 @@ impl Lobby{
         map
     }
 
+    pub fn get_session_websockets(&self, user_session_id: &UserSessionId) -> Vec<WebsocketSessionId> {
+        self.websocket_connections.values().filter(|websocket_session| websocket_session.user_session_id.eq(user_session_id)).map(|websocket_session| websocket_session.websocket_session_id.clone()).collect()
+    }
+
+    pub fn get_session_score(&self, user_session_id: &UserSessionId) -> i32 {
+        *self.user_score.get(user_session_id).unwrap_or(&0)
+    }
+
+    pub fn update_score(&mut self, user_session_id: &UserSessionId, score: i32) {
+        let score = self.user_score.get(user_session_id).unwrap_or(&0) + score;
+        self.user_score.insert(user_session_id.clone(), score);
+    }
+
+
+    
+
 }
 
 
@@ -488,7 +504,7 @@ impl GameState{
 impl GameServer {
     pub fn new(starting_services: StartingServices) -> GameServer {
         let name =  LobbyId::from_str("main");
-        let main = Lobby{
+        let main: Lobby = Lobby{
             creator: UserSessionId::server(),
             lobby_id: name.clone(),
             user_score: HashMap::new(),
@@ -530,12 +546,12 @@ impl GameServer {
         }
     }
 
-    fn send_current_sessions(&mut self, lobby_id: LobbyId, ctx: &mut Context<Self>){
+    fn send_current_sessions(&mut self, user_session_id: UserSessionId,lobby_id: LobbyId,ctx: &mut Context<Self>){
         let fut = self.starting_services.authentication_server.send(GetAdminAccess{})
             .into_actor(self)
             .then(move |admins:Result<Vec<DiscordID>, MailboxError>, game_server, ctx| {
                 let admins = admins.unwrap_or(Vec::new());
-                game_server.send_lobby_message(&lobby_id, WebsocketServerEvents::Session(SessionEvent::CurrentSessions(Vec::from_iter(game_server.get_dto_sessions(&lobby_id, admins)))));
+                game_server.send_lobby_session_message(&lobby_id, &user_session_id, WebsocketServerEvents::Session(SessionEvent::CurrentSessions(Vec::from_iter(game_server.get_dto_sessions(&lobby_id, admins)))));
                 fut::ready(())
             });
         ctx.wait(fut);
@@ -630,6 +646,14 @@ impl GameServer {
         }
     }
 
+    fn send_lobby_session_message(&self, lobby_id: &LobbyId, user_session_id: &UserSessionId, message: WebsocketServerEvents) {
+        if let Some(lobby) = self.lobbies.get(lobby_id) {
+            let websockets_session = lobby.get_session_websockets(user_session_id);
+            for websocket_session_id in websockets_session {
+                self.send_websocket_session_message(lobby_id, &websocket_session_id, message.clone());
+            }
+        }
+    }
 
 
 
@@ -706,7 +730,7 @@ impl Handler<WebsocketConnect> for GameServer {
 
         self.send_lobby_message(&lobby_id, WebsocketServerEvents::Websocket(WebsocketEvent::WebsocketJoined(websocket_session_id.clone())));
         self.send_websocket_session_message(&lobby_id, &websocket_session_id, WebsocketServerEvents::Board(BoardEvent::CurrentBoard(board.dto(creator))));
-        self.send_current_sessions(lobby_id, ctx);
+        self.send_current_sessions(msg.user_session_id, lobby_id, ctx);
         Some(websocket_session_id)
     }
 }
@@ -822,7 +846,7 @@ impl Handler<GetUserAndUpdateSession> for GameServer {
             if token.create.signed_duration_since(user_session.session_token.create) >TimeDelta::seconds(60*5){
                 user_session.session_token.update(); 
                 self.starting_services.mongo_server.collection::<UserSession>(CultPardy(UserSessions)).update_one(
-                    doc! {"user_session_id": user_session.user_session_id.id.clone()},
+                    doc! {"user_session_id.id": user_session.user_session_id.id.clone()},
                     doc! {"$set": {"session_token": &user_session.session_token}},
                     None,
                 ).expect("Cant update User");
@@ -890,7 +914,7 @@ impl Handler<AddDiscordAccount> for GameServer {
         };
         user_session.discord_auth = Some(msg.discord_data);
         self.starting_services.mongo_server.collection::<UserSession>(CultPardy(UserSessions)).update_one(
-            doc! {"user_session_id": user_session.user_session_id.id},
+            doc! {"user_session_id.id": user_session.user_session_id.id},
             doc! {"$set": {"discord_auth": user_session.discord_auth}},
             None,
         ).expect("Cant add the discord Account");
@@ -1030,7 +1054,7 @@ impl Handler<AddLobbySessionScore> for GameServer {
                     let current_question = lobby.jeopardy_board.get_mut_current();
                     if let Some(question) = current_question {
                         if let Some(score) = lobby.user_score.get(&msg.grant_score_user_session_id){
-                            &lobby.user_score.insert(msg.grant_score_user_session_id, score + question.value);
+                            let _ =  &lobby.user_score.insert(msg.grant_score_user_session_id, score + question.value);
                         }
                     }
                     lobby.jeopardy_board.current = None;
@@ -1039,8 +1063,8 @@ impl Handler<AddLobbySessionScore> for GameServer {
 
 
                     let event = WebsocketServerEvents::Board(BoardEvent::CurrentBoard(board.dto(lobby.creator.clone())));
-                    &game_server.send_lobby_message(&msg.user_data.lobby_id, event);
-                    game_server.send_current_sessions(lobby_id, ctx);
+                    let _ = &game_server.send_lobby_message(&msg.user_data.lobby_id, event);
+                    game_server.send_current_sessions(msg.user_data.user_session_id,lobby_id, ctx);
                 }
                 fut::ready(())
             });

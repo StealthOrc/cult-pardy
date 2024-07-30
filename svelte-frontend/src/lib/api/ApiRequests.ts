@@ -1,6 +1,6 @@
 import type JeopardyBoard from "$lib/game/JeopardyBoard.svelte";
 import { getCookies } from "$lib/stores/cookies";
-import { type ApiResponse, type DiscordID, type DiscordUser, type UserSessionId } from "cult-common";
+import { type ApiResponse, type DiscordUser, type UserSessionId } from "cult-common";
 
 
 /*
@@ -37,21 +37,7 @@ export async function discord_session(): Promise<DiscordUser | null> {
     if (response == null || !response.ok) {
         return null;
     }
-    const json = await response.json();
-    if (json == null) {
-        return null;
-    }
-    const discord_id :DiscordID = {
-        id: json.discord_id,
-    };
-    const discord_user: DiscordUser = {
-        avatar_id: json.avatar_id,
-        discord_id: discord_id,
-        discriminator: json.discriminator,
-        global_name: json.global_name,
-        username: json.username,
-    };
-    return discord_user;
+    return await response.json();
 }
 
 export async function session_data(): Promise<SessionData | null> {
@@ -60,10 +46,7 @@ export async function session_data(): Promise<SessionData | null> {
         return null;
     }
     const json = await response.json();
-    const user_session_id: UserSessionId = {
-        id: json.user_session_id,
-        
-    };
+    const user_session_id: UserSessionId = json.user_session_id;
     const session_token: SessionToken = json.session_token;
     return new SessionData(user_session_id, session_token);
 }
@@ -92,8 +75,7 @@ export async function board(): Promise<JeopardyBoard | null> {
 
 export async function api_request(request:BackendApiRequests): Promise<Response | null> {
     try {
-        const cookies = getCookies();
-        console.log("Request", request , cookies.userSessionId.id, cookies.sessionToken);
+        const cookies = getCookies();;
         return await fetch(request + `?user-session-id=${cookies.userSessionId.id}&session-token=${cookies.sessionToken}`, {
             method: 'GET',
             headers: {

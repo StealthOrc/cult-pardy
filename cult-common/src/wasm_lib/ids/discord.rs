@@ -2,7 +2,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use tsify_next::Tsify;
 use wasm_bindgen::prelude::wasm_bindgen;
 
-#[derive(Tsify, Default, Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Tsify, Default, Debug, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub struct DiscordID {
     pub id: String,
 }
@@ -31,21 +31,3 @@ impl DiscordID {
     }
 }
 
-impl Serialize for DiscordID {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_str(&self.id)
-    }
-}
-
-impl<'de> Deserialize<'de> for DiscordID {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let id = String::deserialize(deserializer)?;
-        Ok(DiscordID { id })
-    }
-}

@@ -13,13 +13,13 @@
         }
         let avatar_id = session.discord_user.avatar_id
         let discord_id = session.discord_user.discord_id
-        return `https://cdn.discordapp.com/avatars/${discord_id}/${avatar_id}.png?size=64*10`;
+        return `https://cdn.discordapp.com/avatars/${discord_id.id}/${avatar_id}.png?size=64*10`;
     }
     
 
     function getUserName(DTOSession: DTOSession) {
         if (DTOSession.discord_user === null) {
-            return DTOSession.user_session_id
+            return DTOSession.user_session_id.id
         }
         return DTOSession.discord_user.username
     }
