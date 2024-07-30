@@ -3,25 +3,19 @@ use tsify_next::Tsify;
 use wasm_bindgen::prelude::wasm_bindgen;
 
 #[derive(Tsify, Default, Debug, Clone, PartialEq, Eq, Hash)]
-#[wasm_bindgen]
 pub struct DiscordID {
-    #[wasm_bindgen(skip)]
     pub id: String,
 }
 
-#[wasm_bindgen]
 impl DiscordID {
 
-    #[wasm_bindgen(getter)]
     pub fn id(&self) -> String {
         self.id.clone()
     }
     
-    #[wasm_bindgen(setter)]
     pub fn set_id(&mut self, id: String) {
         self.id = id;
     }
-    #[wasm_bindgen(constructor)]
     pub fn new(id: String) -> Self {
         DiscordID { id }
     }

@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { DTOSession } from 'cult-common';
+    import { type DTOSession } from 'cult-common';
     import PlayerCard from './PlayerCard.svelte';
 
     export let currrentSessions: DTOSession[];

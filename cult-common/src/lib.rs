@@ -27,7 +27,7 @@ pub fn parse_addr_str(domain: &str, port: usize) -> SocketAddr {
     let addr = addr.parse::<SocketAddr>().expect("Failed to parse address");
     addr
 }
-#[wasm_bindgen]
+
 pub fn avatar_image_url2(discord_user: &DiscordUser) -> String {
     format!(
         "https://cdn.discordapp.com/avatars/{}/{}.jpg",

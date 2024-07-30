@@ -5,14 +5,10 @@ use wasm_bindgen::prelude::wasm_bindgen;
 
 
 #[derive(Tsify,Debug, Clone, Hash, Eq, PartialEq)]
-#[wasm_bindgen]
 pub struct WebsocketSessionId {
-    #[wasm_bindgen(skip)]
     pub id: String,
 }
-#[wasm_bindgen]
 impl WebsocketSessionId {
-    #[wasm_bindgen(getter)]
     pub fn id(self) -> usize {
         return self.id.parse::<usize>().unwrap();
     }
@@ -22,7 +18,6 @@ impl WebsocketSessionId {
             id: random::<usize>().to_string(),
         }
     }
-    #[wasm_bindgen(constructor)]
     pub fn of(id: usize) -> Self {
         WebsocketSessionId { id: id.to_string() }
     }

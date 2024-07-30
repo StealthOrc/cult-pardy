@@ -57,6 +57,20 @@ async fn session_request(req: HttpRequest, srv: web::Data<Addr<game::GameServer>
     Ok(response)
 }
 
+#[get("/api/session-data")]
+async fn session_data_request(req: HttpRequest, srv: web::Data<Addr<game::GameServer>>, auth: web::Data<Addr<AuthenticationServer>>) -> Result<HttpResponse, actix_web::Error> {
+    let user_session = get_session(&req, &srv).await;
+    let sessionrequest : SessionRequest = SessionRequest{
+     user_session_id: user_session.user_session_id.clone(), 
+     session_token: user_session.session_token.clone() 
+    };
+
+    let mut response = HttpResponse::from(HttpResponse::Ok().json(sessionrequest));
+    set_session_token_cookie(&mut response, &req, &user_session);
+    Ok(response)
+}
+
+
 pub async fn get_updated_session(req: &HttpRequest, srv: &web::Data<Addr<game::GameServer>>) -> UserSession {
     let user_session_id = get_user_id_from_cookie(&req);
     let session_token = get_session_token_from_cookie(&req);

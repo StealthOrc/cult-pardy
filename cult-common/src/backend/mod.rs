@@ -26,7 +26,7 @@ pub enum LobbyCreateResponse {
     Error(String),
 }
 
-#[derive(Debug, Clone, Serialize, Eq, PartialEq)]
+#[derive(Tsify,Debug, Clone, Serialize, Eq, PartialEq)]
 pub struct JeopardyBoard {
     pub title: String,
     pub categories: Vec<Category>,
@@ -35,9 +35,8 @@ pub struct JeopardyBoard {
     #[serde(skip_serializing)]
     pub create: DateTime<Local>,
 }
-
-
 impl JeopardyBoard {
+
     pub fn default(mode: JeopardyMode) -> Self {
         let mut categories: Vec<Category> = Vec::new();
         for category in 0..mode.field_size() {
@@ -69,6 +68,7 @@ impl JeopardyBoard {
         }
     }
 
+    
     pub fn dto(self, creator:UserSessionId) -> DtoJeopardyBoard {
         let cat = self
             .categories
@@ -166,7 +166,7 @@ impl<'de> Deserialize<'de> for JeopardyBoard {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Tsify,Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Category {
     pub title: String,
     pub questions: Vec<Question>,
@@ -191,7 +191,7 @@ impl Category {
 }
 
 
-#[derive(Debug, Clone, Serialize, Eq, PartialEq)]
+#[derive(Tsify, Debug, Clone, Serialize, Eq, PartialEq)]
 pub struct Question {
     pub question_type: QuestionType,
     pub question: String,

@@ -32,7 +32,7 @@
     console.log("sessionToken:", cookies.sessionToken);
 
     const socket = webSocket({
-        url: `ws://localhost:8000/ws?lobby-id=${lobbyId}&user-session-id=${cookies.userSessionId.id}&session-token=${cookies.sessionToken.id}`,
+        url: `ws://localhost:8000/ws?lobby-id=${lobbyId}&user-session-id=${cookies.userSessionId.id}&session-token=${cookies.sessionToken}`,
         deserializer: (e) => e.data.text(),
     })
 

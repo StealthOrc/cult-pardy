@@ -1,6 +1,6 @@
 <script lang="ts" type="module">
     import { onMount } from 'svelte';
-    import init, { DTOSession, DiscordUser, avatar_image_url2} from 'cult-common';
+    import init, { type DiscordUser, type DTOSession} from 'cult-common';
     import * as wasm from 'cult-common';
     export let session :DTOSession
     let default_avatar : string= "https://cdn-icons-png.flaticon.com/512/149/149071.png"

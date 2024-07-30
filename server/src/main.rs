@@ -12,6 +12,7 @@ use crate::apis::api::session_request;
 use actix_web::{web, App, HttpServer, HttpRequest, HttpResponse, get};
 use anyhow::Result;
 
+use apis::api::session_data_request;
 use tokio::runtime::Runtime;
 use cult_common::*;
 use cult_common::backend::JeopardyBoard;
@@ -58,6 +59,7 @@ async fn main() -> Result<()> {
             .service(find_game)
             .service(assets)
             .service(session_request)
+            .service(session_data_request)
             .service(grant_admin_access)
             .service(has_authorization)
             .service(board)

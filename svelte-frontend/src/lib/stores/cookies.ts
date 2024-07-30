@@ -1,7 +1,8 @@
 
 import Cookies from "js-cookie";
-import type { UserSessionId, WebsocketSessionId} from 'cult-common';
-import { writable } from 'svelte/store';
+import type { UserSessionId} from 'cult-common';
+import { writable, type Writable } from 'svelte/store';
+import { dev } from "$app/environment";
 
 
 // fuction that returns the cookies and a type that represents the cookies
@@ -16,23 +17,22 @@ import { writable } from 'svelte/store';
 
 const cookies: cookies = {
     userSessionId: <UserSessionId>({ id: "" }),
-    sessionToken: <WebsocketSessionId>({ id: "" }),
+    sessionToken: <string>(""),
 };
 
 export type cookies = {
     userSessionId: UserSessionId;
-    sessionToken: WebsocketSessionId;
+    sessionToken: string;
 };
 
 export function getCookies() {
-    console.log("Updating cookies");
     cookies.userSessionId.id =  Cookies.get("user-session-id") || "";
-    cookies.sessionToken.id = Cookies.get("session-token") || "";
-    console.log("Updated cookies");
+    cookies.sessionToken = Cookies.get("session-token") || "";
+    console.log("Updated cookies", cookies.userSessionId.id, cookies.sessionToken);
     return cookies;
 }
 
 
-export const cookieStore = writable({
-    cookies: cookies,
-});
+export const cookieStore = writable(getCookies());
+
+export const dev_loaded : Writable<boolean> = writable(dev ? false : true);

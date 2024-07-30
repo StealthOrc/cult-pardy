@@ -1,0 +1,133 @@
+import type JeopardyBoard from "$lib/game/JeopardyBoard.svelte";
+import { getCookies } from "$lib/stores/cookies";
+import { type ApiResponse, type DiscordID, type DiscordUser, type UserSessionId } from "cult-common";
+
+
+/*
+/api/info
+/api/session
+/api/authorization
+/api/discord_session
+/api/create
+/api/join
+/api/board
+*/
+enum BackendApiRequests {
+    INFO = 'api/info',
+    SESSION_DATA = 'api/session-data',
+    AUTHORIZATION = 'api/authorization',
+    DISCORD_SESSION = 'api/discord_session',
+    //CREATE = 'api/create',
+    JOIN = 'api/join',
+    BOARD = 'api/board',
+}   
+
+
+
+export async function authorization(): Promise<ApiResponse> {
+    const response : Response | null = await api_request(BackendApiRequests.AUTHORIZATION);
+    if (response == null || !response.ok) {
+        return {success: false};
+    }
+    return await response.json();
+}
+
+export async function discord_session(): Promise<DiscordUser | null> {
+    const response : Response | null = await api_request(BackendApiRequests.DISCORD_SESSION);
+    if (response == null || !response.ok) {
+        return null;
+    }
+    const json = await response.json();
+    if (json == null) {
+        return null;
+    }
+    const discord_id :DiscordID = {
+        id: json.discord_id,
+    };
+    const discord_user: DiscordUser = {
+        avatar_id: json.avatar_id,
+        discord_id: discord_id,
+        discriminator: json.discriminator,
+        global_name: json.global_name,
+        username: json.username,
+    };
+    return discord_user;
+}
+
+export async function session_data(): Promise<SessionData | null> {
+    const response : Response | null = await api_request(BackendApiRequests.SESSION_DATA);
+    if (response == null || !response.ok) {
+        return null;
+    }
+    const json = await response.json();
+    const user_session_id: UserSessionId = {
+        id: json.user_session_id,
+        
+    };
+    const session_token: SessionToken = json.session_token;
+    return new SessionData(user_session_id, session_token);
+}
+
+
+
+
+export async function join(): Promise<ApiResponse> {
+    const response : Response | null = await api_request(BackendApiRequests.JOIN);
+    if (response == null || !response.ok) {
+        return {success: false};
+    }
+    return await response.json();
+}
+
+export async function board(): Promise<JeopardyBoard | null> {
+    const response : Response | null = await api_request(BackendApiRequests.BOARD);
+    if (response == null || !response.ok) {
+        return null;
+    }
+    return await response.json();
+}
+
+
+
+
+export async function api_request(request:BackendApiRequests): Promise<Response | null> {
+    try {
+        const cookies = getCookies();
+        console.log("Request", request , cookies.userSessionId.id, cookies.sessionToken);
+        return await fetch(request + `?user-session-id=${cookies.userSessionId.id}&session-token=${cookies.sessionToken}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            //credentials: 'include'
+        });
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (e ) {
+        return null
+    }
+}
+
+
+export class SessionData {
+    public user_session_id: UserSessionId;
+    public session_token: SessionToken;
+    constructor(user_session_id: UserSessionId, session_token: SessionToken) {
+        this.user_session_id = user_session_id;
+        this.session_token = session_token;
+    }
+}
+
+
+
+import { DateTime } from 'ts-luxon';
+
+export class SessionToken {
+    public token: string;
+    public create: DateTime;
+
+    constructor(token: string, create: DateTime) {
+        this.token = token;
+        this.create = create;
+    }
+}

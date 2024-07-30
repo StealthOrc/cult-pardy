@@ -10,23 +10,17 @@ use crate::wasm_lib::{DiscordUser, QuestionType, Vector2D};
 
 
 #[derive(Tsify,Default, Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash)]
-#[wasm_bindgen]
 pub struct DTOSession {
-    #[wasm_bindgen(skip)]
     pub user_session_id: UserSessionId,
     pub score: i32,
-    #[wasm_bindgen(skip)]
     pub discord_user: Option<DiscordUser>,
     pub is_admin: bool,
 }
 
-#[wasm_bindgen]
 impl DTOSession {
-    #[wasm_bindgen(getter)]
     pub fn user_session_id(self) -> UserSessionId {
         self.user_session_id
     }
-    #[wasm_bindgen(getter)]
     pub fn discord_user(self) -> Option<DiscordUser> {
         self.discord_user
     }
@@ -34,6 +28,7 @@ impl DTOSession {
 }
 
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, PartialEq)]
+
 pub struct DtoJeopardyBoard {
     pub creator: UserSessionId,
     pub categories: Vec<DtoCategory>,
@@ -41,6 +36,9 @@ pub struct DtoJeopardyBoard {
 }
 
 impl DtoJeopardyBoard {
+
+ 
+
     pub fn get_question(self, vector2d: Vector2D) -> Option<DtoQuestion> {
         if let Some(categories) = self.categories.get(vector2d.x) {
             if let Some(question) = categories.questions.get(vector2d.y) {

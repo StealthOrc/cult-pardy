@@ -4,20 +4,15 @@ use tsify_next::Tsify;
 use wasm_bindgen::prelude::wasm_bindgen;
 
 #[derive(Tsify,Default, Debug,Clone, PartialEq, Eq, Hash)]
-#[wasm_bindgen]
 pub struct UserSessionId {
-    #[wasm_bindgen(skip)]
      pub id: String,
 }
-#[wasm_bindgen]
 impl UserSessionId {
 
-    #[wasm_bindgen(getter)]
     pub fn id(self) -> usize {
         return self.id.parse::<usize>().unwrap();
     }
 
-    #[wasm_bindgen(constructor)]
     pub fn of(id: usize) -> Self {
         UserSessionId { id: id.to_string() }
     }

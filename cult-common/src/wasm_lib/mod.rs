@@ -44,50 +44,37 @@ impl JeopardyMode {
 }
 
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash)]
-#[wasm_bindgen]
+#[derive(Tsify, Default, Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash)]
 pub struct DiscordUser {
     // Fields are private and not exposed to JavaScript
-    #[wasm_bindgen(skip)]
     pub discord_id: DiscordID,
-    #[wasm_bindgen(skip)]
     pub username: String,
-    #[wasm_bindgen(skip)]
     pub avatar_id: String,
-    #[wasm_bindgen(skip)]
     pub discriminator: String,
-    #[wasm_bindgen(skip)]
     pub global_name: String,
 }
 
-#[wasm_bindgen]
 impl DiscordUser {
-    #[wasm_bindgen(getter)]
     pub fn discord_id(&self) -> DiscordID {
         self.discord_id.clone()
     }
 
-    #[wasm_bindgen(getter)]
     pub fn username(&self) -> String {
         self.username.clone()
     }
 
-    #[wasm_bindgen(getter)]
     pub fn avatar_id(&self) -> String {
         self.avatar_id.clone()
     }
 
-    #[wasm_bindgen(getter)]
     pub fn discriminator(&self) -> String {
         self.discriminator.clone()
     }
 
-    #[wasm_bindgen(getter)]
     pub fn global_name(&self) -> String {
         self.global_name.clone()
     }
 
-    #[wasm_bindgen]
     pub fn avatar_image_url(&self) -> String {
         format!(
             "https://cdn.discordapp.com/avatars/{}/{}.jpg",
@@ -109,11 +96,11 @@ pub enum QuestionType {
     Question,
 }
 
-#[derive(Tsify, Serialize, Deserialize)]
+#[derive(Tsify,Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Default)]
 pub struct ApiResponse {
     pub success: bool,
-}
 
+}
 impl ApiResponse {
     pub fn new(success: bool) -> Self {
         ApiResponse { success }
