@@ -4,7 +4,6 @@
     import JeopardyQuestion from './JeopardyQuestion.svelte';
 
     export let category: DtoCategory;
-    console.log("cat + " + category);
 </script>
 
 <div class="jeopardy-category">

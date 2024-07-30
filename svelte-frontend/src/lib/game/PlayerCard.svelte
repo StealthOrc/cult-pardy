@@ -58,14 +58,6 @@
         flex-shrink: 0; /* Prevent avatar from shrinking */
     }
 
-    .player-details {
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        flex-grow: 1; /* Allow the details container to grow */
-        overflow: hidden; /* Ensure content stays within bounds */
-    }
-
     .player-username {
         margin: 0;
         font-size: 18px;

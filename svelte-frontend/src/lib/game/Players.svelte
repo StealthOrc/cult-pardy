@@ -3,11 +3,11 @@
     import { type DTOSession } from 'cult-common';
     import PlayerCard from './PlayerCard.svelte';
 
-    export let currrentSessions: DTOSession[];
+    export let currentSessions: DTOSession[];
 </script>
 
 <div class="player-container">
-    {#each currrentSessions as session}
+    {#each currentSessions as session}
         <PlayerCard {session} />
     {/each}
 </div>

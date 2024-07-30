@@ -1,48 +1,26 @@
 <script lang="ts">
-    import Cookies from "js-cookie";
     export const prerender = false;
     import JeopardyCategory from './JeopardyCategory.svelte';
     import { onMount } from 'svelte';
-    import {webSocket, WebSocketSubject} from "rxjs/webSocket";
-    import { cookieStore, dev_loaded, getCookies, type cookies } from "$lib/stores/cookies.js";
+    import {webSocket} from "rxjs/webSocket";
+    import { getCookies, type cookies } from "$lib/stores/cookies.js";
     import { match, P } from 'ts-pattern';
-	import type { BoardEvent, DtoJeopardyBoard, DTOSession, SessionEvent, WebsocketServerEvents } from 'cult-common';
+	import type { BoardEvent, DtoJeopardyBoard, DTOSession, SessionEvent, WebsocketEvent, WebsocketServerEvents } from 'cult-common';
 	import Players from './Players.svelte';
-	import { dev } from '$app/environment';
-	import { session_data } from '$lib/api/ApiRequests';
-
-    //import * as dd from "cult_common";
-    
-    
-	//import type { DtoJeopardyBoard, DTOSession, WebsocketServerEvents } from 'cult_common';
 
     export let lobbyId: string = "main";	
 
     let cookies : cookies;
 
-
-    let dto = {
-        "test-data": "test-data",
-    };
-    
-    let is_dev_loaded = false
-
-
     let gameData: DtoJeopardyBoard;
-    let currrentSessions: DTOSession[];
-;
+    let currentSessions: DTOSession[] = [];
 
     let socket : WebSocketSubject<any>;
 
     function updateGridColumns() {
-        console.log("gameData:", gameData);
-
         if (gameData == null || gameData.categories == null) {
             return;
         }
-        console.log("gameData.categories:", gameData.categories);
-
-
         const categoriesSize = Object.keys(gameData.categories).length;
         const gridColumnTemplate = `repeat(${categoriesSize}, 1fr)`;
         document.documentElement.style.setProperty('--grid-columns', gridColumnTemplate);
@@ -114,7 +92,12 @@
         .with({ Board: P.select() }, (boardEvent) => handleBoardEvent(boardEvent))
         //SessionEvents
         .with({Session: P.select() }, (boardEvent) => handleSessionEvent(boardEvent))
-        //Currently no added events
+        //TextEvents
+        .with({ Text: P.select() }, (textEvent) => console.log('Websocket textEvent not implemented:', textEvent))
+        //ErrorEvents
+        .with({ Error: P.select() }, (errorEvent) => {console.error('Websocket errorEvent:', errorEvent)})
+        //WebsocketEvents
+        .with({ Websocket: P.select() }, (websocketEvent) => handleWebsocketEvent(websocketEvent))
         .otherwise(() => {
             console.log("Event not found: ",event)
         });
@@ -140,12 +123,41 @@
     function handleSessionEvent(sessionEvent: SessionEvent): boolean {
         match(sessionEvent)
         .with({ CurrentSessions: P.select() }, (data) => {
-            console.log("Event found: ", data);
-            currrentSessions = data;
+            console.log("CurrentSessions: ", data, currentSessions);
+            currentSessions = data;
             return true;
-        }).otherwise(() => {
-            console.log("Event not found: ",sessionEvent)
-        });
+        })
+        .with({ SessionJoined: P.select() }, (data) => {
+            console.log("Joined Session: ", data, currentSessions);
+            // search inside currentSessions for a object with the same user_session_id as data, if not: add data
+            currentSessions = currentSessions.filter(session => session.user_session_id != data.user_session_id);
+            currentSessions.push(data);
+
+            console.log("Joined Session 2: ", data, currentSessions);
+            return true;
+        })
+        .with({ SessionDisconnected: P.select() }, (data) => {
+            console.log("Disconnected Session: ", data, currentSessions);
+            currentSessions = currentSessions.filter(session => session.user_session_id != data);
+            return true;
+        })
+        .exhaustive();
+        return true;
+    }
+
+    //handle websocket joined and disconnected event
+    function handleWebsocketEvent(websocketEvent: WebsocketEvent): boolean {
+        //match joined and disconnected
+        match(websocketEvent)
+        .with({ WebsocketJoined: P.select() }, (data) => {
+            console.log("Someone joined: ", data);
+            return true;
+        })
+        .with({ WebsocketDisconnected: P.select() }, (data) => {
+            console.log("Someone disconnected: ", data);
+            return true;
+        })
+        .exhaustive();
         return true;
     }
 </script>
@@ -164,7 +176,7 @@
         {/if}
     </div>
 </div>
-<Players {currrentSessions} />
+<Players {currentSessions} />
 
 <style>
     .jeopardy-container {
