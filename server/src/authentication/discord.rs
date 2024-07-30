@@ -15,11 +15,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use strum::{Display};
 use cult_common::wasm_lib::ids::discord::DiscordID;
-use crate::apis::api::{get_updated_session, get_token, remove_cookie, set_cookie, set_session_token_cookie};
+use crate::apis::api::{get_token, get_updated_session, get_updated_session_with_request, remove_cookie, set_cookie, set_session_token_cookie};
 use crate::apis::data::{extract_value};
 use crate::authentication::discord::DiscordRedirectURL::{Grant, Login};
 use crate::servers::authentication::{AuthenticationServer, CheckAdminAccess, RedeemAdminAccessToken};
-use crate::servers::game::{AddDiscordAccount, DiscordData, GameServer, UserSession};
+use crate::servers::game::{AddDiscordAccount, DiscordAccountStatus, DiscordData, GameServer, UserSession};
 
 #[derive(Clone, Display,Debug)]
 enum DiscordRedirectURL{
@@ -149,6 +149,8 @@ pub async fn discord_oauth(
     set_cookie(&mut response, &req,"session-token", &user_session.session_token.token);
     Ok(response)
 }
+
+
 #[allow(dead_code)]
 struct OAuthCallback {
     code: String,
@@ -253,15 +255,15 @@ impl DiscordME {
 
 
 
-async fn add_discord_account(srv:web::Data<Addr<GameServer>>, user_session:UserSession, discord:DiscordUser, token: BasicTokenResponse  ) -> bool{
-    let test = srv.send(AddDiscordAccount{
+async fn add_discord_account(srv:&web::Data<Addr<GameServer>>, user_session:UserSession, discord:DiscordUser, token: BasicTokenResponse  ) -> DiscordAccountStatus {
+    let added = srv.send(AddDiscordAccount{
         user_session_id: user_session.user_session_id,
         discord_data: DiscordData{
             discord_user: Some(discord),
             basic_token_response: token
         },
     }).await;
-    test.unwrap_or(false)
+    added.unwrap_or(DiscordAccountStatus::NotAdded)
 }
 
 
@@ -294,7 +296,7 @@ pub async fn login_only(
     oauth_client: web::Data<LoginDiscordAuth>,
 ) -> anyhow::Result<HttpResponse, actix_web::Error> {
 
-    let user_session = get_updated_session(&req, &srv).await;
+    let mut user_session = get_updated_session(&req, &srv).await;
 
     let mut response = HttpResponse::Found()
         .append_header(("Location", format!("{}{}",PROTOCOL,LOCATION)))
@@ -308,11 +310,16 @@ pub async fn login_only(
 
     if let Some(discord_token) = get_discord_token(&oauth_client.client, code.into_inner()).await {
         if let Some(discord_me) = DiscordME::get(discord_token.clone()).await {
-            add_discord_account(srv, user_session.clone(), discord_me.to_discord_user(), discord_token).await;
+            let status : DiscordAccountStatus = add_discord_account(&srv, user_session.clone(), discord_me.to_discord_user(), discord_token).await;
+            match status {
+                DiscordAccountStatus::Updated(update) => {
+                    println!("Updated Discord Account: {:?}", update);
+                    user_session = get_updated_session_with_request(update, &srv).await;
+                },
+                _ => (),
+            }
         }
     }
-
-
     set_session_token_cookie(&mut response, &req, &user_session);
     Ok(response)
 }
@@ -344,7 +351,7 @@ pub async fn grant_access(
     auth: web::Data<Addr<AuthenticationServer>>,
 ) -> anyhow::Result<HttpResponse, actix_web::Error> {
     let mut response = HttpResponse::NotFound().finish();
-    let user_session = get_updated_session(&req, &srv).await;
+    let mut user_session = get_updated_session(&req, &srv).await;
     let mut printer = JsonPrinter::new();
 
     let token = match get_token(&req){
@@ -366,8 +373,15 @@ pub async fn grant_access(
             printer.add("New discord session:", get_false());
             printer.add("Used Redeem Admin Access Token:", result);
             if let Some(discord_user) = discord_data.clone().discord_user{
-                let added = add_discord_account(srv, user_session.clone(), discord_user, discord_data.basic_token_response).await;
-                printer.add("Added Discord Account to session", added);
+                let status = add_discord_account(&srv, user_session.clone(), discord_user, discord_data.basic_token_response).await;
+                match status.clone() {
+                    DiscordAccountStatus::Updated(update) => {
+                        println!("Updated Discord Account: {:?}", update);
+                        user_session = get_updated_session_with_request(update, &srv).await;
+                    },
+                    _ => (),
+                }
+                printer.add("Added Discord Account to session", status.to_help());
             }
             response = HttpResponse::Found().json(&printer);
         }
@@ -376,8 +390,15 @@ pub async fn grant_access(
             printer.add("Found discord session:", get_true());
             printer.add("New discord session:", get_true());
             let result = redeem_admin_access_token(auth, discord_me.clone().redeem_admin_access_token(token)).await;
-            let added = add_discord_account(srv, user_session.clone(), discord_me.to_discord_user(), discord_token).await;
-            printer.add("Added Discord Account to session", added);
+            let status = add_discord_account(&srv, user_session.clone(), discord_me.to_discord_user(), discord_token).await;
+            match status.clone() {
+                DiscordAccountStatus::Updated(update) => {
+                    println!("Updated Discord Account: {:?}", update);
+                    user_session = get_updated_session_with_request(update, &srv).await;
+                },
+                _ => (),
+            }
+            printer.add("Added Discord Account to session", status.to_help());
             printer.add("Used Redeem Admin Access Token:", result);
             response = HttpResponse::Found().json(&printer);
         }

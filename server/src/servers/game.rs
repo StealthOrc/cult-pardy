@@ -29,6 +29,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use strum::{Display, EnumIter};
 use crate::authentication::discord::DiscordME;
+use crate::data::SessionRequest;
 use crate::servers::authentication::{CheckAdminAccess, GetAdminAccess, RedeemAdminAccessToken};
 use crate::servers::StartingServices;
 use crate::servers::db::DBDatabase::CultPardy;
@@ -138,10 +139,27 @@ pub struct GetUserSession {
 
 
 #[derive(Message)]
-#[rtype(result = "bool")]
+#[rtype(result = "DiscordAccountStatus")]
 pub struct AddDiscordAccount {
     pub user_session_id: UserSessionId,
     pub discord_data: DiscordData,
+}
+
+#[derive(Debug, Clone,PartialEq, EnumIter, Display)]
+pub enum DiscordAccountStatus {
+    Added,
+    Updated(SessionRequest),
+    NotAdded,
+}
+
+impl DiscordAccountStatus {
+    pub fn to_help(self) -> bool {
+    match self {
+        DiscordAccountStatus::Added => true,
+        DiscordAccountStatus::Updated(_) => true,
+        DiscordAccountStatus::NotAdded => false,
+        }
+    }
 }
 
 #[derive(Message)]
@@ -150,10 +168,6 @@ pub struct AddLobbySessionScore {
     pub user_data: UserData,
     pub grant_score_user_session_id: UserSessionId,
 }
-
-
-
-
 
 
 
@@ -201,7 +215,7 @@ pub struct UserSession {
     pub username: Option<String>,
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Default)]
 pub struct SessionToken {
     pub token: String,
     pub create: DateTime<Local>,
@@ -813,7 +827,7 @@ impl Handler<GetUserAndUpdateSession> for GameServer {
                     None,
                 ).expect("Cant update User");
             }
-            return return MessageResult(user_session.clone())
+            return MessageResult(user_session.clone())
             
         } else{
              println!("Session token not eq user_token:{:?}={:?}", user_session.clone().session_token.token,&token.token )
@@ -852,21 +866,35 @@ impl Handler<GetUserSession> for GameServer {
 
 
 impl Handler<AddDiscordAccount> for GameServer {
-    type Result = bool;
+    type Result = MessageResult<AddDiscordAccount>;
 
     fn handle(&mut self, msg: AddDiscordAccount, _ctx: &mut Self::Context) -> Self::Result {
-        let mut user_session = match self.starting_services.mongo_server.find_user_session(&msg.user_session_id) {
-            None => return false,
-            Some(data) => data,
+        let status : DiscordAccountStatus;
+
+        let mut user_session = match self.starting_services.mongo_server.find_user_session_with_discord(&msg.discord_data) {
+            None => 
+                match self.starting_services.mongo_server.find_user_session(&msg.user_session_id) {
+                    None => return MessageResult(DiscordAccountStatus::NotAdded),
+                    Some(data) => {
+                        status = DiscordAccountStatus::Added;
+                        data
+                    }
+                },
+            Some(data) => {
+                status = DiscordAccountStatus::Updated(SessionRequest{
+                    user_session_id: data.user_session_id.clone(),
+                    session_token:data.session_token.clone(),
+                });
+                data
+            }
         };
         user_session.discord_auth = Some(msg.discord_data);
-
         self.starting_services.mongo_server.collection::<UserSession>(CultPardy(UserSessions)).update_one(
             doc! {"user_session_id": user_session.user_session_id.id},
             doc! {"$set": {"discord_auth": user_session.discord_auth}},
             None,
         ).expect("Cant add the discord Account");
-        return true
+        return MessageResult(status)
     }
 }
 

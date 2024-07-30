@@ -22,7 +22,7 @@ const config = {
 		
 		paths: {
 			//TODO: this has to become somehow relative so we remove localhost and the port!!
-			assets: 'http://localhost:8000/assets' || 'https://localhost:8000/assets',
+			assets: 'http://localhost:8000/assets',
 		}
 	}
 };

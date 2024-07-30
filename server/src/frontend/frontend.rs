@@ -108,7 +108,6 @@ async fn assets(
         .parse()
         .expect("assets(): could not parse filename");
     let mut cexe = env::current_exe().unwrap();
-    println!("{:?}", path);
     cexe.pop();
     cexe.push("www");
     cexe.push(path);

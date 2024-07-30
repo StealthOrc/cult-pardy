@@ -1,12 +1,12 @@
 use std::str::FromStr;
+use crate::data::SessionRequest;
 use crate::servers::game::{CreateLobby, GetUserAndUpdateSession, GetUserSession, SessionToken};
 use actix::{Addr};
 
 use actix_web::cookie::Cookie;
 use actix_web::{get, HttpRequest, HttpResponse, post, web};
 use chrono::Local;
-use cult_common::wasm_lib::JeopardyMode;
-use cult_common::ApiResponse;
+use cult_common::wasm_lib::{ApiResponse, JeopardyMode};
 use oauth2::http::header::COOKIE;
 use oauth2::http::HeaderValue;
 use serde::Serialize;
@@ -60,6 +60,12 @@ async fn session_request(req: HttpRequest, srv: web::Data<Addr<game::GameServer>
 pub async fn get_updated_session(req: &HttpRequest, srv: &web::Data<Addr<game::GameServer>>) -> UserSession {
     let user_session_id = get_user_id_from_cookie(&req);
     let session_token = get_session_token_from_cookie(&req);
+    srv.send(GetUserAndUpdateSession {user_session_id, session_token}).await.expect("Something happens by getting the user")
+}
+
+pub async fn get_updated_session_with_request(sessionRequest:SessionRequest, srv: &web::Data<Addr<game::GameServer>>) -> UserSession {
+    let user_session_id = Some(sessionRequest.user_session_id);
+    let session_token = Some(sessionRequest.session_token);
     srv.send(GetUserAndUpdateSession {user_session_id, session_token}).await.expect("Something happens by getting the user")
 }
 

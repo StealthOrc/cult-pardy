@@ -1,4 +1,5 @@
 use ids::discord::DiscordID;
+use ids::usersession::UserSessionId;
 use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
 use std::hash::{Hash, Hasher};
@@ -94,9 +95,6 @@ impl DiscordUser {
         )
     }
 }
-
-
-
 
 
 

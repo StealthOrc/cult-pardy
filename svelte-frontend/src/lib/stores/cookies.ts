@@ -1,6 +1,7 @@
 
 import Cookies from "js-cookie";
 import type { UserSessionId, WebsocketSessionId} from 'cult-common';
+import { writable } from 'svelte/store';
 
 
 // fuction that returns the cookies and a type that represents the cookies
@@ -30,3 +31,8 @@ export function getCookies() {
     console.log("Updated cookies");
     return cookies;
 }
+
+
+export const cookieStore = writable({
+    cookies: cookies,
+});

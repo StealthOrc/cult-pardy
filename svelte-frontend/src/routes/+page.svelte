@@ -1,17 +1,41 @@
 <script lang="ts">
     import { base } from "$app/paths";
+
+
+
+
 	import { onMount } from "svelte";
-    import { getCookies,type cookies } from "$lib/stores/cookies";
+    import { cookieStore, getCookies,type cookies } from "$lib/stores/cookies";
     import {dev} from "$app/environment";
 	import { DiscordUser } from "cult-common";
 	import PlayerIcon from "./PlayerIcon.svelte";
     let lobbyid = '';
 
-    let cookies: cookies = getCookies();
+    let cookies : cookies = getCookies();
+
+    function updateUser() {
+        cookieStore.update(store => ({
+            cookies : cookies
+        }));
+    }
+
+    onMount(() => {
+         updateUser() 
+    })
+
+
+
     let discord_user: DiscordUser | null = null;
 
     onMount(async () => {
-        let response = await fetch(`api/discord_session?user-session-id=${cookies.userSessionId.id}&session-token=${cookies.sessionToken.id}`)
+        let response = await fetch(`api/discord_session`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+           'credentials': 'include',
+            }
+        )
         if (response.ok) {
             try {
                 discord_user = await response.json();
