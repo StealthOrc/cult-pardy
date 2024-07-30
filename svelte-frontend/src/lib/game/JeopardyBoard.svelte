@@ -2,11 +2,14 @@
     export const prerender = false;
     import JeopardyCategory from './JeopardyCategory.svelte';
     import { onMount } from 'svelte';
-    import {webSocket} from "rxjs/webSocket";
-    import { getCookies, type cookies } from "$lib/stores/cookies.js";
+    import {webSocket, WebSocketSubject} from "rxjs/webSocket";
+    import { cookieStore, dev_loaded, getCookies, type cookies } from "$lib/stores/cookies";
     import { match, P } from 'ts-pattern';
 	import type { BoardEvent, DtoJeopardyBoard, DTOSession, SessionEvent, WebsocketEvent, WebsocketServerEvents } from 'cult-common';
 	import Players from './Players.svelte';
+	import { session_data } from '$lib/api/ApiRequests';
+    import Cookies from "js-cookie";
+	import { dev } from '$app/environment';
 
     export let lobbyId: string = "main";	
 
@@ -14,7 +17,7 @@
 
     let gameData: DtoJeopardyBoard;
     let currentSessions: DTOSession[] = [];
-
+    let is_dev_loaded = false;
     let socket : WebSocketSubject<any>;
 
     function updateGridColumns() {
@@ -128,17 +131,19 @@
             return true;
         })
         .with({ SessionJoined: P.select() }, (data) => {
-            console.log("Joined Session: ", data, currentSessions);
-            // search inside currentSessions for a object with the same user_session_id as data, if not: add data
-            currentSessions = currentSessions.filter(session => session.user_session_id != data.user_session_id);
+            if (currentSessions.find(session => session.user_session_id.id == data.user_session_id.id)) {
+                return false;
+            }
+            currentSessions = currentSessions.filter(session => session.user_session_id.id != data.user_session_id.id);
             currentSessions.push(data);
-
-            console.log("Joined Session 2: ", data, currentSessions);
             return true;
         })
         .with({ SessionDisconnected: P.select() }, (data) => {
             console.log("Disconnected Session: ", data, currentSessions);
-            currentSessions = currentSessions.filter(session => session.user_session_id != data);
+
+            //
+
+            currentSessions = currentSessions.filter(session => session.user_session_id.id != data.id);
             return true;
         })
         .exhaustive();
@@ -165,7 +170,7 @@
 
 <div class="jeopardy-container">
     <div class="jeopardy-board">
-        {#if dev_loaded}
+        {#if is_dev_loaded}
             {#if gameData != null && gameData.categories != null}
                 {#each gameData.categories as category}
                     <JeopardyCategory {category} />
@@ -176,7 +181,9 @@
         {/if}
     </div>
 </div>
-<Players {currentSessions} />
+{#key currentSessions}
+    <Players {currentSessions} />
+{/key}
 
 <style>
     .jeopardy-container {
