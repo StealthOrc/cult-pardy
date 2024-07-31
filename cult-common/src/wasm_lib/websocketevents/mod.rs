@@ -78,8 +78,8 @@ pub enum WebsocketError {
 }
 
 
-#[derive(Serialize, Clone,Deserialize, Debug, Hash)]
+#[derive(Tsify, Serialize, Clone,Deserialize, Debug, Hash)]
 pub struct WebsocketPing {
     pub user_session_id: UserSessionId,
-    pub ping : u64,
+    pub ping : i64,
 }

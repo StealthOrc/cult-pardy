@@ -3,8 +3,9 @@
     import { type DTOSession, type Vector2D } from 'cult-common';
     import PlayerCard from './PlayerCard.svelte';
 	import type { WebSocketSubject } from 'rxjs/webSocket';
+	import type { Session } from '$lib/stores/currentSessions';
 
-    export let currentSessions: DTOSession[];
+    export let currentSessions: Session[];
     export let current: Vector2D | null;
     export let ws : WebSocketSubject<any> | null;
 </script>

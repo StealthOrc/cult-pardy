@@ -1,8 +1,9 @@
 <script lang="ts" type="module">
+	import type { Session } from "$lib/stores/currentSessions";
 	import type { DTOSession, Vector2D, WebsocketSessionEvent } from "cult-common";
 	import type { WebSocketSubject } from "rxjs/webSocket";
 
-    export let session : DTOSession
+    export let session : Session
     export let current: Vector2D | null;
     export let ws : WebSocketSubject<any> | null;
     let default_avatar : string= "https://cdn-icons-png.flaticon.com/512/149/149071.png"
@@ -10,11 +11,12 @@
 
 
     function getAvatar() {
-        if (session.discord_user === null) {
+        if (session.dto_Session.discord_user === null) {
             return default_avatar
         }
-        let avatar_id = session.discord_user.avatar_id
-        let discord_id = session.discord_user.discord_id
+        const discord_user = session.dto_Session.discord_user;
+        let avatar_id = discord_user.avatar_id
+        let discord_id = discord_user.discord_id
         return `https://cdn.discordapp.com/avatars/${discord_id.id}/${avatar_id}.png?size=64*10`;
     }
     
@@ -39,10 +41,11 @@
 </script>
 
 <div class="player-card">
-    {#key session.score}
+    {#key session.dto_Session.score}
         <img src="{getAvatar()}" on:click={addStore} alt="Avatar" class="player-avatar">
-        <h1 class="player-username">{getUserName(session)}</h1> 
-        <h3 class="player-score">{session.score}</h3>
+        <h1 class="player-username">{getUserName(session.dto_Session)}</h1> 
+        <h3 class="player-score">{session.dto_Session.score}</h3>
+        <h2 class="ping">{session.ping}</h2>
     {/key}
 </div>
 

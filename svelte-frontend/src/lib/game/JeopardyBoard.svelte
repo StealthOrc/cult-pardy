@@ -7,7 +7,7 @@
     import { match, P } from 'ts-pattern';
 	import type { BoardEvent, DtoJeopardyBoard, DTOSession, SessionEvent, WebsocketEvent, WebsocketServerEvents } from 'cult-common';
 	import Players from './Players.svelte';
-	import { createCurrentSessionsStore } from '$lib/stores/currentSessions';
+	import { createCurrentSessionsStore, type Session } from '$lib/stores/currentSessions';
 	import type { Observable, Observer } from 'rxjs';
 
     export let lobbyId: string = "main";	
@@ -15,7 +15,7 @@
     const cookies : cookies = getCookies();
 
     let gameData: DtoJeopardyBoard;
-    let currentSessions: DTOSession[] = [];
+    let currentSessions: Session[] = [];
     let currentSessionsStore = createCurrentSessionsStore(); 
 
     currentSessionsStore.subscribe(value => {
@@ -143,7 +143,7 @@
             return true;
         })
         .with({ SessionsPing : P.select() }, (data) => {
-            console.log("Ping Sessions: ", data);
+            currentSessionsStore.updateSessionsPing(data);
             return true;
         })  
         .exhaustive();
