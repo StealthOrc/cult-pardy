@@ -8,6 +8,7 @@
 	import type { BoardEvent, DtoJeopardyBoard, DTOSession, SessionEvent, WebsocketEvent, WebsocketServerEvents } from 'cult-common';
 	import Players from './Players.svelte';
 	import { createCurrentSessionsStore } from '$lib/stores/currentSessions';
+	import type { Observable, Observer } from 'rxjs';
 
     export let lobbyId: string = "main";	
 
@@ -20,6 +21,7 @@
     currentSessionsStore.subscribe(value => {
         currentSessions = value;
     })
+
 
     const ws = webSocket({
         url: `ws://localhost:8000/ws?lobby-id=${lobbyId}&user-session-id=${cookies.userSessionId.id}&session-token=${cookies.sessionToken}`,
@@ -58,6 +60,7 @@
 
     onMount(() => {
         ws.subscribe({
+
             next: (message) => {
                 if (message instanceof ArrayBuffer) {
                     const decoder = new TextDecoder();
@@ -75,6 +78,9 @@
                 //console.error('WebSocket error:', error);
             }
         });
+
+        
+
     });
 
     function handleEvent(event: WebsocketServerEvents): boolean {
@@ -136,6 +142,10 @@
             currentSessionsStore.removeSessionById(data);
             return true;
         })
+        .with({ SessionsPing : P.select() }, (data) => {
+            console.log("Ping Sessions: ", data);
+            return true;
+        })  
         .exhaustive();
         return true;
     }
@@ -155,6 +165,10 @@
         .exhaustive();
         return true;
     }
+
+
+
+
 </script>
 {#if gameData != null && gameData.categories != null}
     <div class="jeopardy-container">
@@ -182,3 +196,4 @@
         max-height: 90%;
     }
 </style>
+

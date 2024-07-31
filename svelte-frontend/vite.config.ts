@@ -30,7 +30,7 @@ export default {
         changeOrigin: true,
         rewrite: (path : string) => {
           return path.replace(/^\/game\/api/, '/api');
-        }
+        },
       },
 
 
@@ -39,6 +39,8 @@ export default {
         target: 'http://localhost:8000',
         changeOrigin: true,
       },
+      
     },
   },
 };
+

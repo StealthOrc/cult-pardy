@@ -5,9 +5,13 @@
 
 
 use core::fmt;
+use std::any::{self, Any};
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
-use actix::{Actor, ActorFutureExt, Addr, AsyncContext, Context, ContextFutureSpawner, fut, Handler, MailboxError, Message, MessageResult, Recipient, WrapFuture};
+use std::sync::{Arc, Mutex};
+use actix::{fut, run, Actor, ActorFutureExt, Addr, AsyncContext, Context, ContextFutureSpawner, Handler, MailboxError, Message, MessageResult, Recipient, WrapFuture};
+use actix_web::web;
+use attohttpc::Session;
 use chrono::{DateTime, Local, TimeDelta};
 
 use cult_common::backend::{JeopardyBoard, LobbyCreateResponse};
@@ -16,7 +20,7 @@ use cult_common::wasm_lib::ids::discord::DiscordID;
 use cult_common::wasm_lib::ids::lobby::LobbyId;
 use cult_common::wasm_lib::ids::usersession::UserSessionId;
 use cult_common::wasm_lib::ids::websocketsession::WebsocketSessionId;
-use cult_common::wasm_lib::websocketevents::{BoardEvent, SessionEvent, WebsocketError, WebsocketEvent, WebsocketServerEvents};
+use cult_common::wasm_lib::websocketevents::{BoardEvent, SessionEvent, WebsocketError, WebsocketEvent, WebsocketPing, WebsocketServerEvents};
 use cult_common::wasm_lib::{DiscordUser, JeopardyMode, Vector2D};
 use futures::StreamExt;
 use mongodb::bson::{Bson, doc, Document};
@@ -37,21 +41,52 @@ use crate::servers::db::DBDatabase::CultPardy;
 use crate::servers::db::MongoServer;
 use crate::servers::db::UserCollection::{UserSessions};
 use crate::servers::game::GameState::{Playing, Waiting};
-use crate::ws::session::UserData;
+use crate::ws::session::{self, UserData};
+
+#[derive(Serialize, Deserialize, Debug)]
+pub enum SessionMessageResult {
+    Void,
+    U64(u64),
+}
+
+
+#[derive(Serialize, Deserialize, Debug)]
+pub enum GetSessionMessageType {
+    GetPing,
+}
 
 /// Chat server sends this messages to session
-#[derive(Message,Serialize, Deserialize, Debug)]
-#[rtype(result = "()")]
-pub enum SessionMessageType {
+#[derive(Serialize, Deserialize, Debug)]
+pub enum SendSessionMessageType {
     Data(WebsocketServerEvents),
     SelfDisconnect,
 }
+
+/// Message for chat server communications
+#[derive(Message)]
+#[rtype(result = "SessionMessageResult")]
+pub enum SessionMessageType {
+    Send(SendSessionMessageType),
+    Get(GetSessionMessageType),
+}
+
+
 #[derive(Debug,Clone)]
 pub struct WebsocketConnect {
     pub lobby_id: LobbyId,
     pub user_session_id:UserSessionId,
     pub addr: Recipient<SessionMessageType>,
 }
+#[derive(Debug, Clone)]
+pub struct GetWebsocketsPings{
+    pub lobby_id: LobbyId,
+}
+
+impl Message for GetWebsocketsPings {
+    type Result = Vec<WebsocketPing>;
+    
+}
+
 
 impl Message for WebsocketConnect {
     type Result = Option<WebsocketSessionId>;
@@ -460,6 +495,18 @@ impl Lobby{
         self.websocket_connections.values().filter(|websocket_session| websocket_session.user_session_id.eq(user_session_id)).map(|websocket_session| websocket_session.websocket_session_id.clone()).collect()
     }
 
+    pub fn get_session(&self, user_session_id: &UserSessionId) -> Option<UserSession> {
+        if self.connected_user_session.contains(user_session_id) {
+            return Some(UserSession{
+                user_session_id: user_session_id.clone(),
+                discord_auth: None,
+                session_token: SessionToken::new(),
+                username: None,
+            });
+        }
+        None
+    }
+
     pub fn get_session_score(&self, user_session_id: &UserSessionId) -> i32 {
         *self.user_score.get(user_session_id).unwrap_or(&0)
     }
@@ -652,13 +699,13 @@ impl GameServer {
     }
 
     pub fn send_message(addr:&Recipient<SessionMessageType>, message: WebsocketServerEvents) {
-        addr.do_send(SessionMessageType::Data(message));
+        addr.do_send(SessionMessageType::Send(SendSessionMessageType::Data(message)));
     }
     
     fn send_websocket_session_message(&self, lobby_id: &LobbyId, websocket_session_id: &WebsocketSessionId,message: WebsocketServerEvents) {
         if let Some(lobby) = self.lobbies.get(lobby_id) {
             if let Some(websocket_session) = lobby.websocket_connections.get(websocket_session_id) {
-                websocket_session.addr.do_send(SessionMessageType::Data(message));
+                websocket_session.addr.do_send(SessionMessageType::Send(SendSessionMessageType::Data(message)));
             }
         }
 
@@ -680,7 +727,7 @@ impl GameServer {
         if let Some(lobby) = self.lobbies.get(lobby_id) {
            for websocket_session in lobby.websocket_connections.values(){
                if websocket_session.user_session_id.eq(user_id){
-                   websocket_session.addr.do_send(SessionMessageType::SelfDisconnect);
+                   websocket_session.addr.do_send(SessionMessageType::Send(SendSessionMessageType::SelfDisconnect));
                 }
             }
         }
@@ -697,6 +744,7 @@ impl Actor for GameServer {
         Context::new().run(self)
     }
 }
+
 
 /// Handler for Connect message.
 ///
@@ -1097,7 +1145,67 @@ impl Handler<AddLobbySessionScore> for GameServer {
 }
 
 
+impl Handler<GetWebsocketsPings> for GameServer {
+    type Result = Vec<WebsocketPing>;
 
+    fn handle(&mut self, msg: GetWebsocketsPings, ctx: &mut Self::Context) -> Self::Result {
+        let lobby = match self.lobbies.get(&msg.lobby_id) {
+            None => return Vec::new(),
+            Some(lobby) => lobby
+        };
+
+        let mut pings = Vec::new();
+        let session = lobby.connected_user_session.clone();
+
+        for user_session_id in session {
+            let websockets = lobby.get_session_websockets(&user_session_id);
+
+            // Shared state to collect results
+            let result_arc = Arc::new(Mutex::new(0));
+
+            // Collect futures
+            let mut futures = Vec::new();
+
+            for websocket_session in websockets {
+                if let Some(websocket) = lobby.websocket_connections.get(&websocket_session) {
+                    let result_arc = Arc::clone(&result_arc);
+                    let fut = websocket.addr
+                        .send(SessionMessageType::Get(GetSessionMessageType::GetPing))
+                        .into_actor(self)
+                        .then(move |result: Result<SessionMessageResult, MailboxError>, _: &mut GameServer, _| {
+                            let ping: u64 = match result {
+                                Ok(SessionMessageResult::Void) => 0,
+                                Ok(SessionMessageResult::U64(v)) => v,
+                                Err(_) => 0,
+                            };
+
+                            let mut result_lock = result_arc.lock().unwrap();
+                            *result_lock += ping;
+                            fut::ready(())
+                        });
+
+                    futures.push(fut);
+                }
+            }
+
+            for fut in futures {
+                ctx.wait(fut);
+            }
+
+            let total_pings = {
+                let result_lock = result_arc.lock().unwrap();
+                *result_lock
+            };
+
+            pings.push(WebsocketPing {
+                user_session_id,
+                ping: total_pings,
+            });
+        }
+
+        pings
+    }
+}
 
 
 

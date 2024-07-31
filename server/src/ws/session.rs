@@ -2,8 +2,9 @@ use std::time::{Duration, Instant};
 use std::vec;
 
 use actix::prelude::*;
+use serde::{Deserialize, Serialize};
 
-use crate::servers::game;
+use crate::servers::game::{self, GameServer, SendSessionMessageType, SessionMessageResult};
 use crate::servers::game::{WebsocketDisconnect, SessionMessageType};
 use actix_web::web;
 use actix_web_actors::ws;
@@ -12,13 +13,24 @@ use chrono::{DateTime, Local, TimeDelta};
 use cult_common::wasm_lib::ids::lobby::LobbyId;
 use cult_common::wasm_lib::ids::usersession::UserSessionId;
 use cult_common::wasm_lib::ids::websocketsession::WebsocketSessionId;
-use cult_common::wasm_lib::websocketevents::WebsocketSessionEvent;
+use cult_common::wasm_lib::websocketevents::{SessionEvent, WebsocketServerEvents, WebsocketSessionEvent};
 
 /// How often heartbeat pings are sent
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
 
 /// How long before lack of client response causes a timeout
 const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
+
+#[derive(Debug, Clone)]
+pub struct GetPing {
+
+}
+
+impl Message for GetPing {
+    type Result = i64;
+    
+}
+
 
 #[derive(Debug)]
 pub struct WsSession {
@@ -62,20 +74,51 @@ impl WsSession {
     }
 
     fn hb(&mut self, ctx: &mut ws::WebsocketContext<Self>) {
-        ctx.run_interval(HEARTBEAT_INTERVAL, |act, ctx| {
-            let current_ping = Local::now();
+        self.ping(ctx);
+        self.hb2(ctx);
+        ctx.run_interval(HEARTBEAT_INTERVAL, |act: &mut WsSession, ctx| {
             let time_since = Instant::now().duration_since(act.hb);
-            println!("Ping from {:?}ms ", time_since );
             if time_since > CLIENT_TIMEOUT {
                 println!("Websocket Client heartbeat failed, disconnecting!");
                 ctx.stop();
                 return;
             }
-            //convert current_ping to &[u8]
-            let test = serde_json::to_vec(&Local::now()).expect("Can´t convert to vec");
-            ctx.ping(&test.as_slice());
+            act.ping(ctx);
+            act.hb2(ctx)
         });
+
     }
+
+    fn hb2(&mut self, ctx: &mut ws::WebsocketContext<Self>) {
+        let addr = ctx.address();
+        self.handler
+        .send(game::GetWebsocketsPings {
+            lobby_id: self.player.lobby_id.clone(),
+        })
+        .into_actor(self)
+        .then(|res, act, ctx| {
+            match res {
+                Ok(res) => {
+                    if res.len() > 0 {
+                        let binary = serde_json::to_vec(&WebsocketServerEvents::Session(SessionEvent::SessionsPing(res))).expect("Can´t convert to vec");
+                        ctx.binary(binary);
+                    }
+                }
+                _ => ctx.stop(),
+            }
+            fut::ready(())
+        })
+        .wait(ctx);
+
+    }
+
+
+    fn ping(&mut self, ctx: &mut ws::WebsocketContext<Self>) {
+        let test = serde_json::to_vec(&Local::now()).expect("Can´t convert to vec");
+        ctx.ping(&test.as_slice());
+    }
+
+
 }
 
 impl Actor for WsSession {
@@ -101,7 +144,10 @@ impl Actor for WsSession {
                             println!("Something happens 3");
                             ctx.stop()
                         }
-                        Some(id) => act.player.websocket_session_id = Some(id),
+                        Some(id) => {
+                            println!("Test? {:?}", id);
+                            act.player.websocket_session_id = Some(id)
+                        }
                     },
 
                     _ => ctx.stop(),
@@ -111,6 +157,8 @@ impl Actor for WsSession {
             .wait(ctx);
     }
 
+
+  
     fn stopping(&mut self, _: &mut Self::Context) -> Running {
         self.handler.do_send(WebsocketDisconnect {
             user_data: self.player.clone(),
@@ -119,24 +167,42 @@ impl Actor for WsSession {
     }
 }
 
-/// Handle messages from chat server, we simply send it to peer websocket
-impl Handler<game::SessionMessageType> for WsSession {
-    type Result = ();
 
-    fn handle(&mut self, msg: game::SessionMessageType, ctx: &mut Self::Context) {
+
+
+/// Handle messages from chat server, we simply send it to peer websocket
+impl Handler<SessionMessageType> for WsSession {
+    type Result = MessageResult<SessionMessageType>;
+
+    fn handle(&mut self, msg: game::SessionMessageType, ctx: &mut Self::Context) -> Self::Result {
         match msg {
-            SessionMessageType::SelfDisconnect => ctx.stop(),
-            SessionMessageType::Data(data) => {
-                let binary = serde_json::to_vec(&data).expect("Can´t convert to vec");
-                ctx.binary(binary);
-                //TODO: make deflate alogithm de-/activatable again for development
-                //if let Ok(bytes) = compress(&binary) {
-                //    ctx.binary(bytes)
-                //}
+            SessionMessageType::Send(send) => 
+            {
+                match send  {
+                    SendSessionMessageType::SelfDisconnect => ctx.stop(),
+                    SendSessionMessageType::Data(data) => {
+                        let binary = serde_json::to_vec(&data).expect("Can´t convert to vec");
+                        ctx.binary(binary);
+                        //TODO: make deflate alogithm de-/activatable again for development
+                        //if let Ok(bytes) = compress(&binary) {
+                        //    ctx.binary(bytes)
+                        //}
+                    }
+                }
+                MessageResult(SessionMessageResult::Void)
             }
+            SessionMessageType::Get(get) => {
+                match get {
+                    game::GetSessionMessageType::GetPing => { 
+                        MessageResult(SessionMessageResult::U64(self.player.ping as u64))
+                    }
+                }
+            },
         }
     }
 }
+
+
 
 /// WebSocket message handler
 impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
@@ -155,14 +221,13 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                 self.hb = Instant::now();
                 ctx.pong(&msg);
             }
-            ws::Message::Pong(test) => {
-                if !test.is_empty() {
-                    let pong = serde_json::from_slice::<DateTime<Local>>(&test).expect("Can´t convert to vec");
-                    println!("Ping2 from {:?} : {:?}ms ", self.player.user_session_id, Local::now().signed_duration_since(pong).num_milliseconds() );
-                    println!("Ping3 from {:?} : {:?}ms ", self.player.user_session_id, Local::now().signed_duration_since(pong).num_milliseconds()/2 );
-
+            ws::Message::Pong(bytes) => {
+                if !bytes.is_empty() {
+                    if let Ok(pong) = serde_json::from_slice::<DateTime<Local>>(&bytes) {
+                        let ping = Local::now().signed_duration_since(pong).num_milliseconds();
+                        self.player.ping = ping;
+                    }
                 }
-             
                 self.hb = Instant::now();
             }
             ws::Message::Text(text) => {
