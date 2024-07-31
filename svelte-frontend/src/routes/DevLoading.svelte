@@ -1,4 +1,4 @@
-  sessiondata = await session_data();<script lang="ts">
+<script lang="ts">
     import Cookies from "js-cookie";
 	import { onMount } from "svelte";
     import { cookieStore, dev_loaded,updateCookies,type cookies } from "$lib/stores/cookies";

@@ -10,9 +10,10 @@ use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use actix::{fut, run, Actor, ActorFutureExt, Addr, AsyncContext, Context, ContextFutureSpawner, Handler, MailboxError, Message, MessageResult, Recipient, WrapFuture};
+use actix_web::rt::task;
 use actix_web::web;
 use attohttpc::Session;
-use chrono::{DateTime, Local, TimeDelta};
+use chrono::{DateTime, Duration, Local, TimeDelta};
 
 use cult_common::backend::{JeopardyBoard, LobbyCreateResponse};
 use cult_common::dto::DTOSession;
@@ -76,6 +77,14 @@ pub struct WebsocketConnect {
     pub lobby_id: LobbyId,
     pub user_session_id:UserSessionId,
     pub addr: Recipient<SessionMessageType>,
+    pub ping : i64,
+}
+#[derive(Message,Debug, Clone)]
+#[rtype(result = "()")]
+pub struct SetWebsocketsPing{
+    pub lobby_id: LobbyId,
+    pub websocket_session_id: WebsocketSessionId,
+    pub ping : i64,
 }
 #[derive(Debug, Clone)]
 pub struct GetWebsocketsPings{
@@ -86,7 +95,6 @@ impl Message for GetWebsocketsPings {
     type Result = Vec<WebsocketPing>;
     
 }
-
 
 impl Message for WebsocketConnect {
     type Result = Option<WebsocketSessionId>;
@@ -337,6 +345,7 @@ pub struct WebsocketSession{
     user_session_id: UserSessionId,
     #[serde(skip_serializing)]
     addr:Recipient<SessionMessageType>,
+    ping: i64,
 }
 
 
@@ -775,6 +784,7 @@ impl Handler<WebsocketConnect> for GameServer {
             websocket_session_id:websocket_session_id.clone(),
             user_session_id: msg.user_session_id.clone(),
             addr: msg.addr.clone(),
+            ping: msg.ping,
         });
         let creator = lobby.creator.clone();
         
@@ -1145,69 +1155,48 @@ impl Handler<AddLobbySessionScore> for GameServer {
 }
 
 
-impl Handler<GetWebsocketsPings> for GameServer {
-    type Result = Vec<WebsocketPing>;
+impl Handler<SetWebsocketsPing> for GameServer {
+    type Result = ();
 
-    fn handle(&mut self, msg: GetWebsocketsPings, ctx: &mut Self::Context) -> Self::Result {
-        let lobby = match self.lobbies.get(&msg.lobby_id) {
-            None => return Vec::new(),
+    fn handle(&mut self, msg: SetWebsocketsPing, _: &mut Self::Context) -> Self::Result {
+        let lobby = match self.lobbies.get_mut(&msg.lobby_id) {
+            None => return,
             Some(lobby) => lobby
         };
-
-        let mut pings = Vec::new();
-        let session = lobby.connected_user_session.clone();
-
-        for user_session_id in session {
-            let websockets = lobby.get_session_websockets(&user_session_id);
-
-            // Shared state to collect results
-            let result_arc = Arc::new(Mutex::new(0));
-
-            // Collect futures
-            let mut futures = Vec::new();
-            for websocket_session in websockets {
-                if let Some(websocket) = lobby.websocket_connections.get(&websocket_session) {
-                    let result_arc = Arc::clone(&result_arc);
-                    let fut = websocket.addr
-                        .send(SessionMessageType::Get(GetSessionMessageType::GetPing))
-                        .into_actor(self)
-                        .then(move |result: Result<SessionMessageResult, MailboxError>, _: &mut GameServer, _| {
-                            let ping: u64 = match result {
-                                Ok(SessionMessageResult::Void) => 0,
-                                Ok(SessionMessageResult::U64(v)) => v,
-                                Err(_) => 0,
-                            };
-                            let mut result_lock = result_arc.lock().unwrap();
-                            *result_lock += ping;
-
-                            fut::ready(())
-                        });
-
-                    futures.push(fut);
-                }
-            }
-
-
-
-
-            for fut in futures {
-                ctx.wait(fut);
-            }
-
-            let total_pings = {
-                let result_lock = result_arc.lock().unwrap();
-                *result_lock
-            };
-            pings.push(WebsocketPing {
-                user_session_id,
-                ping: total_pings,
-            });
-        }
-
-        pings
+        if let Some(ws) = lobby.websocket_connections.get_mut(&msg.websocket_session_id) {
+            ws.ping = msg.ping;
+        };
+        
     }
 }
 
+impl Handler<GetWebsocketsPings> for GameServer {
+    type Result = MessageResult<GetWebsocketsPings>;
 
+    fn handle(&mut self, msg: GetWebsocketsPings, _: &mut Self::Context) -> Self::Result {
+        let lobby = match self.lobbies.get(&msg.lobby_id) {
+            None => return MessageResult(Vec::new()),
+            Some(lobby) => lobby
+        };
+        let mut session_ping: Vec<WebsocketPing> = Vec::new();
+        let connected_sessions = lobby.connected_user_session.clone();
+        for session in connected_sessions {
+            let mut pings: i64 = 0;
+            let ws = lobby.get_session_websockets(&session);
+            let size = ws.len();
+            for websocket_session in ws {
+                let ping = match lobby.websocket_connections.get(&websocket_session){
+                    None => 0 as i64,
+                    Some(websocket) => websocket.ping,
+                };
+                pings += ping;
+            }
+            session_ping.push(WebsocketPing{
+                user_session_id: session,
+                ping: pings / size as i64,
+            });
+        }
+        MessageResult(session_ping)
 
-
+    }
+}

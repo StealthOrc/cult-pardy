@@ -27,7 +27,7 @@ pub struct GetPing {
 }
 
 impl Message for GetPing {
-    type Result = i64;
+    type Result = i32;
     
 }
 
@@ -44,7 +44,6 @@ pub struct UserData {
     pub websocket_session_id: Option<WebsocketSessionId>,
     pub user_session_id: UserSessionId,
     pub lobby_id: LobbyId,
-    pub last_pong: DateTime<Local>,
     pub ping: i64
 }
 
@@ -54,7 +53,6 @@ impl UserData {
             websocket_session_id: None,
             user_session_id,
             lobby_id: lobby,
-            last_pong: Local::now(),
             ping: 0
         }
     }
@@ -75,7 +73,7 @@ impl WsSession {
 
     fn hb(&mut self, ctx: &mut ws::WebsocketContext<Self>) {
         self.ping(ctx);
-        self.hb2(ctx);
+        self.get_pings(ctx);
         ctx.run_interval(HEARTBEAT_INTERVAL, |act: &mut WsSession, ctx| {
             let time_since = Instant::now().duration_since(act.hb);
             if time_since > CLIENT_TIMEOUT {
@@ -84,12 +82,27 @@ impl WsSession {
                 return;
             }
             act.ping(ctx);
-            act.hb2(ctx)
+            act.get_pings(ctx)
         });
 
     }
 
-    fn hb2(&mut self, ctx: &mut ws::WebsocketContext<Self>) {
+    fn set_ping(&mut self, _: &mut ws::WebsocketContext<Self>) {
+        if let Some(websocket_id) = &self.player.websocket_session_id {
+            self.handler
+                .do_send(game::SetWebsocketsPing {
+                    lobby_id: self.player.lobby_id.clone(),
+                    websocket_session_id: websocket_id.clone(),
+                    ping: self.player.ping,
+                });
+
+        }
+
+    }
+
+
+
+    fn get_pings(&mut self, ctx: &mut ws::WebsocketContext<Self>) {
         self.handler
         .send(game::GetWebsocketsPings {
             lobby_id: self.player.lobby_id.clone(),
@@ -108,13 +121,14 @@ impl WsSession {
             fut::ready(())
         })
         .wait(ctx);
-
     }
 
 
     fn ping(&mut self, ctx: &mut ws::WebsocketContext<Self>) {
+         self.set_ping(ctx);
         let test = serde_json::to_vec(&Local::now()).expect("Can´t convert to vec");
         ctx.ping(&test.as_slice());
+    
     }
 
 
@@ -134,6 +148,7 @@ impl Actor for WsSession {
                 lobby_id: self.player.lobby_id.clone(),
                 user_session_id: self.player.user_session_id.clone(),
                 addr: addr.recipient(),
+                ping: self.player.ping,
             })
             .into_actor(self)
             .then(|res, act, ctx| {
@@ -145,8 +160,9 @@ impl Actor for WsSession {
                         }
                         Some(id) => {
                             println!("Test? {:?}", id);
-                            act.hb2(ctx);
-                            act.player.websocket_session_id = Some(id)
+                            act.player.websocket_session_id = Some(id);
+                            act.get_pings(ctx);
+                            act.ping(ctx);
                         }
                     },
 
