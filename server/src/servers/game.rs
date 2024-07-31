@@ -1165,7 +1165,6 @@ impl Handler<GetWebsocketsPings> for GameServer {
 
             // Collect futures
             let mut futures = Vec::new();
-
             for websocket_session in websockets {
                 if let Some(websocket) = lobby.websocket_connections.get(&websocket_session) {
                     let result_arc = Arc::clone(&result_arc);
@@ -1181,13 +1180,15 @@ impl Handler<GetWebsocketsPings> for GameServer {
                             let mut result_lock = result_arc.lock().unwrap();
                             *result_lock += ping;
 
-                            println!("Ping intern: {}", result_lock);
                             fut::ready(())
                         });
 
                     futures.push(fut);
                 }
             }
+
+
+
 
             for fut in futures {
                 ctx.wait(fut);
@@ -1197,8 +1198,6 @@ impl Handler<GetWebsocketsPings> for GameServer {
                 let result_lock = result_arc.lock().unwrap();
                 *result_lock
             };
-
-            println!("Ping intern2: {:?} {:?}", total_pings, result_arc);
             pings.push(WebsocketPing {
                 user_session_id,
                 ping: total_pings,

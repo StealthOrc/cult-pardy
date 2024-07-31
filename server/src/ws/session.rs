@@ -90,7 +90,6 @@ impl WsSession {
     }
 
     fn hb2(&mut self, ctx: &mut ws::WebsocketContext<Self>) {
-        let addr = ctx.address();
         self.handler
         .send(game::GetWebsocketsPings {
             lobby_id: self.player.lobby_id.clone(),
@@ -146,6 +145,7 @@ impl Actor for WsSession {
                         }
                         Some(id) => {
                             println!("Test? {:?}", id);
+                            act.hb2(ctx);
                             act.player.websocket_session_id = Some(id)
                         }
                     },
@@ -194,7 +194,6 @@ impl Handler<SessionMessageType> for WsSession {
             SessionMessageType::Get(get) => {
                 match get {
                     game::GetSessionMessageType::GetPing => { 
-                        println!("GetPing {:?}", self.player.ping);
                         MessageResult(SessionMessageResult::U64(self.player.ping as u64))
                     }
                 }
