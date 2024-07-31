@@ -63,12 +63,17 @@ impl WsSession {
 
     fn hb(&mut self, ctx: &mut ws::WebsocketContext<Self>) {
         ctx.run_interval(HEARTBEAT_INTERVAL, |act, ctx| {
-            if Instant::now().duration_since(act.hb) > CLIENT_TIMEOUT {
+            let current_ping = Local::now();
+            let time_since = Instant::now().duration_since(act.hb);
+            println!("Ping from {:?}ms ", time_since );
+            if time_since > CLIENT_TIMEOUT {
                 println!("Websocket Client heartbeat failed, disconnecting!");
                 ctx.stop();
                 return;
             }
-            ctx.ping("".as_ref());
+            //convert current_ping to &[u8]
+            let test = serde_json::to_vec(&Local::now()).expect("Can´t convert to vec");
+            ctx.ping(&test.as_slice());
         });
     }
 }
@@ -150,15 +155,14 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                 self.hb = Instant::now();
                 ctx.pong(&msg);
             }
-            ws::Message::Pong(_) => {
-                let current_ping = Local::now();
-                //Fix ping calculation
-                self.player.last_pong = current_ping;
-                //
-                self.player.ping = current_ping.signed_duration_since(self.player.last_pong).num_milliseconds();
-                if self.player.ping > 5 {
-                    println!("Ping from {:?} : {:?}ms ", self.player.user_session_id, current_ping.signed_duration_since(self.player.last_pong).num_milliseconds() );
+            ws::Message::Pong(test) => {
+                if !test.is_empty() {
+                    let pong = serde_json::from_slice::<DateTime<Local>>(&test).expect("Can´t convert to vec");
+                    println!("Ping2 from {:?} : {:?}ms ", self.player.user_session_id, Local::now().signed_duration_since(pong).num_milliseconds() );
+                    println!("Ping3 from {:?} : {:?}ms ", self.player.user_session_id, Local::now().signed_duration_since(pong).num_milliseconds()/2 );
+
                 }
+             
                 self.hb = Instant::now();
             }
             ws::Message::Text(text) => {
