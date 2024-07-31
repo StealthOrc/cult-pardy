@@ -194,6 +194,7 @@ impl Handler<SessionMessageType> for WsSession {
             SessionMessageType::Get(get) => {
                 match get {
                     game::GetSessionMessageType::GetPing => { 
+                        println!("GetPing {:?}", self.player.ping);
                         MessageResult(SessionMessageResult::U64(self.player.ping as u64))
                     }
                 }

@@ -1178,7 +1178,7 @@ impl Handler<GetWebsocketsPings> for GameServer {
                                 Ok(SessionMessageResult::U64(v)) => v,
                                 Err(_) => 0,
                             };
-
+                            println!("Ping intern: {}", ping);
                             let mut result_lock = result_arc.lock().unwrap();
                             *result_lock += ping;
                             fut::ready(())
