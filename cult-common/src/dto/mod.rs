@@ -98,4 +98,5 @@ pub struct DtoQuestion {
     pub value: i32,
     pub answer: Option<String>,
     pub won_user_id: Option<UserSessionId>,
+    pub vector2d: Vector2D,
 }

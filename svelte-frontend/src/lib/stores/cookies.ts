@@ -3,6 +3,7 @@ import Cookies from "js-cookie";
 import type { UserSessionId} from 'cult-common';
 import { writable, type Writable } from 'svelte/store';
 import { dev } from "$app/environment";
+import { SessionData } from '../api/ApiRequests';
 
 
 // fuction that returns the cookies and a type that represents the cookies
@@ -29,6 +30,26 @@ export function getCookies(): cookies {
     cookies.userSessionId.id =  Cookies.get("user-session-id") || "";
     cookies.sessionToken = Cookies.get("session-token") || "";
     return cookies;
+}
+
+export function updateCookies(sessionData: SessionData | null) {
+    if (sessionData == null) {
+        return;
+    }
+    if (cookies.userSessionId.id != sessionData.user_session_id.id) {
+        Cookies.set("user-session-id", sessionData.user_session_id.id);
+        cookieStore.update(value => {
+            value.userSessionId.id = sessionData.user_session_id.id;
+            return value;
+        });
+    }
+    if (cookies.sessionToken != sessionData.session_token.token) {
+        Cookies.set("session-token", sessionData.session_token.token);
+        cookieStore.update(value => {
+            value.sessionToken = sessionData.session_token.token;
+            return value;
+        });
+    }
 }
 
 

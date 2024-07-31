@@ -79,14 +79,14 @@ impl JeopardyBoard {
                     .questions
                     .iter()
                     .enumerate()
-                    .map(|(col_index, question)| match self.current {
-                        None => question.clone().dto(false),
-                        Some(vec) => {
-                            let current = Vector2D {
-                                x: row_index,
-                                y: col_index,
-                            };
-                            question.clone().dto(vec.eq(&current))
+                    .map(|(col_index, question)| {
+                        let current: Vector2D = Vector2D {
+                            x: row_index,
+                            y: col_index,
+                        };
+                        match self.current {
+                        None => question.clone().dto(false, current),
+                        Some(vec) =>  question.clone().dto(vec.eq(&current), current)
                         }
                     })
                     .collect::<Vec<DtoQuestion>>();
@@ -114,11 +114,9 @@ impl JeopardyBoard {
         None
     }
 
-    pub fn get_mut_question(&mut self, vector2d: Vector2D) -> Option<Question> {
+    pub fn get_mut_question(&mut self, vector2d: Vector2D) ->  Option<&mut Question> {
         if let Some(categories) = self.categories.get_mut(vector2d.x) {
-            if let Some(question) = categories.questions.get_mut(vector2d.y) {
-                return Some(question.clone());
-            }
+            return categories.questions.get_mut(vector2d.y)
         }
         None
     }
@@ -132,11 +130,9 @@ impl JeopardyBoard {
         None
     }
 
-    pub fn get_mut_current(&mut self) -> Option<Question> {
+    pub fn get_mut_current(&mut self) -> Option<&mut Question> {
         if let Some(current) = self.current {
-            if let Some(question) = self.get_mut_question(current) {
-                return Some(question.clone());
-            }
+         return self.get_mut_question(current);
         }
         None
     }
@@ -178,13 +174,13 @@ impl Category {
         Category { title, questions }
     }
 
-    pub fn dto(self) -> DtoCategory {
+    pub fn dto(self, x: usize) -> DtoCategory {
         DtoCategory {
             title: self.title,
             questions: self
                 .questions
-                .into_iter()
-                .map(|question| question.dto(false))
+                .iter().enumerate()
+                .map(|(index, question)| question.clone().dto(false, Vector2D{x,y : index}))
                 .collect(),
         }
     }
@@ -204,7 +200,7 @@ pub struct Question {
 }
 impl Question {
 
-    pub fn dto(self, current: bool) -> DtoQuestion {
+    pub fn dto(self, current: bool, vector2d: Vector2D) -> DtoQuestion {
         let question_text = match current {
             true => Some(self.question),
             false => None,
@@ -219,6 +215,7 @@ impl Question {
             question_text,
             answer,
             won_user_id: self.won_user_id,
+            vector2d,
         }
     }
 }

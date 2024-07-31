@@ -1,5 +1,5 @@
 import type { DTOSession, UserSessionId } from "cult-common";
-import { writable, type Subscriber, type Unsubscriber, type Updater, type Writable } from "svelte/store";
+import { writable, type Subscriber, type Unsubscriber} from "svelte/store";
 
 export function createCurrentSessionsStore() {
 
@@ -17,7 +17,7 @@ export function createCurrentSessionsStore() {
 
     function removeSessionById(sessionId: UserSessionId) {
         currentSessions.update((curr) => {
-            let found: DTOSession | undefined = curr.find((s) => s.user_session_id.id === sessionId.id);
+            const found: DTOSession | undefined = curr.find((s) => s.user_session_id.id === sessionId.id);
             if (found == undefined) return curr.sort(doSort);
             curr.splice(curr.indexOf(found), 1);
             return curr.sort(doSort);
@@ -28,7 +28,7 @@ export function createCurrentSessionsStore() {
         currentSessions.set(sessions.sort(doSort));
     }
 
-    function subscribe(this: void, run: Subscriber<DTOSession[]>, invalidate?: () => void): Unsubscriber {
+    function subscribe(this: void, run: Subscriber<DTOSession[]>): Unsubscriber {
         return currentSessions.subscribe(run);
     }
 

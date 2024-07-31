@@ -9,25 +9,21 @@
 	import { type DiscordUser } from "cult-common";
 	import PlayerIcon from "./PlayerIcon.svelte";
 	import { discord_session, session_data } from "$lib/api/ApiRequests";
-	import LoadingPage from "./LoadingPage.svelte";
+	import LoadingPage from "./DevLoading.svelte";
     let lobbyid = '';
 
     let cookies : cookies; 
-    let is_dev_loaded = false;
+    cookieStore.subscribe(value => {
+            cookies = value;
+        });
+
+
+  
     let discord_user: DiscordUser | null = null;
     let loaded = false;
 
     onMount(async () => {
-        dev_loaded.subscribe(value => {
-            is_dev_loaded = value;
-        })
-        cookieStore.subscribe(value => {
-            cookies = value;
-        });
 
-        while(!is_dev_loaded) {
-            await new Promise(r => setTimeout(r, 100));
-        }
         let session_res= await discord_session();
         if (session_res) {
             discord_user = session_res;
@@ -38,8 +34,7 @@
 
 </script>
 <div class=" h-dvh w-dvw flex flex-col items-center justify-center gap-2">
-    {#key is_dev_loaded}
-        {#if is_dev_loaded && loaded}
+        {#if loaded}
         <input bind:value={lobbyid} class="border-2 border-blue-600 placeholder-blue-600 p-2 rounded m-2" type="text" name="lobby-id" id="lobby-id" placeholder="Lobby ID"/>
         <button on:click={() => window.location.href = `${base}/game/${lobbyid}`} class="bg-blue-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:ring-2 transition-all duration-200">Join Game</button>
         <button on:click={() => window.location.href = `${base}/game/main`} class="bg-blue-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:ring-2 transition-all duration-200">Join /main/ Game</button>
@@ -53,5 +48,4 @@
         {:else}
             <LoadingPage/>
         {/if}
-    {/key}
 </div>

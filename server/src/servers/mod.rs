@@ -40,7 +40,7 @@ impl Services {
         let mongo_server = MongoServer::new();
 
         let login_client = LoginDiscordAuth::init();
-        let auth_server = AuthenticationServer::new().start();
+        let auth_server = AuthenticationServer::new(mongo_server.clone()).start();
         let discord_auth = GrantDiscordAuth::init();
 
         let services = StartingServices {

@@ -4,6 +4,7 @@
 
 
 
+use core::fmt;
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 use actix::{Actor, ActorFutureExt, Addr, AsyncContext, Context, ContextFutureSpawner, fut, Handler, MailboxError, Message, MessageResult, Recipient, WrapFuture};
@@ -167,6 +168,7 @@ impl DiscordAccountStatus {
 pub struct AddLobbySessionScore {
     pub user_data: UserData,
     pub grant_score_user_session_id: UserSessionId,
+    pub vector2d: Vector2D,
 }
 
 
@@ -546,16 +548,32 @@ impl GameServer {
         }
     }
 
-    fn send_current_sessions(&mut self, user_session_id: UserSessionId,lobby_id: LobbyId,ctx: &mut Context<Self>){
+    fn send_current_sessions_to_session(&mut self, user_session_id: UserSessionId,lobby_id: LobbyId,ctx: &mut Context<Self>){
         let fut = self.starting_services.authentication_server.send(GetAdminAccess{})
             .into_actor(self)
-            .then(move |admins:Result<Vec<DiscordID>, MailboxError>, game_server, ctx| {
+            .then(move |admins:Result<Vec<DiscordID>, MailboxError>, game_server, _| {
                 let admins = admins.unwrap_or(Vec::new());
-                game_server.send_lobby_session_message(&lobby_id, &user_session_id, WebsocketServerEvents::Session(SessionEvent::CurrentSessions(Vec::from_iter(game_server.get_dto_sessions(&lobby_id, admins)))));
+                let msg = WebsocketServerEvents::Session(SessionEvent::CurrentSessions(Vec::from_iter(game_server.get_dto_sessions(&lobby_id, admins))));
+                game_server.send_lobby_session_message(&lobby_id, &user_session_id, msg);
                 fut::ready(())
             });
         ctx.wait(fut);
     }
+
+    fn send_current_sessions(&mut self,lobby_id: LobbyId,ctx: &mut Context<Self>){
+        let fut = self.starting_services.authentication_server.send(GetAdminAccess{})
+            .into_actor(self)
+            .then(move |admins:Result<Vec<DiscordID>, MailboxError>, game_server, _| {
+                let admins = admins.unwrap_or(Vec::new());
+                let msg = WebsocketServerEvents::Session(SessionEvent::CurrentSessions(Vec::from_iter(game_server.get_dto_sessions(&lobby_id, admins))));
+                game_server.send_lobby_message(&lobby_id, msg);
+                fut::ready(())
+            });
+        ctx.wait(fut);
+    }
+
+    
+
 
     fn get_discord_id(&self, user_session_id: &UserSessionId) -> Option<DiscordID>{
         let user_session = match self.starting_services.mongo_server.find_user_session(&user_session_id) {
@@ -627,8 +645,8 @@ impl GameServer {
     ///
     fn send_lobby_message(&self, lobby_id: &LobbyId, message: WebsocketServerEvents) {
         if let Some(lobby) = self.lobbies.get(lobby_id) {
-            for web_socket_session in lobby.websocket_connections.values() {
-                web_socket_session.addr.do_send(SessionMessageType::Data(message.clone()));
+            for websocket_session in lobby.websocket_connections.values() {
+                Self::send_message(&websocket_session.addr, message.clone());
             }
         }
     }
@@ -639,11 +657,11 @@ impl GameServer {
     
     fn send_websocket_session_message(&self, lobby_id: &LobbyId, websocket_session_id: &WebsocketSessionId,message: WebsocketServerEvents) {
         if let Some(lobby) = self.lobbies.get(lobby_id) {
-            for web_socket_session in  lobby.websocket_connections.get(&websocket_session_id) {
-                    web_socket_session.addr.do_send(SessionMessageType::Data(message));
-                    return;
+            if let Some(websocket_session) = lobby.websocket_connections.get(websocket_session_id) {
+                websocket_session.addr.do_send(SessionMessageType::Data(message));
             }
         }
+
     }
 
     fn send_lobby_session_message(&self, lobby_id: &LobbyId, user_session_id: &UserSessionId, message: WebsocketServerEvents) {
@@ -730,7 +748,7 @@ impl Handler<WebsocketConnect> for GameServer {
 
         self.send_lobby_message(&lobby_id, WebsocketServerEvents::Websocket(WebsocketEvent::WebsocketJoined(websocket_session_id.clone())));
         self.send_websocket_session_message(&lobby_id, &websocket_session_id, WebsocketServerEvents::Board(BoardEvent::CurrentBoard(board.dto(creator))));
-        self.send_current_sessions(msg.user_session_id, lobby_id, ctx);
+        self.send_current_sessions_to_session(msg.user_session_id, lobby_id, ctx);
         Some(websocket_session_id)
     }
 }
@@ -985,7 +1003,7 @@ impl Handler<LobbyClick> for GameServer {
                     let event = WebsocketServerEvents::Board(
                         BoardEvent::CurrentQuestion(
                             msg.vector_2d,
-                            question.clone().dto(true),
+                            question.clone().dto(true, msg.vector_2d),
                         ),
                     );
                     msg2.send_lobby_message(&msg.user_data.lobby_id, event);
@@ -1052,9 +1070,13 @@ impl Handler<AddLobbySessionScore> for GameServer {
                 };
                 if &lobby.creator.eq(&msg.user_data.user_session_id) | &is_admin {
                     let current_question = lobby.jeopardy_board.get_mut_current();
-                    if let Some(question) = current_question {
+                    if let Some(current_question) = current_question {
                         if let Some(score) = lobby.user_score.get(&msg.grant_score_user_session_id){
-                            let _ =  &lobby.user_score.insert(msg.grant_score_user_session_id, score + question.value);
+                            let session_id = msg.grant_score_user_session_id.clone();
+                            let _ =  &lobby.user_score.insert(session_id.clone(), score + current_question.value);
+                            if let Some(question) = lobby.jeopardy_board.get_mut_question(msg.vector2d){
+                                question.won_user_id = Some(session_id);                                
+                            }
                         }
                     }
                     lobby.jeopardy_board.current = None;
@@ -1064,7 +1086,7 @@ impl Handler<AddLobbySessionScore> for GameServer {
 
                     let event = WebsocketServerEvents::Board(BoardEvent::CurrentBoard(board.dto(lobby.creator.clone())));
                     let _ = &game_server.send_lobby_message(&msg.user_data.lobby_id, event);
-                    game_server.send_current_sessions(msg.user_data.user_session_id,lobby_id, ctx);
+                    game_server.send_current_sessions(lobby_id, ctx);
                 }
                 fut::ready(())
             });

@@ -1,4 +1,5 @@
 use std::time::{Duration, Instant};
+use std::vec;
 
 use actix::prelude::*;
 
@@ -122,7 +123,6 @@ impl Handler<game::SessionMessageType> for WsSession {
             SessionMessageType::SelfDisconnect => ctx.stop(),
             SessionMessageType::Data(data) => {
                 let binary = serde_json::to_vec(&data).expect("Can´t convert to vec");
-
                 ctx.binary(binary);
                 //TODO: make deflate alogithm de-/activatable again for development
                 //if let Ok(bytes) = compress(&binary) {
@@ -152,8 +152,13 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
             }
             ws::Message::Pong(_) => {
                 let current_ping = Local::now();
+                //Fix ping calculation
                 self.player.last_pong = current_ping;
-                self.player.ping = (current_ping.signed_duration_since(self.player.last_pong).num_milliseconds() - TimeDelta::seconds(5).num_milliseconds())/5;
+                //
+                self.player.ping = current_ping.signed_duration_since(self.player.last_pong).num_milliseconds();
+                if self.player.ping > 5 {
+                    println!("Ping from {:?} : {:?}ms ", self.player.user_session_id, current_ping.signed_duration_since(self.player.last_pong).num_milliseconds() );
+                }
                 self.hb = Instant::now();
             }
             ws::Message::Text(text) => {
@@ -185,10 +190,11 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                                         user_data: self.player.clone(),
                                     });
                                 }
-                                WebsocketSessionEvent::AddUserSessionScore(grant_score_user_session_id) => {
+                                WebsocketSessionEvent::AddUserSessionScore(grant_score_user_session_id,  vector2d) => {
                                     self.handler.do_send(game::AddLobbySessionScore{
                                         user_data: self.player.clone(),
                                         grant_score_user_session_id,
+                                        vector2d
                                     });
                                 }
                             }

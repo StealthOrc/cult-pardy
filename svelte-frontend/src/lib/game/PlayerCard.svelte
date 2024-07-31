@@ -1,8 +1,10 @@
 <script lang="ts" type="module">
-    import { onMount } from 'svelte';
-    import init, { type DiscordUser, type DTOSession} from 'cult-common';
-    import * as wasm from 'cult-common';
-    export let session :DTOSession
+	import type { DTOSession, Vector2D, WebsocketSessionEvent } from "cult-common";
+	import type { WebSocketSubject } from "rxjs/webSocket";
+
+    export let session : DTOSession
+    export let current: Vector2D | null;
+    export let ws : WebSocketSubject<any> | null;
     let default_avatar : string= "https://cdn-icons-png.flaticon.com/512/149/149071.png"
 
 
@@ -24,12 +26,24 @@
         return DTOSession.discord_user.username
     }
 
+    function addStore() {
+        if (ws == null || session == null || current == null) {
+            return;
+        }
+        let store: WebsocketSessionEvent = {AddUserSessionScore : [session.user_session_id, current]};
+        ws.next(store);
+    }
+
+
+
 </script>
 
 <div class="player-card">
-    <img src="{getAvatar()}" alt="Avatar" class="player-avatar">
-    <h1 class="player-username">{getUserName(session)}</h1> 
-    <h3 class="player-score">{session.score}</h3>
+    {#key session.score}
+        <img src="{getAvatar()}" on:click={addStore} alt="Avatar" class="player-avatar">
+        <h1 class="player-username">{getUserName(session)}</h1> 
+        <h3 class="player-score">{session.score}</h3>
+    {/key}
 </div>
 
 

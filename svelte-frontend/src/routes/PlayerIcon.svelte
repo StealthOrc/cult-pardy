@@ -9,26 +9,17 @@
 	import wasm from 'vite-plugin-wasm';
 
     export let discord_user: DiscordUser | null;
-
-
     let cookies : cookies;
-
-
+    cookieStore.subscribe(value => {
+            cookies = value;
+    });
     let isAdmin : ApiResponse | null
     let loaded = false;
     console.log(discord_user)
 
     onMount( async () => {
-        dev_loaded.subscribe(value => {
-            loaded = value;
-        })
-        cookieStore.subscribe(value => {
-            cookies = value;
-        });
-        while(!loaded) {
-            await new Promise(r => setTimeout(r, 500));
-        }
         isAdmin = await authorization();
+        loaded = true;
     })
 
 

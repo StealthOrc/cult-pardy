@@ -9,8 +9,11 @@ use rand::{random};
 use serde::{Deserialize, Serialize};
 use cult_common::wasm_lib::ids::discord::DiscordID;
 
+use super::db::MongoServer;
+use super::StartingServices;
+
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Hash, Clone)]
-struct Admin{
+pub struct Admin{
     discord_id:DiscordID,
 }
 
@@ -71,7 +74,7 @@ impl actix::Message for RedeemAdminAccessToken {
 }
 
 
-pub struct CheckAdminAccess{
+pub struct CheckAdminAccess {
     pub discord_id: DiscordID,
 
 }
@@ -97,58 +100,22 @@ impl AdminAccessTokenResponse {
 
 
 
-fn get_file_reader(file_path: &str) -> BufReader<File> {
-    let path = Path::new(file_path);
-    let is_file = match path.exists() {
-        true => File::open(path),
-        false => File::create(file_path).and_then(|mut file| {
-            file.write_all(b"[]").expect("Can´t write on file");
-            file.flush().expect("Failed to flush file");
-            File::open(file_path)
-        }),
-    };
-
-    let file = is_file.expect("Failed to open file");
-    let buf_reader = BufReader::new(file);
-    buf_reader
-}
-
-
-fn read_structs_from_file(file_path: &str) -> Result<Vec<Admin>, ()> {
-    let reader = get_file_reader(file_path);
-    let struct_list: Vec<Admin> = serde_json::from_reader(reader).unwrap_or_else(|error| {
-        eprintln!("Error deserializing JSON: {}", error);
-        Vec::new()
-    });
-    Ok(struct_list)
-}
-
-fn append_structs_to_file(file_path: &str, structs_to_append: Admin) -> Result<(), ()> {
-    let mut reader = get_file_reader(file_path);
-    let mut struct_list: Vec<Admin> = serde_json::from_reader(&mut reader).unwrap_or_else(|_| Vec::new());
-    struct_list.push(structs_to_append);
-    let file = File::create(file_path).expect("Somethings wrong");
-    let writer = BufWriter::new(file);
-    serde_json::to_writer_pretty(writer, &struct_list).expect("Somethings wrong");
-    Ok(())
-}
 
 
 #[derive(Debug, Clone)]
 pub struct AuthenticationServer {
     admin_token: HashSet<AdminAccessTokenResponse>,
     ////Maybe only IDs? DISCORD_ID
+    // Mongodb
+    mongo_server: MongoServer,
     admin: HashSet<Admin>
 }
 
 
 
 impl AuthenticationServer {
-    pub fn new() -> Self {
-        let admins = match read_structs_from_file("Admin.json") {
-            Ok(admins) => HashSet::from_iter(admins),
-            Err(_) => HashSet::new(),
-        };
+    pub fn new(mongo_server:MongoServer ) -> Self {
+        let admins = mongo_server.get_admins();
         let mut token = HashSet::new();
         token.insert(AdminAccessTokenResponse {
             token: 123,
@@ -156,6 +123,7 @@ impl AuthenticationServer {
         });
         AuthenticationServer{
             admin_token: token,
+            mongo_server: mongo_server,
             admin: admins,
         }
     }
@@ -164,7 +132,7 @@ impl AuthenticationServer {
         if self.admin.contains(&admin) {
             return true
         } else {
-            append_structs_to_file(&"Admin.json", admin.clone()).expect("Somethings wrong");
+            self.mongo_server.add_admin(admin.clone());
             self.admin.insert(admin)
         }
 

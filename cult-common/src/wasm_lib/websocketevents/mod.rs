@@ -62,7 +62,7 @@ pub enum SessionEvent {
 pub enum WebsocketSessionEvent {
     Click(Vector2D),
     Back,
-    AddUserSessionScore(UserSessionId)
+    AddUserSessionScore(UserSessionId, Vector2D),
 }
 
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, Display)]

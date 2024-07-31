@@ -21,9 +21,30 @@
         currentSessions = value;
     })
 
-    const socket = webSocket({
+    const ws = webSocket({
         url: `ws://localhost:8000/ws?lobby-id=${lobbyId}&user-session-id=${cookies.userSessionId.id}&session-token=${cookies.sessionToken}`,
-        deserializer: (e) => e.data.text(),
+        //use binaryType: 'arraybuffer' if you are sending binary data
+        binaryType: 'arraybuffer',
+        deserializer: (e) => e.data,
+        serializer: (value : any) => {
+            if (value instanceof ArrayBuffer) {
+                return value;
+            }
+            if (value instanceof Uint8Array) {
+                    let buffer = new ArrayBuffer(value.length);
+                    let view = new Uint8Array(buffer);
+                    view.set(value);
+                    return buffer;
+            } 
+            let json = JSON.stringify(value);
+            let encoder = new TextEncoder();
+            let binaryData = encoder.encode(json)
+            let buffer = new ArrayBuffer(binaryData.length);
+            let view = new Uint8Array(buffer);
+            view.set(binaryData);
+            return buffer;
+            
+        }
     })
 
     function updateGridColumns() {
@@ -36,17 +57,20 @@
     }
 
     onMount(() => {
-        socket.subscribe({
+        ws.subscribe({
             next: (message) => {
-                message.then((data: string) => {
-                    const parsed : WebsocketServerEvents = JSON.parse(data);
+                if (message instanceof ArrayBuffer) {
+                    const decoder = new TextDecoder();
+                    let json : string = decoder.decode(message);
+                    const parsed : WebsocketServerEvents = JSON.parse(json);
                     const updated = handleEvent(parsed);
                     if (updated) {
                         updateGridColumns();
                     }
-                });
+                };
             },
             error: (error) => {
+                
                 console.log(error);
                 //console.error('WebSocket error:', error);
             }
@@ -80,7 +104,13 @@
             gameData = data;
             updateGridColumns();
             return true;
-        }).otherwise(() => {
+        })
+        .with({ CurrentQuestion: P.select() }, (data) => {
+            gameData.current = data[0];
+            updateGridColumns();
+            return true;
+        })    
+        .otherwise(() => {
             console.log("Event not found: ",boardEvent)
         });
         return true;
@@ -126,18 +156,16 @@
         return true;
     }
 </script>
-
-<div class="jeopardy-container">
-    <div class="jeopardy-board">
-        {#if gameData != null && gameData.categories != null}
-            {#each gameData.categories as category}
-                <JeopardyCategory {category} />
-            {/each}
-        {/if}
+{#if gameData != null && gameData.categories != null}
+    <div class="jeopardy-container">
+        <div class="jeopardy-board">
+                {#each gameData.categories as category}
+                    <JeopardyCategory {category} {ws} currentQuestion={gameData.current} />
+                {/each}
+        </div>
     </div>
-</div>
-<Players {currentSessions} />
-
+    <Players {currentSessions} {ws} current={gameData.current}/>
+{/if}
 <style>
     .jeopardy-container {
         display: flex;
