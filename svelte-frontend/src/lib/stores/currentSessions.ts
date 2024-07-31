@@ -61,14 +61,17 @@ export function createCurrentSessionsStore() {
     }
 
     function setSessions(sessions: DTOSession[]) {
-       const newSessions: Session[] = sessions.map((s) => {
-            return {
-                user_session_id: s.user_session_id,
-                dto_Session: s,
-                ping: 0
-            }
+        currentSessions.update((curr) => {
+            const newSessions: Session[] = sessions.map((s) => {
+                const found: Session | undefined = curr.find((c) => c.user_session_id.id === s.user_session_id.id);
+                return {
+                    user_session_id: s.user_session_id,
+                    dto_Session: s,
+                    ping: found != undefined ? found.ping : 0
+                }
+            });
+            return newSessions.sort(doSort);
         });
-        currentSessions.set(newSessions.sort(doSort));
     }
 
     function subscribe(this: void, run: Subscriber<Session[]>): Unsubscriber {
