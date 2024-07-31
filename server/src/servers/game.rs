@@ -1183,13 +1183,16 @@ impl Handler<GetWebsocketsPings> for GameServer {
         for session in connected_sessions {
             let mut pings: i64 = 0;
             let ws = lobby.get_session_websockets(&session);
-            let size = ws.len();
+            let mut size:  i64 = 0;
             for websocket_session in ws {
                 let ping = match lobby.websocket_connections.get(&websocket_session){
                     None => 0 as i64,
-                    Some(websocket) => websocket.ping,
+                    Some(websocket) => websocket.ping
                 };
-                pings += ping;
+                if ping > 0 {
+                    size += 1;
+                    pings += ping;
+                }
             }
             session_ping.push(WebsocketPing{
                 user_session_id: session,
