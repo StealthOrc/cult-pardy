@@ -165,11 +165,8 @@
         .exhaustive();
         return true;
     }
-
-
-
-
 </script>
+
 {#if gameData != null && gameData.categories != null}
     <div class="jeopardy-container">
         <div class="jeopardy-board">
@@ -180,6 +177,7 @@
     </div>
     <Players {currentSessions} {ws} current={gameData.current}/>
 {/if}
+
 <style>
     .jeopardy-container {
         display: flex;

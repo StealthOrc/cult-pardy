@@ -8,7 +8,7 @@
     export let ws : WebSocketSubject<any> | null;
     let default_avatar : string= "https://cdn-icons-png.flaticon.com/512/149/149071.png"
 
-
+    let ping = 0;
 
     function getAvatar() {
         if (session.dto_Session.discord_user === null) {
@@ -40,53 +40,18 @@
 
 </script>
 
-<div class="player-card">
+<div class={`player-card hover:border-blue-500 border border-white border-2 flex items-center border-rounded rounded radius-10 p-2 m-2 gap-2 w-full max-w-48 overflow-hidden box-border bg-white shadow hover:shadow-lg hover:-translate-y-2 duration-200 relative ${$$props.class || ''}`} on:click={addStore}>
     {#key session.dto_Session.score}
-        <img src="{getAvatar()}" on:click={addStore} alt="Avatar" class="player-avatar">
-        <h1 class="player-username">{getUserName(session.dto_Session)}</h1> 
-        <h3 class="player-score">{session.dto_Session.score}</h3>
-        <h2 class="ping">{session.ping}</h2>
+        <img src="{getAvatar()}" alt="Avatar" class="h-14 w-14 rounded-full">
+        <div class="flex flex-col w-full overflow-hidden">
+            <p class="text-base font-bold overflow-hidden text-ellipsis">{getUserName(session.dto_Session)}</p> 
+            <p class="m-0 text-lg text-gray-500">{session.dto_Session.score}</p>
+        </div>
+        <p class="absolute bottom-0 right-0 mx-1 font-bold {session.ping <= 50 ? 'text-green-600' : session.ping <= 100 ? 'text-yellow-600' : 'text-red-600'}">{#if session.ping > 999} :c {:else if session.ping < 1}Pinging...{:else}{session.ping}ms{/if}</p>
+
+
     {/key}
 </div>
 
-
-
 <style>
-    .player-card {
-        background-color: #f1f1f1;
-        border: 1px solid #ddd;
-        border-radius: 5px;
-        padding: 10px;
-        margin: 10px;
-        box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        width: 100%;
-        max-width: 200px; /* Adjust based on your design */
-        box-sizing: border-box; /* Include padding and border in the width */
-        overflow: hidden; /* Prevent overflow */
-    }
-
-    .player-avatar {
-        width: 50px;
-        height: 50px;
-        border-radius: 50%;
-        flex-shrink: 0; /* Prevent avatar from shrinking */
-    }
-
-    .player-username {
-        margin: 0;
-        font-size: 18px;
-        font-weight: bold;
-        white-space: nowrap; /* Prevent text wrapping */
-        overflow: hidden;
-        text-overflow: ellipsis; /* Truncate text with ellipsis */
-    }
-
-    .player-score {
-        margin: 0;
-        font-size: 18px;
-        color: #666;
-    }
 </style>
