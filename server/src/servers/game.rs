@@ -1194,10 +1194,12 @@ impl Handler<GetWebsocketsPings> for GameServer {
                     pings += ping;
                 }
             }
-            session_ping.push(WebsocketPing{
-                user_session_id: session,
-                ping: pings / size as i64,
-            });
+            if size > 0 {
+                session_ping.push(WebsocketPing{
+                    user_session_id: session,
+                    ping: pings / size
+                });
+            }
         }
         MessageResult(session_ping)
 
