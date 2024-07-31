@@ -1,9 +1,9 @@
-<script lang="ts">
+  sessiondata = await session_data();<script lang="ts">
     import Cookies from "js-cookie";
 	import { onMount } from "svelte";
     import { cookieStore, dev_loaded,updateCookies,type cookies } from "$lib/stores/cookies";
     import {dev} from "$app/environment";
-	import { session_data } from "$lib/api/ApiRequests";
+	import { session_data, SessionData } from "$lib/api/ApiRequests";
 
     let is_dev_loaded = false
     dev_loaded.subscribe(value => {
@@ -14,11 +14,20 @@
             cookies = value;
     });
     console.log("LOADING!!!")
+    let is_loading = false;
     let loaded = false;
 
     onMount(async () => {
         if (dev) {
-            let sessiondata = await session_data();
+            if (is_loading) {
+                return;
+            }
+            let sessiondata : SessionData | null = await session_data();
+            while (sessiondata === null) {
+                sessiondata = await session_data();
+                await new Promise(r => setTimeout(r, 10000));
+            }
+            is_loading = true;
             updateCookies(sessiondata);
             dev_loaded.set(true);
         }

@@ -55,6 +55,7 @@ pub enum WebsocketEvent {
 pub enum SessionEvent {
     CurrentSessions(Vec<DTOSession>),
     SessionJoined(DTOSession),
+    SessionsPing(Vec<WebsocketPing>),
     SessionDisconnected(UserSessionId),
 }
 
@@ -63,6 +64,7 @@ pub enum WebsocketSessionEvent {
     Click(Vector2D),
     Back,
     AddUserSessionScore(UserSessionId, Vector2D),
+    
 }
 
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, Display)]
@@ -73,4 +75,11 @@ pub enum WebsocketError {
     NotAuthorized,
     WebsocketCrashed,
     UNKNOWN(String),
+}
+
+
+#[derive(Serialize, Clone,Deserialize, Debug, Hash)]
+pub struct WebsocketPing {
+    pub user_session_id: UserSessionId,
+    pub ping : u64,
 }

@@ -8,6 +8,7 @@ use wasm_bindgen::prelude::*;
 
 pub mod ids;
 pub mod websocketevents;
+mod WebsocketEvents;
 
 
 
