@@ -1178,9 +1178,10 @@ impl Handler<GetWebsocketsPings> for GameServer {
                                 Ok(SessionMessageResult::U64(v)) => v,
                                 Err(_) => 0,
                             };
-                            println!("Ping intern: {}", ping);
                             let mut result_lock = result_arc.lock().unwrap();
                             *result_lock += ping;
+
+                            println!("Ping intern: {}", result_lock);
                             fut::ready(())
                         });
 
@@ -1197,6 +1198,7 @@ impl Handler<GetWebsocketsPings> for GameServer {
                 *result_lock
             };
 
+            println!("Ping intern2: {:?} {:?}", total_pings, result_arc);
             pings.push(WebsocketPing {
                 user_session_id,
                 ping: total_pings,
