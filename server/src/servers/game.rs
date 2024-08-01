@@ -1046,7 +1046,7 @@ impl Handler<GetUserSession> for GameServer {
             None => return MessageResult(self.new_session()),
             Some(data) => data,
         };
-
+        
         if user_session.clone().session_token.token.eq(&token.token) {
                 return MessageResult(user_session.clone())
         }

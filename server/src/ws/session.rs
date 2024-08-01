@@ -127,6 +127,7 @@ impl WsSession {
     fn ping(&mut self, ctx: &mut ws::WebsocketContext<Self>) {
         let time = Local::now();
         self.player.last_ping = time;
+        println!("Send ping {:?}", time.timestamp_millis());
         let test = serde_json::to_vec(&time).expect("Can´t convert to vec");
         ctx.ping(&test.as_slice());
     
@@ -236,7 +237,10 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
             ws::Message::Pong(bytes) => {
                 if !bytes.is_empty() {
                     if let Ok(pong) = serde_json::from_slice::<DateTime<Local>>(&bytes) {
-                        let ping = Local::now().signed_duration_since(pong).num_milliseconds();
+                        let time = Local::now();
+
+                        println!("rec + cur + ping {:?} {:?} {:?}",pong.timestamp_millis(), time.timestamp_millis(), time.signed_duration_since(pong).num_milliseconds());
+                        let ping = time.signed_duration_since(pong).num_milliseconds();
                         self.player.ping = ping;
                         self.set_ping(ctx);
                     }
