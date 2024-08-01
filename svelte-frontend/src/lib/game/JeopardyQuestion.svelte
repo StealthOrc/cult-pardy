@@ -29,10 +29,7 @@
         }
     }
     function req_open_question() {
-        if (open_request) {
-            return;
-        }
-        if (ws == null) {
+        if (open_request || ws == null ) {
             return;
         }
         let click : WebsocketSessionEvent = {Click : question.vector2d};

@@ -46,6 +46,8 @@
         }
     }
 
+ 
+
 
 
 </script>
@@ -59,17 +61,20 @@
             <p class="text-base font-bold overflow-hidden text-ellipsis">{getUserName(session.dto_Session)}</p> 
             <p class="m-0 text-lg text-gray-500">{session.dto_Session.score}</p>
         </div>
-        <p class="absolute bottom-0 right-0 mx-1 font-bold {get_ping_class()}">
-            {#if session.ping > 999}
-                :c 
+        <div class="absolute bottom-0 right-0 mx-1 font-bold {get_ping_class()}">
+            <div class="flex">
+            {#if session.ping > 999} 
+                :c
             {:else if session.ping < 1}
-                ...
+               ...
             {:else}
                 {session.ping}ms
             {/if}
-        </p>
+            </div>  
+        </div>
     {/key}
 </div>
 
 <style>
+
 </style>

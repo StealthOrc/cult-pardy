@@ -147,6 +147,22 @@ impl JeopardyBoard {
         }
         None
     }
+
+    pub fn get_value_and_remove_current(&mut self, won_user_id: &UserSessionId) -> Option<i32> {
+        let mut value : Option<i32> = None;
+        if let Some(current) = self.current {
+            if let Some(question) = self.get_mut_question(current) {
+                question.open = true;
+                question.won_user_id = Some(won_user_id.clone());
+                value = Some(question.value);
+            }
+        }
+        self.current = None;
+        value
+    }
+
+
+
 }
 
 impl<'de> Deserialize<'de> for JeopardyBoard {
@@ -216,7 +232,7 @@ impl Question {
             true => Some(self.question),
             false => None,
         };
-        let answer = match self.open {
+        let answer: Option<String> = match self.open {
             true => Some(self.answer),
             false => None,
         };

@@ -29,7 +29,7 @@ async fn game_info(req: HttpRequest, srv: web::Data<Addr<game::GameServer>>) -> 
         Ok(data) => data,
         Err(error) => return Ok(error),
     };
-    let lobby = srv.send(game::HasLobby { lobby_id: LobbyId::of(lobby_id.clone())}).await.expect("No Lobby found!");
+    let lobby = srv.send(game::LobbyExists { lobby_id: LobbyId::of(lobby_id.clone())}).await.expect("No Lobby found!");
     let error = json!(
         {
             "Error": "Lobby not found",

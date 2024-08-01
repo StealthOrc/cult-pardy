@@ -43,7 +43,7 @@ pub async fn start_ws(req: HttpRequest, stream: web::Payload, srv: web::Data<Add
     };
 
 
-    let lobbies = srv.send(game::Lobbies).await.expect("No Lobbies found");
+    let lobbies = srv.send(game::GetLobbies).await.expect("No Lobbies found");
 
 
     let error = json!(

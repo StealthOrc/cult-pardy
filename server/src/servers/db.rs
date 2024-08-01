@@ -84,6 +84,14 @@ impl MongoServer{
         }
     }
 
+    pub fn is_admin(&self, discord_id: &DiscordID) -> bool {
+        match self.find_admin(discord_id) {
+            None => false,
+            Some(_) => true,
+        }
+    }
+
+
     pub fn add_admin(&self, admin: Admin) -> bool {
         let result = self.collection::<authentication::Admin>(CultPardy(UserCollection::Admins)).insert_one(admin, None);
         match result {

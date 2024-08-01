@@ -12,7 +12,6 @@
 <div class="jeopardy-category">
     <h2>{category.title}</h2>
     {#each category.questions as question: Question}
-        
         <JeopardyQuestion {question} {ws} {current}/>
     {/each}
 </div>

@@ -14,7 +14,7 @@ use super::StartingServices;
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Hash, Clone)]
 pub struct Admin{
-    discord_id:DiscordID,
+    pub discord_id:DiscordID,
 }
 
 
@@ -108,14 +108,12 @@ pub struct AuthenticationServer {
     ////Maybe only IDs? DISCORD_ID
     // Mongodb
     mongo_server: MongoServer,
-    admin: HashSet<Admin>
 }
 
 
 
 impl AuthenticationServer {
     pub fn new(mongo_server:MongoServer ) -> Self {
-        let admins = mongo_server.get_admins();
         let mut token = HashSet::new();
         token.insert(AdminAccessTokenResponse {
             token: 123,
@@ -124,18 +122,15 @@ impl AuthenticationServer {
         AuthenticationServer{
             admin_token: token,
             mongo_server: mongo_server,
-            admin: admins,
         }
     }
 
-    fn add_admin_access(&mut self, admin: Admin) -> bool{
-        if self.admin.contains(&admin) {
-            return true
+    fn add_admin_access(&mut self, admin: Admin) -> bool {
+        if self.mongo_server.find_admin(&admin.discord_id).is_none(){
+            self.mongo_server.add_admin(admin.clone())
         } else {
-            self.mongo_server.add_admin(admin.clone());
-            self.admin.insert(admin)
+            false
         }
-
     }
 
 
@@ -196,8 +191,7 @@ impl Handler<CheckAdminAccess> for AuthenticationServer {
     type Result = bool;
 
     fn handle(&mut self, msg: CheckAdminAccess, _ctx: &mut Self::Context) -> Self::Result {
-        let admin = Admin{ discord_id:msg.discord_id };
-        self.admin.contains(&admin)
+        return self.mongo_server.find_admin(&msg.discord_id).is_some();
     }
 }
 
@@ -213,6 +207,6 @@ impl Handler<GetAdminAccess> for AuthenticationServer {
     type Result = Vec<DiscordID>;
 
     fn handle(&mut self, _msg: GetAdminAccess, _ctx: &mut Self::Context) -> Self::Result {
-        self.admin.iter().map(|admin| admin.discord_id.clone()).collect::<Vec<DiscordID>>()
+        self.mongo_server.get_admins().iter().map(|admin| admin.discord_id.clone()).collect::<Vec<DiscordID>>()
     }
 }
