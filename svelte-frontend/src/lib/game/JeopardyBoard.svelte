@@ -112,7 +112,7 @@
             return true;
         })
         .with({ CurrentQuestion: P.select() }, (data) => {
-            gameData.current = data[0];
+            gameData.current = data;
             updateGridColumns();
             return true;
         })    
@@ -171,7 +171,7 @@
     <div class="jeopardy-container">
         <div class="jeopardy-board">
                 {#each gameData.categories as category}
-                    <JeopardyCategory {category} {ws} currentQuestion={gameData.current} />
+                    <JeopardyCategory {category} {ws} current={gameData.current} />
                 {/each}
         </div>
     </div>

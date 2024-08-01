@@ -1060,7 +1060,6 @@ impl Handler<LobbyClick> for GameServer {
                     lobby.jeopardy_board.current = Some(msg.vector_2d);
                     let event = WebsocketServerEvents::Board(
                         BoardEvent::CurrentQuestion(
-                            msg.vector_2d,
                             question.clone().dto(true, msg.vector_2d),
                         ),
                     );
@@ -1187,12 +1186,12 @@ impl Handler<GetWebsocketsPings> for GameServer {
             for websocket_session in ws {
                 let ping = match lobby.websocket_connections.get(&websocket_session){
                     None => 0 as i64,
-                    Some(websocket) => websocket.ping
+                    Some(websocket) => {
+                        size += 1;
+                        websocket.ping
+                    }
                 };
-                if ping > 0 {
-                    size += 1;
-                    pings += ping;
-                }
+                pings += ping;
             }
             if size > 0 {
                 session_ping.push(WebsocketPing{

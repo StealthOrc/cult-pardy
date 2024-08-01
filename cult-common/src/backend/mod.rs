@@ -44,12 +44,16 @@ impl JeopardyBoard {
             let mut questions: Vec<Question> = Vec::new();
             let mut value = 100;
             for question in 0..mode.field_size() {
+                let mut question_type : QuestionType = QuestionType::Question;
+                if question == 0 && category == 0 {
+                    question_type = QuestionType::Media("dQw4w9WgXcQ".to_string());
+                }
                 let question_name = format!("question_{}", question);
                 let answer_name = format!("answer{}", question);
                 let question = Question {
                     value,
                     question: question_name,
-                    question_type: QuestionType::Question,
+                    question_type,
                     answer: answer_name,
                     open: false,
                     won_user_id: None,
@@ -98,10 +102,17 @@ impl JeopardyBoard {
             })
             .collect::<Vec<DtoCategory>>();
 
+        let current = match self.current {
+            None => None,
+            Some(vec) => {
+                let question = self.get_question(vec).unwrap();
+                Some(question.dto(true, vec))
+            }
+        };
         DtoJeopardyBoard {
             creator,
             categories: cat,
-            current: self.current,
+            current,
         }
     }
 

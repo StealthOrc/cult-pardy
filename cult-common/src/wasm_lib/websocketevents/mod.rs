@@ -40,7 +40,7 @@ impl WebsocketServerEvents {
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, Display)]
 pub enum BoardEvent {
     CurrentBoard(DtoJeopardyBoard),
-    CurrentQuestion(Vector2D, DtoQuestion),
+    CurrentQuestion(DtoQuestion),
     UpdateCurrentQuestion(Option<Vector2D>),
     UpdateSessionScore(UserSessionId, i32),
 }

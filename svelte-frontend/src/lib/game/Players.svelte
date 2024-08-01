@@ -1,12 +1,12 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { type DTOSession, type Vector2D } from 'cult-common';
+    import { type DtoQuestion, type DTOSession, type Vector2D } from 'cult-common';
     import PlayerCard from './PlayerCard.svelte';
 	import type { WebSocketSubject } from 'rxjs/webSocket';
 	import type { Session } from '$lib/stores/currentSessions';
 
     export let currentSessions: Session[];
-    export let current: Vector2D | null;
+    export let current: DtoQuestion | null;
     export let ws : WebSocketSubject<any> | null;
 </script>
 

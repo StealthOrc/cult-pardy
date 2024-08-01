@@ -32,12 +32,11 @@ impl DTOSession {
 pub struct DtoJeopardyBoard {
     pub creator: UserSessionId,
     pub categories: Vec<DtoCategory>,
-    pub current: Option<Vector2D>,
+    pub current: Option<DtoQuestion>,
 }
 
 impl DtoJeopardyBoard {
 
- 
 
     pub fn get_question(self, vector2d: Vector2D) -> Option<DtoQuestion> {
         if let Some(categories) = self.categories.get(vector2d.x) {
@@ -48,7 +47,7 @@ impl DtoJeopardyBoard {
         None
     }
 
-    pub fn get_mut_question(mut self, vector2d: Vector2D) -> Option<DtoQuestion> {
+    pub fn get_mut_question(&mut self, vector2d: Vector2D) -> Option<DtoQuestion> {
         if let Some(categories) = self.categories.get_mut(vector2d.x) {
             if let Some(question) = categories.questions.get_mut(vector2d.y) {
                 return Some(question.clone());
@@ -57,18 +56,14 @@ impl DtoJeopardyBoard {
         None
     }
 
-    pub fn get_current(self) -> Option<DtoQuestion> {
-        if let Some(current) = self.current {
-            if let Some(question) = self.get_question(current) {
-                return Some(question.clone());
-            }
-        }
-        None
+    pub fn get_current(&self) -> Option<DtoQuestion> {
+        return self.current.clone();
     }
 
-    pub fn get_mut_current(self) -> Option<DtoQuestion> {
-        if let Some(current) = self.current {
-            if let Some(question) = self.get_mut_question(current) {
+    pub fn get_mut_current(&mut self) -> Option<DtoQuestion> {
+        let opt = self.current.clone();
+        if let Some(current) = opt {
+            if let Some(question) = self.get_mut_question(current.vector2d) {
                 return Some(question.clone());
             }
         }
@@ -100,3 +95,4 @@ pub struct DtoQuestion {
     pub won_user_id: Option<UserSessionId>,
     pub vector2d: Vector2D,
 }
+

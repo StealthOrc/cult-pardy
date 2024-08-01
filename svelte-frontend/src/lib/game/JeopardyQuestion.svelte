@@ -1,12 +1,18 @@
 <script lang="ts">
 	import type { DtoQuestion, Vector2D, WebsocketSessionEvent } from 'cult-common';
 	import type { WebSocketSubject } from 'rxjs/webSocket';
+	import { onMount } from 'svelte';
+	import { on } from 'svelte/events';
+	import { match, P } from 'ts-pattern';
+    import YouTubePlayerPlus from 'youtube-player-plus';
+	import type { YTPP_Options } from 'youtube-player-plus/types';
+    
 
 
     
     export let question: DtoQuestion;
     export let ws: WebSocketSubject<any> | null;
-    export let currentQuestion : Vector2D | null;
+    export let current : DtoQuestion | null;
     let open_request = false;
 
     function handleClose() {
@@ -33,22 +39,93 @@
         ws.next(click);
     }
 
-</script>
+    let player: YouTubePlayerPlus | null = null;
 
+    function is_youtuve() : boolean {
+        if (current == null) {
+            return false;
+        }
+        let result = false;
+        match(current.question_type)
+        .with({ Media: P.select() }, (data) => {
+            console.log(current);
+            result = true;
+        })
+        .otherwise(() => {
+            result = false;
+        });
+        return result;
+    }
+
+    function createYouTubePlayer() : boolean {
+        if (current == null) {
+            return false;
+        }
+        if (player != null) {
+            return true;
+        }
+        let result = false;
+        match(current.question_type)
+        .with({ Media: P.select() }, (data) => {
+            //if element #player is not found, return false
+            console.log("?", document.getElementsByClassName("player").length > 0);
+            if (document.getElementsByClassName("player").length == 0) {
+                result = false;
+                return
+            }
+
+            let options : YTPP_Options = {
+                autoplay: true,
+                controls: false,
+                keyboard: false,
+                loop: false,
+                annotations: false,
+                modestBranding: false,
+                relatedVideos: false,
+                playsInline: false,
+            }
+
+            player = new YouTubePlayerPlus('#player', options)
+            player.load(data)
+            player.setVolume(100)
+            result = true;
+        })
+        .otherwise(() => {
+            result = false;
+        });
+        return result;
+    }
+
+
+</script>
+<div class="player" id="player"></div>
 <div class="jeopardy-question">
     {#if question.won_user_id !== null}
         <button disabled>WON</button>
     {:else}
         <button on:click={req_open_question}>${question.value}</button>
     {/if}
-    {#if currentQuestion && currentQuestion.x === question.vector2d.x && currentQuestion.y === question.vector2d.y}
+    {#if current && current.vector2d.x === question.vector2d.x && current.vector2d.y === question.vector2d.y}
         <div class="overlay" role="dialog">
-            <div class="overlay-content">
-                <h1>${question.value}</h1>
-                <p>{question.question_text} ?</p>
-                <p>Vector2D X{question.vector2d.x}</p>
-                <p>Vector2D Y{question.vector2d.y}</p>
-            </div>
+            {#if is_youtuve()}
+                <div class="overlay-content">
+                    //edit hier with tailwind
+                    <p class="player container mx-auto"></p>
+                    <h1>${current.value}</h1>
+                    <p>{current.question_type}</p>
+                    {#if createYouTubePlayer()}
+                     
+                    <button on:click={() => player?.play()}>Play</button>
+                    <button on:click={() => player?.pause()}>Pause</button>
+                    <button on:click={() => player?.stop()}>Stop</button>
+                {/if}
+                </div>
+            {:else}
+                <div class="overlay-content">
+                    <h1>${current.value}</h1>
+                    <p>{current.question_text}</p>
+                </div>
+            {/if}
             <button class="close-button" on:click={handleClose}>Close</button>
         </div>
     {/if}
@@ -103,6 +180,7 @@
         align-items: center;
         z-index: 2;
     }
+
 
     .overlay-content {
         background-color: white;
