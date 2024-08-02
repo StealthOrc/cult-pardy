@@ -2,7 +2,7 @@
 //! And manages available rooms. Peers send messages to other peers in same
 //! room through `ChatServer`.
 
-//!!!!!!!!!!
+//!!!!!!!!!!!
 
 use core::fmt;
 use std::any::{self, Any};
