@@ -883,7 +883,7 @@ impl Handler<WebsocketConnect> for GameServer {
         };
         
         let new_session = lobby.is_new_session(&msg.user_session_id);
-        let websockets = lobby.get_session_websockets(&msg.user_session_id);
+        let websockets =lobby.get_session_websockets(&msg.user_session_id);
         if !new_session && websockets.len() > 1 {
             println!("2 Session {:?} has been already connected to the lobby={:?}.", msg.user_session_id.id, &msg.lobby_id.id);
             return None;
