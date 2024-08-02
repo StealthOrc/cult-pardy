@@ -890,7 +890,6 @@ impl Handler<WebsocketConnect> for GameServer {
         } 
         let websocket_session_id = lobby.add_new_websocket(&msg);
 
-
         let creator = lobby.creator.clone();
         
         let board = lobby.jeopardy_board.clone();
