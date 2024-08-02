@@ -1130,7 +1130,7 @@ impl Handler<CanJoinLobby> for GameServer {
 }
 
 impl Handler<LobbyClick> for GameServer {
-    type Result = ();
+    type Result =  ();
 
     fn handle(&mut self, msg: LobbyClick, _ctx: &mut Self::Context) -> Self::Result {
         if !self.is_editor(&msg.user_data.lobby_id, &msg.user_data.user_session_id){
