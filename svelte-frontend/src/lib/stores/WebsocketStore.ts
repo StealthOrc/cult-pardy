@@ -1,25 +1,35 @@
 
+import { dev } from "$app/environment";
 import type { UserSessionId, WebsocketSessionEvent } from "cult-common";
 import { webSocket, WebSocketSubject } from "rxjs/webSocket";
 import { writable, type Subscriber, type Unsubscriber} from "svelte/store"; 
+import type { SessionCookies } from "./cookies";
 
 
 // eslint-disable-next-line no-var
 export var WebsocketStore : ReturnType<typeof createWebsocketStore> | null = null;
 
 
-export function newWebSocketStore(lobbyId: string, userSessionId: UserSessionId, sessionToken: string): ReturnType<typeof createWebsocketStore> {
+export function newWebSocketStore(lobbyId: string, cookies:SessionCookies): ReturnType<typeof createWebsocketStore> {
     if (WebsocketStore != null) {
         return WebsocketStore;
     }
     console.log("Creating new websocket store");
-    const ws = createWebsocketStore(lobbyId, userSessionId, sessionToken);
+    const ws = createWebsocketStore(lobbyId, cookies.userSessionId, cookies.sessionToken);
     WebsocketStore = ws;
     return ws;
 }
 
 
-
+if(dev) {
+    if (import.meta.hot) {
+        import.meta.hot.accept((newModule ) => {
+            if (newModule != undefined) {
+                newModule.WebsocketStore = WebsocketStore;
+            }
+        });
+    }
+}
 
 
 
@@ -43,25 +53,23 @@ function get_ws(lobbyId: string, userSessionId: UserSessionId, sessionToken: str
 
 
 
-
 function createWebsocketStore(lobbyId: string, userSessionId: UserSessionId, sessionToken: string) {
-
     const lobby_id = lobbyId;
     const user_session_id = userSessionId;
     const session_token = sessionToken;
 
-    const ws = writable<WebSocketSubject<WebsocketSessionEvent>>(get_ws(lobby_id, user_session_id, session_token));
+    const store = writable<WebSocketSubject<WebsocketSessionEvent>>(get_ws(lobby_id, user_session_id, session_token));
 
     function new_ws() {
-        ws.set(get_ws(lobby_id, user_session_id, session_token));
+        store.set(get_ws(lobby_id, user_session_id, session_token));
     }
 
     function subscribe(this: void, run: Subscriber<WebSocketSubject<WebsocketSessionEvent>>): Unsubscriber {
-        return ws.subscribe(run);
+        return store.subscribe(run);
     }
 
     function stop() {
-        ws.update((ws) => {
+        store.update((ws) => {
             ws.complete();
             return ws;
         });
@@ -69,7 +77,7 @@ function createWebsocketStore(lobbyId: string, userSessionId: UserSessionId, ses
 
 
     return {
-        ws,
+        store,
         stop,
         new_ws,
         subscribe,

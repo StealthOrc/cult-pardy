@@ -3,25 +3,27 @@
     import JeopardyCategory from './JeopardyCategory.svelte';
     import { onMount } from 'svelte';
     import {webSocket, WebSocketSubject} from "rxjs/webSocket";
-    import { getCookies, type cookies } from "$lib/stores/cookies.js";
+    import { CookieStore, type SessionCookies} from "$lib/stores/cookies.js";
     import { match, P } from 'ts-pattern';
 	import type { BoardEvent, DtoJeopardyBoard, DTOSession, SessionEvent, WebsocketEvent, WebsocketServerEvents, WebsocketSessionEvent } from 'cult-common';
 	import Players from './Players.svelte';
 	import {CurrentSessionsStore } from '$lib/stores/SessionStore';
 	import type { Observable, Observer } from 'rxjs';
 	import { SessionPingsStore } from '$lib/stores/SessionPings';
-	import { newWebSocketStore, WebsocketStore } from '$lib/stores/WebsocketStore';
+	import { newWebSocketStore} from '$lib/stores/WebsocketStore';
 	import { JeopardyBoardStore } from '$lib/stores/JeopardyBoardStore';
 
     export let lobbyId: string = "main";	
 
-    const cookies : cookies = getCookies();
-
-    let wsStore = newWebSocketStore(lobbyId, cookies.userSessionId, cookies.sessionToken);
-    if (wsStore == null) {
-        throw new Error("Websocket store is null");
+    var cookies : SessionCookies | null = null;
+    CookieStore.subscribe(value => {
+        cookies = value;
+    })
+    if (cookies == undefined) {
+        throw new Error("Cookies are null");
     }
 
+    let wsStore = newWebSocketStore(lobbyId, cookies);
     let ws : WebSocketSubject<WebsocketSessionEvent> | null = null;
     wsStore.subscribe(value => {
         ws = value;
@@ -39,8 +41,6 @@
         currentSessions = value;
     })
     
-    
-
 
     function updateGridColumns() {
         if (gameData == null || gameData.categories == null) {
@@ -68,6 +68,8 @@
                 },
                 error: (error) => {
                     console.log(error);
+                    wsStore.stop();
+
                     //wsStore.new_ws();
                     //console.error('WebSocket error:', error);
                 }

@@ -19,7 +19,6 @@
     let ping: number = 0; 
     SessionPingsStore.get_ping_update_by_session_id(session.user_session_id,value => {
         ping = value.ping;
-        console.log(ping, session.user_session_id);
     })
 
 
@@ -74,7 +73,7 @@
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class={`player-card hover:border-blue-500 border border-white border-2 flex items-center border-rounded rounded radius-10 p-2 m-2 gap-2 w-full max-w-48 overflow-hidden box-border bg-white shadow hover:shadow-lg hover:-translate-y-2 duration-200 relative ${$$props.class || ''}`} on:click={addStore}>
+<div class={`player-card hover:border-blue-500 border border-neutral-300 border-2 flex items-center border-rounded rounded radius-10 p-2 m-2 gap-2 w-full max-w-48 overflow-hidden box-border bg-neutral-200 shadow hover:shadow-lg hover:-translate-y-2 duration-200 relative ${$$props.class || ''}`} on:click={addStore}>
     {#key session.score}
         <img src="{getAvatar()}" alt="Avatar" class="h-14 w-14 rounded-full">
         <div class="flex flex-col w-full overflow-hidden">

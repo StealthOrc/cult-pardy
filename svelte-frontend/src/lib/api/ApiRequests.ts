@@ -1,7 +1,6 @@
 import type JeopardyBoard from "$lib/game/JeopardyBoard.svelte";
-import { getCookies } from "$lib/stores/cookies";
 import { type ApiResponse, type DiscordUser, type UserSessionId } from "cult-common";
-
+import { CookieStore, type SessionCookies } from "$lib/stores/cookies";
 
 /*
 /api/info
@@ -12,6 +11,15 @@ import { type ApiResponse, type DiscordUser, type UserSessionId } from "cult-com
 /api/join
 /api/board
 */
+
+let cookies : SessionCookies | null = null;
+
+let updater : boolean = false;
+
+
+
+
+
 enum BackendApiRequests {
     INFO = 'api/info',
     SESSION_DATA = 'api/session-data',
@@ -71,11 +79,34 @@ export async function board(): Promise<JeopardyBoard | null> {
 }
 
 
+export async function UserInfo() {
+    const discord = api_request(BackendApiRequests.DISCORD_SESSION);
+    const auth = api_request(BackendApiRequests.AUTHORIZATION);
+
+    const [discord_response, auth_response] = await Promise.all([discord, auth]);
+
+
+
+    return {
+        discord_response, 
+        auth_response
+    };
+
+}
+
 
 
 export async function api_request(request:BackendApiRequests): Promise<Response | null> {
     try {
-        const cookies = getCookies();;
+        if (!updater) {
+            CookieStore.subscribe((c) => {
+                cookies = c;
+            });
+            updater = true;
+        }
+        if (cookies == null) {
+            return null;
+        }  
         return await fetch(request + `?user-session-id=${cookies.userSessionId.id}&session-token=${cookies.sessionToken}`, {
             method: 'GET',
             headers: {

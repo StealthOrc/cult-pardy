@@ -1,3 +1,4 @@
+import { dev } from "$app/environment";
 import type { DTOSession, UserSessionId } from "cult-common";
 import { writable, type Subscriber, type Unsubscriber} from "svelte/store"; 
 
@@ -7,12 +8,22 @@ import { writable, type Subscriber, type Unsubscriber} from "svelte/store";
 export const CurrentSessionsStore = createCurrentSessionsStore();
 
 
+if(dev) {
+    if (import.meta.hot) {
+        import.meta.hot.accept((newModule ) => {
+            if (newModule != undefined) {
+                newModule.CurrentSessionsStore.store = CurrentSessionsStore.store;
+            }
+        });
+    }
+}
+
 function createCurrentSessionsStore() {
 
-    const currentSessions = writable<DTOSession[]>([]);
+    const store = writable<DTOSession[]>([]);
 
     function addSession(dtoSession: DTOSession) {
-        currentSessions.update((curr) => {
+        store.update((curr) => {
             if (curr.find((s) => s.user_session_id.id === dtoSession.user_session_id.id) != undefined){
                 return curr.sort(doSort);
             }
@@ -24,7 +35,7 @@ function createCurrentSessionsStore() {
 
 
     function removeSessionById(sessionId: UserSessionId) {
-        currentSessions.update((curr) => {
+        store.update((curr) => {
             const found: DTOSession | undefined = curr.find((s) => s.user_session_id.id === sessionId.id);
             if (found == undefined) return curr.sort(doSort);
             curr.splice(curr.indexOf(found), 1);
@@ -33,11 +44,11 @@ function createCurrentSessionsStore() {
     }
 
     function setSessions(sessions: DTOSession[]) {
-        currentSessions.set(sessions.sort(doSort));
+        store.set(sessions.sort(doSort));
     }
 
     function subscribe(this: void, run: Subscriber<DTOSession[]>): Unsubscriber {
-        return currentSessions.subscribe(run);
+        return store.subscribe(run);
     }
 
     function doSort(a: DTOSession, b: DTOSession) {
@@ -51,7 +62,7 @@ function createCurrentSessionsStore() {
     }
     
     return {
-        currentSessions,
+        store,
         addSession,
         removeSessionById,
         setSessions,

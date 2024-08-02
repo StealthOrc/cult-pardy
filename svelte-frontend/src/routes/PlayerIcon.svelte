@@ -1,7 +1,6 @@
 <script lang="ts">
-	import { dev_loaded } from '$lib/stores/cookies';
+	import { CookieStore, dev_loaded, type  SessionCookies } from '$lib/stores/cookies';
 	import { authorization } from '$lib/api/ApiRequests';
-	import { cookieStore, getCookies, type cookies} from '$lib/stores/cookies';
     import init, { type ApiResponse,type DiscordUser } from 'cult-common';
     
 	import { onDestroy, onMount } from 'svelte';
@@ -9,8 +8,8 @@
 	import wasm from 'vite-plugin-wasm';
 
     export let discord_user: DiscordUser | null;
-    let cookies : cookies;
-    cookieStore.subscribe(value => {
+    let cookies : SessionCookies | null = null;
+    CookieStore.subscribe(value => {
             cookies = value;
     });
     let isAdmin : ApiResponse | null
@@ -24,6 +23,9 @@
 
 
     function getUserName() {
+        if (cookies == null) {
+            return "Unknown";
+        }
         if (!discord_user) {
             return cookies.userSessionId.id;
         }
@@ -41,7 +43,7 @@
     }
 </script>
 
-{#if loaded && isAdmin}  
+{#if loaded && isAdmin && cookies}  
     <div class="fixed top-5 w-full flex justify-center items-center z-10">
         <div class="relative bg-gray-700 p-4 rounded-lg flex items-center space-x-4 shadow-lg">
             <!-- Shadow Overlay -->  ´

@@ -45,7 +45,6 @@ pub struct UserData {
     pub user_session_id: UserSessionId,
     pub lobby_id: LobbyId,
     pub ping: i64,
-    pub last_ping: DateTime<Local>,
 }
 
 impl UserData {
@@ -55,7 +54,6 @@ impl UserData {
             user_session_id,
             lobby_id: lobby,
             ping: 0,
-            last_ping: Local::now(),
         }
     }
 }
@@ -74,6 +72,8 @@ impl WsSession {
     }
 
     fn hb(&mut self, ctx: &mut ws::WebsocketContext<Self>) {
+        self.ping(ctx);
+        self.get_pings(ctx);
         ctx.run_interval(HEARTBEAT_INTERVAL, |act: &mut WsSession, ctx| {
             let time_since = Instant::now().duration_since(act.hb);
             if time_since > CLIENT_TIMEOUT {
@@ -83,7 +83,6 @@ impl WsSession {
             }
             act.ping(ctx);
             act.get_pings(ctx);
-            act.set_ping(ctx);
         });
 
     }
@@ -127,8 +126,6 @@ impl WsSession {
 
     fn ping(&mut self, ctx: &mut ws::WebsocketContext<Self>) {
         let time = Local::now();
-        self.player.last_ping = time;
-        println!("Send ping {:?}", time.timestamp_millis());
         let test = serde_json::to_vec(&time).expect("Can´t convert to vec");
         ctx.ping(&test.as_slice());
     
@@ -160,6 +157,7 @@ impl Actor for WsSession {
                         }
                         Some(id) => {
                             act.player.websocket_session_id = Some(id);
+                            act.get_pings(ctx);
                         }
                     },
 

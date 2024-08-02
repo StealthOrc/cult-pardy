@@ -1,7 +1,7 @@
 
 import Cookies from "js-cookie";
 import type { UserSessionId} from 'cult-common';
-import { writable, type Writable } from 'svelte/store';
+import { writable, type Subscriber, type Unsubscriber, type Writable } from 'svelte/store';
 import { dev } from "$app/environment";
 import { SessionData } from '../api/ApiRequests';
 
@@ -16,43 +16,96 @@ import { SessionData } from '../api/ApiRequests';
 // the update function is called with a function that gets the value of the cookie from the browser
 // the value of the cookie is the value of the cookie from the browser or an empty string
 
-const cookies: cookies = {
+const default_cookies: SessionCookies = {
     userSessionId: <UserSessionId>({ id: "" }),
     sessionToken: <string>(""),
 };
 
-export type cookies = {
+export type SessionCookies = {
     userSessionId: UserSessionId;
     sessionToken: string;
 };
 
-export function getCookies(): cookies {
-    cookies.userSessionId.id =  Cookies.get("user-session-id") || "";
-    cookies.sessionToken = Cookies.get("session-token") || "";
-    return cookies;
-}
-
-export function updateCookies(sessionData: SessionData | null) {
-    if (sessionData == null) {
-        return;
-    }
-    if (cookies.userSessionId.id != sessionData.user_session_id.id) {
-        Cookies.set("user-session-id", sessionData.user_session_id.id);
-        cookieStore.update(value => {
-            value.userSessionId.id = sessionData.user_session_id.id;
-            return value;
-        });
-    }
-    if (cookies.sessionToken != sessionData.session_token.token) {
-        Cookies.set("session-token", sessionData.session_token.token);
-        cookieStore.update(value => {
-            value.sessionToken = sessionData.session_token.token;
-            return value;
-        });
-    }
+function getCookies(): SessionCookies {
+    default_cookies.userSessionId.id =  Cookies.get("user-session-id") || "";
+    default_cookies.sessionToken = Cookies.get("session-token") || "";
+    return default_cookies;
 }
 
 
-export const cookieStore = writable(getCookies());
+
+export const CookieStore = createCookieStore();
 
 export const dev_loaded : Writable<boolean> = writable(dev ? false : true);
+
+
+function createCookieStore() {
+
+    const store = writable<SessionCookies>(getCookies());
+
+
+    function setCookies(newCookies: SessionCookies) {
+        store.set(newCookies);
+    }
+
+    function update(newCookies: SessionCookies) {
+        store.update((cookies) => {
+            if (cookies.userSessionId.id !== newCookies.userSessionId.id) {
+                cookies.userSessionId.id = newCookies.userSessionId.id;
+                Cookies.set("user-session-id", newCookies.userSessionId.id);
+            }
+            if (cookies.sessionToken !== newCookies.sessionToken) {
+                cookies.sessionToken = newCookies.sessionToken;
+                Cookies.set("session-token", newCookies.sessionToken);
+            }
+            return cookies;
+        });
+    }
+
+    function update_with_sessionData(sessionData: SessionData) {
+        store.update((cookies) => {
+            if (cookies.userSessionId.id !== sessionData.user_session_id.id) {
+                cookies.userSessionId.id = sessionData.user_session_id.id;
+                Cookies.set("user-session-id", sessionData.user_session_id.id);
+            }
+            if (cookies.sessionToken !== sessionData.session_token.token) {
+                cookies.sessionToken = sessionData.session_token.token;
+                Cookies.set("session-token", sessionData.session_token.token);
+            }
+            return cookies;
+        });
+    }
+
+
+
+    function update_userSessionId(userSessionId: UserSessionId) {
+        store.update((cookies) => {
+            cookies.userSessionId = userSessionId;
+            return cookies;
+        });
+    }
+
+    function update_sessionToken(sessionToken: string) {
+        store.update((cookies) => {
+            cookies.sessionToken = sessionToken;
+            return cookies;
+        });
+    }
+
+
+    function subscribe(this: void, run: Subscriber<SessionCookies>): Unsubscriber {
+        return store.subscribe(run);
+    }
+
+    
+
+    return {
+        store,
+        update,
+        update_with_sessionData,
+        setCookies,
+        update_userSessionId,
+        update_sessionToken,
+        subscribe,
+    }
+}

@@ -5,17 +5,17 @@
 
     import Cookies from "js-cookie";
 	import { onMount } from "svelte";
-    import { cookieStore, dev_loaded, getCookies,type cookies } from "$lib/stores/cookies";
+    import { CookieStore, dev_loaded,type SessionCookies } from "$lib/stores/cookies";
 	import { type DiscordUser } from "cult-common";
 	import PlayerIcon from "./PlayerIcon.svelte";
-	import { discord_session, session_data } from "$lib/api/ApiRequests";
+	import { discord_session} from "$lib/api/ApiRequests";
 	import LoadingPage from "./DevLoading.svelte";
     let lobbyid = '';
 
-    let cookies : cookies; 
-    cookieStore.subscribe(value => {
+    let cookies : SessionCookies; 
+    CookieStore.subscribe(value => {
             cookies = value;
-        });
+    });
 
 
   
@@ -23,7 +23,6 @@
     let loaded = false;
 
     onMount(async () => {
-
         let session_res= await discord_session();
         if (session_res) {
             discord_user = session_res;
