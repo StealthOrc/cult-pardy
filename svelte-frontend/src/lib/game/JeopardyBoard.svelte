@@ -2,52 +2,45 @@
     export const prerender = false;
     import JeopardyCategory from './JeopardyCategory.svelte';
     import { onMount } from 'svelte';
-    import {webSocket} from "rxjs/webSocket";
+    import {webSocket, WebSocketSubject} from "rxjs/webSocket";
     import { getCookies, type cookies } from "$lib/stores/cookies.js";
     import { match, P } from 'ts-pattern';
-	import type { BoardEvent, DtoJeopardyBoard, DTOSession, SessionEvent, WebsocketEvent, WebsocketServerEvents } from 'cult-common';
+	import type { BoardEvent, DtoJeopardyBoard, DTOSession, SessionEvent, WebsocketEvent, WebsocketServerEvents, WebsocketSessionEvent } from 'cult-common';
 	import Players from './Players.svelte';
-	import { createCurrentSessionsStore, type Session } from '$lib/stores/currentSessions';
+	import {CurrentSessionsStore } from '$lib/stores/SessionStore';
 	import type { Observable, Observer } from 'rxjs';
+	import { SessionPingsStore } from '$lib/stores/SessionPings';
+	import { newWebSocketStore, WebsocketStore } from '$lib/stores/WebsocketStore';
+	import { JeopardyBoardStore } from '$lib/stores/JeopardyBoardStore';
 
     export let lobbyId: string = "main";	
 
     const cookies : cookies = getCookies();
 
-    let gameData: DtoJeopardyBoard;
-    let currentSessions: Session[] = [];
-    let currentSessionsStore = createCurrentSessionsStore(); 
+    let wsStore = newWebSocketStore(lobbyId, cookies.userSessionId, cookies.sessionToken);
+    if (wsStore == null) {
+        throw new Error("Websocket store is null");
+    }
 
-    currentSessionsStore.subscribe(value => {
+    let ws : WebSocketSubject<WebsocketSessionEvent> | null = null;
+    wsStore.subscribe(value => {
+        ws = value;
+    })
+
+    let gameData: DtoJeopardyBoard | null = null;
+
+    JeopardyBoardStore.subscribe(value => {
+        gameData = value;
+    })
+
+    let currentSessions: DTOSession[] = [];
+
+    CurrentSessionsStore.subscribe(value => {
         currentSessions = value;
     })
+    
+    
 
-
-    const ws = webSocket({
-        url: `ws://localhost:8000/ws?lobby-id=${lobbyId}&user-session-id=${cookies.userSessionId.id}&session-token=${cookies.sessionToken}`,
-        //use binaryType: 'arraybuffer' if you are sending binary data
-        binaryType: 'arraybuffer',
-        deserializer: (e) => e.data,
-        serializer: (value : any) => {
-            if (value instanceof ArrayBuffer) {
-                return value;
-            }
-            if (value instanceof Uint8Array) {
-                    let buffer = new ArrayBuffer(value.length);
-                    let view = new Uint8Array(buffer);
-                    view.set(value);
-                    return buffer;
-            } 
-            let json = JSON.stringify(value);
-            let encoder = new TextEncoder();
-            let binaryData = encoder.encode(json)
-            let buffer = new ArrayBuffer(binaryData.length);
-            let view = new Uint8Array(buffer);
-            view.set(binaryData);
-            return buffer;
-            
-        }
-    })
 
     function updateGridColumns() {
         if (gameData == null || gameData.categories == null) {
@@ -59,28 +52,27 @@
     }
 
     onMount(() => {
-        ws.subscribe({
 
-            next: (message) => {
-                if (message instanceof ArrayBuffer) {
-                    const decoder = new TextDecoder();
-                    let json : string = decoder.decode(message);
-                    const parsed : WebsocketServerEvents = JSON.parse(json);
-                    const updated = handleEvent(parsed);
-                    if (updated) {
-                        updateGridColumns();
-                    }
-                };
-            },
-            error: (error) => {
-                
-                console.log(error);
-                //console.error('WebSocket error:', error);
-            }
-        });
-
-        
-
+        if (ws != null) {
+            ws.subscribe({
+                next: (message) => {
+                    if (message instanceof ArrayBuffer) {
+                        const decoder = new TextDecoder();
+                        let json : string = decoder.decode(message);
+                        const parsed : WebsocketServerEvents = JSON.parse(json);
+                        const updated = handleEvent(parsed);
+                        if (updated) {
+                            updateGridColumns();
+                        }
+                    };
+                },
+                error: (error) => {
+                    console.log(error);
+                    //wsStore.new_ws();
+                    //console.error('WebSocket error:', error);
+                }
+            });
+        }
     });
 
     function handleEvent(event: WebsocketServerEvents): boolean {
@@ -107,12 +99,12 @@
         match(boardEvent)
         .with({ CurrentBoard: P.select() }, (data) => {
             console.log("Event found: ", data);
-            gameData = data;
+            JeopardyBoardStore.setBoard(data);
             updateGridColumns();
             return true;
         })
         .with({ CurrentQuestion: P.select() }, (data) => {
-            gameData.current = data;
+            JeopardyBoardStore.setCurrent(data);
             updateGridColumns();
             return true;
         })    
@@ -127,23 +119,24 @@
         match(sessionEvent)
         .with({ CurrentSessions: P.select() }, (data) => {
             console.log("CurrentSessions: ", data, currentSessions);
-            currentSessionsStore.setSessions(data);
+            CurrentSessionsStore.setSessions(data);
             return true;
         })
         .with({ SessionJoined: P.select() }, (data) => {
             console.log("Joined Session: ", data, currentSessions);
             // search inside currentSessions for a object with the same user_session_id as data, if not: add data
-            currentSessionsStore.addSession(data); 
+            CurrentSessionsStore.addSession(data); 
             console.log("Joined Session 2: ", data, currentSessions);
             return true;
         })
         .with({ SessionDisconnected: P.select() }, (data) => {
             console.log("Disconnected Session: ", data, currentSessions);
-            currentSessionsStore.removeSessionById(data);
+            CurrentSessionsStore.removeSessionById(data);
+            SessionPingsStore.removeBySessionId(data);
             return true;
         })
         .with({ SessionsPing : P.select() }, (data) => {
-            currentSessionsStore.updateSessionsPing(data);
+            SessionPingsStore.updateSessionsPing(data);
             return true;
         })  
         .exhaustive();
@@ -171,11 +164,11 @@
     <div class="jeopardy-container">
         <div class="jeopardy-board">
                 {#each gameData.categories as category}
-                    <JeopardyCategory {category} {ws} current={gameData.current} />
+                    <JeopardyCategory {category} />
                 {/each}
         </div>
     </div>
-    <Players {currentSessions} {ws} current={gameData.current}/>
+    <Players/>
 {/if}
 
 <style>

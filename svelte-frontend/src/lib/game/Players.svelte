@@ -1,18 +1,24 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { type DtoQuestion, type DTOSession, type Vector2D } from 'cult-common';
+    import type { DtoQuestion, DTOSession, Vector2D, WebsocketPing } from 'cult-common';
     import PlayerCard from './PlayerCard.svelte';
 	import type { WebSocketSubject } from 'rxjs/webSocket';
-	import type { Session } from '$lib/stores/currentSessions';
+	import { SessionPingsStore } from '$lib/stores/SessionPings';
+	import { CurrentSessionsStore } from '$lib/stores/SessionStore';
 
-    export let currentSessions: Session[];
-    export let current: DtoQuestion | null;
-    export let ws : WebSocketSubject<any> | null;
+
+    let current_session : DTOSession[] = [];
+    CurrentSessionsStore.subscribe(value => {
+        current_session = value;
+    })
+
+
+
 </script>
 
 <div class="player-container">
-    {#each currentSessions as session}
-        <PlayerCard {session} {ws} {current}/>
+    {#each current_session as session}
+        <PlayerCard {session}/>
     {/each}
 </div>
 

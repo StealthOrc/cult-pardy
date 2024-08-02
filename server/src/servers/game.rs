@@ -582,6 +582,7 @@ impl Lobby{
         
     }
 
+
     pub fn is_new_session(&self, user_session_id: &UserSessionId) -> bool {
        !self.websocket_connections.values().any(|websocket_session| websocket_session.user_session_id.eq(&user_session_id))
     }
@@ -882,6 +883,15 @@ impl Handler<WebsocketConnect> for GameServer {
         };
         
         let new_session = lobby.is_new_session(&msg.user_session_id);
+        let websockets =lobby.get_session_websockets(&msg.user_session_id);
+        if !new_session && websockets.len() > 1 {
+            println!("2 Session {:?} has been already connected to the lobby={:?}.", msg.user_session_id.id, &msg.lobby_id.id);
+            return None;
+        }
+
+
+
+
         let websocket_session_id = lobby.add_new_websocket(&msg);
 
 
@@ -1046,7 +1056,7 @@ impl Handler<GetUserSession> for GameServer {
             None => return MessageResult(self.new_session()),
             Some(data) => data,
         };
-        
+
         if user_session.clone().session_token.token.eq(&token.token) {
                 return MessageResult(user_session.clone())
         }

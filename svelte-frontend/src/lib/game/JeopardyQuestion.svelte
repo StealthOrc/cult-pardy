@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { WebsocketStore } from '$lib/stores/WebsocketStore';
 	import type { DtoQuestion, Vector2D, WebsocketSessionEvent } from 'cult-common';
 	import type { WebSocketSubject } from 'rxjs/webSocket';
 	import { onMount } from 'svelte';
@@ -6,14 +7,26 @@
 	import { match, P } from 'ts-pattern';
     import YouTubePlayerPlus from 'youtube-player-plus';
 	import type { YTPP_Options } from 'youtube-player-plus/types';
-    
-
-
+	import JeopardyBoard from './JeopardyBoard.svelte';
+	import { JeopardyBoardStore } from '$lib/stores/JeopardyBoardStore';
     
     export let question: DtoQuestion;
-    export let ws: WebSocketSubject<any> | null;
-    export let current : DtoQuestion | null;
     let open_request = false;
+
+    let ws : WebSocketSubject<WebsocketSessionEvent> | null = null;
+    if (WebsocketStore != null) {
+        WebsocketStore.subscribe(value => {
+            ws = value;
+        })
+    }
+
+    let current : DtoQuestion | null = null;
+    JeopardyBoardStore.subscribe(value => {
+        if (value != null) {
+            current = value.current;
+        }
+    })
+
 
     function handleClose() {
         if (ws == null) {
