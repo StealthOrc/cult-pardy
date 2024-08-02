@@ -887,7 +887,7 @@ impl Handler<WebsocketConnect> for GameServer {
         if !new_session && websockets.len() > 1 {
             println!("2 Session {:?} has been already connected to the lobby={:?}.", msg.user_session_id.id, &msg.lobby_id.id);
             return None;
-        }
+        } 
 
 
 
