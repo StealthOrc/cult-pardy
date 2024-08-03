@@ -888,7 +888,6 @@ impl Handler<WebsocketConnect> for GameServer {
             println!("2 Session {:?} has been already connected to the lobby={:?}.", msg.user_session_id.id, &msg.lobby_id.id);
             return None;
         } 
-    
         let websocket_session_id = lobby.add_new_websocket(&msg);
 
         let creator = lobby.creator.clone();
