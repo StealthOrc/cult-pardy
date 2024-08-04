@@ -484,6 +484,7 @@ pub struct Lobby {
     jeopardy_board: JeopardyBoard,
 }
 
+
 impl Lobby{
     pub fn connected_user_score(&self) -> LinkedHashMap<UserSessionId, i32>{
         let mut map = LinkedHashMap::new();
