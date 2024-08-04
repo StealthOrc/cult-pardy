@@ -423,7 +423,6 @@ impl DiscordData {
 
 
 
-
 impl UserSession {
     fn dto(self, score:&i32, is_admin:bool) -> DTOSession {
         let clone = self.clone();
@@ -483,7 +482,6 @@ pub struct Lobby {
     game_state: GameState,
     jeopardy_board: JeopardyBoard,
 }
-
 
 impl Lobby{
     pub fn connected_user_score(&self) -> LinkedHashMap<UserSessionId, i32>{
