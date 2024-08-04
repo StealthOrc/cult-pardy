@@ -476,7 +476,7 @@ impl UserSession {
 
 //TODO ADD CUSTOM Serialize / Deserialize
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct Lobby{
+pub struct Lobby {
     creator: UserSessionId,
     lobby_id: LobbyId,
     user_score: HashMap<UserSessionId, i32>,
@@ -637,9 +637,9 @@ impl GameState{
 
     pub fn open(&self) -> bool {
         match self {
-            Waiting => true,
+            GameState::Waiting => true,
             GameState::Starting => false,
-            Playing => false,
+            GameState::Playing => false,
             GameState::End => true,
         }
 
