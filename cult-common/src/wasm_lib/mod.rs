@@ -9,8 +9,7 @@ use wasm_bindgen::prelude::*;
 use crate::backend::{ActionState, MediaPlayer};
 
 pub mod ids;
-pub mod websocketevents;
-mod WebsocketEvents;
+pub mod websocket_events;
 
 
 
