@@ -422,7 +422,6 @@ impl DiscordData {
 }
 
 
-
 impl UserSession {
     fn dto(self, score:&i32, is_admin:bool) -> DTOSession {
         let clone = self.clone();
