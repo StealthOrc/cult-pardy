@@ -469,7 +469,6 @@ impl UserSession {
         }
     }
 }
-
 //TODO ADD CUSTOM Serialize / Deserialize
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Lobby {
