@@ -32,6 +32,8 @@
 
 
 </script>
+
+<h1>Cult Pardy</h1>
 <div class=" h-dvh w-dvw flex flex-col items-center justify-center gap-2">
         {#if loaded}
         <input bind:value={lobbyid} class="border-2 border-blue-600 placeholder-blue-600 p-2 rounded m-2" type="text" name="lobby-id" id="lobby-id" placeholder="Lobby ID"/>
