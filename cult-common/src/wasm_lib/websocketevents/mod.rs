@@ -5,6 +5,7 @@ use tsify_next::Tsify;
 use std::hash::{Hash, Hasher};
 use std::string::ToString;
 
+use crate::backend::ActionState;
 use crate::dto::{DTOSession, DtoJeopardyBoard, DtoQuestion};
 
 use super::ids::lobby::LobbyId;
@@ -19,6 +20,7 @@ pub enum WebsocketServerEvents {
     Websocket(WebsocketEvent),
     Session(SessionEvent),
     Error(WebsocketError),
+    ActionState(ActionStateEvent),
     Text(String),
 }
 
@@ -31,6 +33,7 @@ impl WebsocketServerEvents {
             WebsocketServerEvents::Session(event) => event.to_string(),
             WebsocketServerEvents::Error(event) => event.to_string(),
             WebsocketServerEvents::Text(event) => event.to_string(),
+            WebsocketServerEvents::ActionState(event) => event.to_string().to_string(),
         };
 
         format!("{} -> {} ", wse, event)
@@ -38,9 +41,26 @@ impl WebsocketServerEvents {
 }
 
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, Display)]
+pub enum ActionStateEvent {
+    Media(ActionMediaEvent)
+
+
+}
+#[derive(Tsify,Debug, Clone, Serialize, Deserialize, Display)]
+pub enum ActionMediaEvent {
+    Play,
+    Pause,
+    Resume,
+}
+
+
+
+
+
+#[derive(Tsify,Debug, Clone, Serialize, Deserialize, Display)]
 pub enum BoardEvent {
     CurrentBoard(DtoJeopardyBoard),
-    CurrentQuestion(DtoQuestion),
+    CurrentQuestion(DtoQuestion, ActionState),
     UpdateCurrentQuestion(Option<Vector2D>),
     UpdateSessionScore(UserSessionId, i32),
 }
@@ -64,8 +84,19 @@ pub enum WebsocketSessionEvent {
     Click(Vector2D),
     Back,
     AddUserSessionScore(UserSessionId, Vector2D),
+    ViedeoEvent(VideoEvent),
     
 }
+#[derive(Tsify,Debug, Clone, Serialize, Deserialize, Display)]
+pub enum VideoEvent {
+    Play,
+    Pause(i64),
+    Resume(i64),
+}
+
+
+
+
 
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, Display)]
 pub enum WebsocketError {

@@ -8,7 +8,7 @@ use tsify_next::Tsify;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
-use std::io;
+use std::{default, io};
 use std::io::{Read, Write};
 use std::net::SocketAddr;
 use std::string::ToString;
@@ -34,7 +34,10 @@ pub struct JeopardyBoard {
     pub current: Option<Vector2D>,
     #[serde(skip_serializing)]
     pub create: DateTime<Local>,
+    pub action_state: ActionState,
 }
+
+
 impl JeopardyBoard {
 
     pub fn default(mode: JeopardyMode) -> Self {
@@ -47,6 +50,10 @@ impl JeopardyBoard {
                 let mut question_type : QuestionType = QuestionType::Question;
                 if question == 0 && category == 0 {
                     question_type = QuestionType::Media("dQw4w9WgXcQ".to_string());
+
+
+
+
                 }
                 let question_name = format!("question_{}", question);
                 let answer_name = format!("answer{}", question);
@@ -69,6 +76,7 @@ impl JeopardyBoard {
             categories,
             current: None,
             create: Local::now(),
+            action_state: ActionState::None,
         }
     }
 
@@ -183,11 +191,41 @@ impl<'de> Deserialize<'de> for JeopardyBoard {
             categories: partial_board.categories,
             current: None,
             create: Local::now(),
+            action_state: ActionState::None,
         };
 
         Ok(board)
     }
 }
+#[derive(Tsify,Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+pub enum ActionState {
+    None,
+    MediaPlayer(MediaPlayer),
+}
+
+#[derive(Tsify,Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+pub struct MediaPlayer {
+    pub starting_time: DateTime<Local>,
+    pub video_start: i32,
+    pub video_end: i32,
+    pub restarting_time: Option<DateTime<Local>>,
+    pub current: i32,
+}
+
+impl MediaPlayer {
+
+    pub fn default() -> Self {
+        MediaPlayer {
+            starting_time: Local::now(),
+            video_start: 0,
+            video_end: 0,
+            restarting_time: None,
+            current: 0,
+        }
+    }
+    
+}
+
 
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Category {

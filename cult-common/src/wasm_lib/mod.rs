@@ -6,8 +6,11 @@ use std::hash::{Hash, Hasher};
 use std::string::ToString;
 use wasm_bindgen::prelude::*;
 
+use crate::backend::{ActionState, MediaPlayer};
+
 pub mod ids;
 pub mod websocketevents;
+mod WebsocketEvents;
 
 
 
@@ -94,6 +97,17 @@ pub enum QuestionType {
     Media(String),
     #[default]
     Question,
+}
+
+
+impl QuestionType {
+    pub fn get_action_state(self: &QuestionType) -> ActionState {
+        match self {
+            QuestionType::Media(_) =>  ActionState::MediaPlayer(MediaPlayer::default()),
+            _ => ActionState::None,
+        }
+    }
+    
 }
 
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Default)]

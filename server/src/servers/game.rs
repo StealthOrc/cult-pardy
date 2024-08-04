@@ -15,13 +15,13 @@ use actix_web::web;
 use attohttpc::Session;
 use chrono::{DateTime, Duration, Local, TimeDelta};
 
-use cult_common::backend::{JeopardyBoard, LobbyCreateResponse, Question};
+use cult_common::backend::{JeopardyBoard, ActionState, LobbyCreateResponse, MediaPlayer, Question};
 use cult_common::dto::DTOSession;
 use cult_common::wasm_lib::ids::discord::DiscordID;
 use cult_common::wasm_lib::ids::lobby::{self, LobbyId};
 use cult_common::wasm_lib::ids::usersession::UserSessionId;
 use cult_common::wasm_lib::ids::websocketsession::WebsocketSessionId;
-use cult_common::wasm_lib::websocketevents::{BoardEvent, SessionEvent, WebsocketError, WebsocketEvent, WebsocketPing, WebsocketServerEvents};
+use cult_common::wasm_lib::websocketevents::{ActionMediaEvent, ActionStateEvent, BoardEvent, SessionEvent, VideoEvent, WebsocketError, WebsocketEvent, WebsocketPing, WebsocketServerEvents};
 use cult_common::wasm_lib::{DiscordUser, JeopardyMode, Vector2D};
 use futures::StreamExt;
 use mongodb::bson::{Bson, doc, Document};
@@ -123,6 +123,15 @@ pub struct Join{
     /// Client ID
     pub playerdata: UserData
 }
+
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct ReciveVideoEvent{
+    pub user_session_id: UserSessionId,
+    pub lobby_id: LobbyId,
+    pub event: VideoEvent,
+}
+
 
 #[derive(Message)]
 #[rtype(result = "HashSet<String>")]
@@ -472,8 +481,8 @@ impl UserSession {
 //TODO ADD CUSTOM Serialize / Deserialize
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Lobby {
-    creator: UserSessionId,
     lobby_id: LobbyId,
+    creator: UserSessionId,
     user_score: HashMap<UserSessionId, i32>,
     connected_user_session: LinkedHashSet<UserSessionId>,
     allowed_user_session: LinkedHashSet<UserSessionId>,
@@ -562,8 +571,9 @@ impl Lobby{
 
     pub fn set_current_question(&mut self, vector2d: Vector2D) -> Option<Question>{
         let qeuestion = self.jeopardy_board.get_mut_question(vector2d).cloned();
-        if qeuestion.is_some() {
+        if let Some(value) = qeuestion.clone() {
             self.jeopardy_board.current = Some(vector2d);
+            self.jeopardy_board.action_state = value.question_type.get_action_state();
         }
          qeuestion
     }
@@ -759,6 +769,8 @@ impl GameServer {
             game_state: GameState::Waiting,
             jeopardy_board,
         };
+
+
         self.lobbies.insert(lobby_id.clone(), lobby.clone());
         println!("Added Lobby {:?}", lobby_id);
         lobby
@@ -1130,7 +1142,8 @@ impl Handler<LobbyClick> for GameServer {
             Some(lobby) => lobby
         };
         if let Some(question) = lobby.set_current_question(msg.vector_2d){
-            let event = WebsocketServerEvents::Board(BoardEvent::CurrentQuestion(question.dto(true, msg.vector_2d)));
+            let action_state = question.question_type.get_action_state();
+            let event = WebsocketServerEvents::Board(BoardEvent::CurrentQuestion(question.dto(true, msg.vector_2d), action_state));
             self.send_lobby_message(&msg.user_data.lobby_id, event);
         }
     }
@@ -1202,5 +1215,37 @@ impl Handler<GetSessionsPings> for GameServer {
         } else {
             MessageResult(Vec::new())
         }
+    }
+}
+
+impl Handler<ReciveVideoEvent> for GameServer {
+    type Result = ();
+
+    fn handle(&mut self, msg: ReciveVideoEvent, _: &mut Self::Context) -> Self::Result {
+
+        if !self.is_editor(&msg.lobby_id, &msg.user_session_id){
+            return;
+        }   
+
+        let lobby = match self.get_mut_lobby(&msg.lobby_id){
+            None => return,
+            Some(lobby) => lobby
+        };
+
+        match msg.event {
+            VideoEvent::Play => {
+                let event = WebsocketServerEvents::ActionState(ActionStateEvent::Media(ActionMediaEvent::Play));
+                self.send_lobby_message(&msg.lobby_id, event);
+            }
+            VideoEvent::Pause(_) => {
+                let event = WebsocketServerEvents::ActionState(ActionStateEvent::Media(ActionMediaEvent::Pause));
+                self.send_lobby_message(&msg.lobby_id, event);
+            }
+            VideoEvent::Resume(_) => {
+                let event = WebsocketServerEvents::ActionState(ActionStateEvent::Media(ActionMediaEvent::Resume));
+                self.send_lobby_message(&msg.lobby_id, event);
+            }
+        }
+
     }
 }

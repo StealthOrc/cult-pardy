@@ -89,10 +89,11 @@
         .with({ Error: P.select() }, (errorEvent) => {console.error('Websocket errorEvent:', errorEvent)})
         //WebsocketEvents
         .with({ Websocket: P.select() }, (websocketEvent) => handleWebsocketEvent(websocketEvent))
-        .otherwise(() => {
-            console.log("Event not found: ",event)
-        });
-
+        .with({ ActionState: P.select()}, (data) => {
+                console.log("ActionStateEvent: ", data);
+                            return true;
+        })
+        .exhaustive();
         return true;
     }
 
@@ -106,7 +107,7 @@
             return true;
         })
         .with({ CurrentQuestion: P.select() }, (data) => {
-            JeopardyBoardStore.setCurrent(data);
+            JeopardyBoardStore.setCurrent(data[0]);
             updateGridColumns();
             return true;
         })    

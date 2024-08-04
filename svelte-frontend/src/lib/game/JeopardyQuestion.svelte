@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { WebsocketStore } from '$lib/stores/WebsocketStore';
-	import type { DtoQuestion, Vector2D, WebsocketSessionEvent } from 'cult-common';
+	import type { DtoQuestion, Vector2D, VideoEvent, WebsocketSessionEvent } from 'cult-common';
 	import type { WebSocketSubject } from 'rxjs/webSocket';
 	import { onMount } from 'svelte';
 	import { on } from 'svelte/events';
@@ -106,6 +106,45 @@
         return result;
     }
 
+    function play() {
+        if (player == null) {
+            return;
+        }
+        if (open_request || ws == null ) {
+            return;
+        }
+        player.play();
+        let click : VideoEvent  = "Play" ;
+        let click2 : WebsocketSessionEvent = {ViedeoEvent : click};
+        ws.next(click2);
+    }
+
+    function pause() {
+        if (player == null) {
+            return;
+        }
+        if (open_request || ws == null ) {
+            return;
+        }
+        player.pause();
+        let click : VideoEvent ={ Pause: 12 };
+        let click2 : WebsocketSessionEvent = {ViedeoEvent : click};
+        ws.next(click2);
+    }
+
+    function stop() {
+        if (player == null) {
+            return;
+        }
+        if (open_request || ws == null ) {
+            return;
+        }
+        player.stop();
+        let click : VideoEvent ={ Resume: 12 };
+        let click2 : WebsocketSessionEvent = {ViedeoEvent : click};
+        ws.next(click2);
+    }
+
 
 </script>
 <div class="player" id="player"></div>
@@ -125,9 +164,9 @@
                     <p>{current.question_type}</p>
                     {#if createYouTubePlayer()}
                      
-                    <button on:click={() => player?.play()}>Play</button>
-                    <button on:click={() => player?.pause()}>Pause</button>
-                    <button on:click={() => player?.stop()}>Stop</button>
+                    <button on:click={() => play()}>Play</button>
+                    <button on:click={() => pause()}>Pause</button>
+                    <button on:click={() => stop()}>Stop</button>
                 {/if}
                 </div>
             {:else}

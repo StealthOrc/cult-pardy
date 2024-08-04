@@ -273,6 +273,13 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                                         vector2d
                                     });
                                 }
+                                WebsocketSessionEvent::ViedeoEvent(event) => {
+                                self.handler.do_send(game::ReciveVideoEvent{
+                                    user_session_id: self.player.user_session_id.clone(),
+                                    lobby_id: self.player.lobby_id.clone(),
+                                    event
+                                })
+                                }
                             }
                             println!("Receive an client event {:?}", event);
                         }
