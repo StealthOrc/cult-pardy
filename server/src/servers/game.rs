@@ -21,7 +21,7 @@ use cult_common::wasm_lib::ids::discord::DiscordID;
 use cult_common::wasm_lib::ids::lobby::{self, LobbyId};
 use cult_common::wasm_lib::ids::usersession::UserSessionId;
 use cult_common::wasm_lib::ids::websocketsession::WebsocketSessionId;
-use cult_common::wasm_lib::websocketevents::{ActionMediaEvent, ActionStateEvent, BoardEvent, SessionEvent, VideoEvent, WebsocketError, WebsocketEvent, WebsocketPing, WebsocketServerEvents};
+use cult_common::wasm_lib::websocket_events::{ActionMediaEvent, ActionStateEvent, BoardEvent, SessionEvent, VideoEvent, WebsocketError, WebsocketEvent, WebsocketPing, WebsocketServerEvents};
 use cult_common::wasm_lib::{DiscordUser, JeopardyMode, Vector2D};
 use futures::StreamExt;
 use mongodb::bson::{Bson, doc, Document};
