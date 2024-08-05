@@ -1,9 +1,11 @@
 use std::collections::HashSet;
 
 use cult_common::wasm_lib::ids::discord::DiscordID;
+use cult_common::wasm_lib::FileData;
 use mongodb::bson::doc;
 use mongodb::options::{ClientOptions, ServerApi, ServerApiVersion};
 use mongodb::sync::{Client, Collection};
+use ritelinked::LinkedHashSet;
 use strum::{Display, EnumIter};
 use cult_common::wasm_lib::ids::usersession::UserSessionId;
 use crate::servers::db::DBDatabase::CultPardy;
@@ -27,7 +29,8 @@ pub enum DBDatabase{
 pub enum UserCollection{
     #[default]
     UserSessions,
-    Admins
+    Admins,
+    Files,
 }
 
 
@@ -117,6 +120,62 @@ impl MongoServer{
                 }
                 return set;
             }
+        }
+    }
+
+    pub fn add_file(&self, file: FileData) -> bool {
+        let result = self.collection::<FileData>(CultPardy(UserCollection::Files)).insert_one(file, None);
+        match result {
+            Err(_) => {
+                return false;
+            }
+            Ok(_) => {
+                return true;
+            }
+        }
+    }
+
+    pub  fn get_files_from_user_session(&self, user_session_id: &UserSessionId) -> HashSet<FileData> {
+        let result = self.collection::<FileData>(CultPardy(UserCollection::Files)).find(doc! {"user_session_id.id": &user_session_id.id}, None);
+        match result {
+            Err(_) => {
+                return HashSet::new();
+            }
+            Ok(data) => {
+                let mut set = HashSet::new();
+                for doc in data {
+                    if let Ok(doc) = doc {
+                        set.insert(doc);
+                    }
+                }
+                return set;
+            }
+        }
+    }
+
+    pub fn is_file_by_hash(&self, hash: &str) -> bool {
+        self.collection::<FileData>(CultPardy(UserCollection::Files)).find_one(doc! {"hash": &hash}, None).is_ok()
+    }
+
+
+
+    pub fn get_file_by_hash(&self, hash: &str) -> Option<FileData> {
+        let result = self.collection::<FileData>(CultPardy(UserCollection::Files)).find_one(doc! {"hash": &hash}, None);
+        match result {
+            Err(_) => {
+                return None;
+            }
+            Ok(data) => data,
+        }
+    }
+
+    pub fn get_file_by_name(&self, name: &str) -> Option<FileData> {
+        let result = self.collection::<FileData>(CultPardy(UserCollection::Files)).find_one(doc! {"file_name": &name}, None);
+        match result {
+            Err(_) => {
+                return None;
+            }
+            Ok(data) => data,
         }
     }
 

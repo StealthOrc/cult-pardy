@@ -1,3 +1,4 @@
+use chrono::{DateTime, Local};
 use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
 use std::hash::{Hash, Hasher};
@@ -5,7 +6,7 @@ use std::string::ToString;
 use wasm_bindgen::prelude::*;
 
 use crate::wasm_lib::ids::usersession::UserSessionId;
-use crate::wasm_lib::{DiscordUser, QuestionType, Vector2D};
+use crate::wasm_lib::{DiscordUser, FileData, QuestionType, Vector2D};
 
 
 
@@ -96,3 +97,31 @@ pub struct DtoQuestion {
     pub vector2d: Vector2D,
 }
 
+
+#[derive(Tsify, Debug, Clone, Serialize, Deserialize, Hash,Eq, PartialEq, Default)]
+pub struct DTOFileData {
+    pub image: Vec<u8>,
+    pub file_name: String,
+    pub file_type: String,
+}
+
+impl DTOFileData {
+    
+    pub fn to_file_data(self,upload_data:DateTime<Local>, uploader: UserSessionId) -> FileData {
+        let hash = self.video_hash();
+        FileData {
+            image: self.image,
+            file_name: self.file_name,
+            file_type: self.file_type,
+            hash,
+            upload_data,
+            uploader,
+        }
+    }
+
+    pub fn video_hash(&self) -> String {
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        self.image.hash(&mut hasher);
+        hasher.finish().to_string()
+    }
+}

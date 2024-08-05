@@ -1,3 +1,4 @@
+use chrono::{DateTime, Local};
 use ids::discord::DiscordID;
 use ids::usersession::UserSessionId;
 use serde::{Deserialize, Serialize};
@@ -109,6 +110,7 @@ impl QuestionType {
     
 }
 
+
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Default)]
 pub struct ApiResponse {
     pub success: bool,
@@ -122,5 +124,12 @@ impl ApiResponse {
         ApiResponse { success }
     }
 }
-
-
+#[derive(Tsify, Debug, Clone, Serialize, Deserialize, Hash,Eq, PartialEq, Default)]
+pub struct FileData {
+    pub image: Vec<u8>,
+    pub file_name: String,
+    pub file_type: String,
+    pub hash: String,
+    pub upload_data: DateTime<Local>,
+    pub uploader: UserSessionId,
+}

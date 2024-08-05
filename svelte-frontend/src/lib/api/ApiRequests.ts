@@ -1,5 +1,5 @@
-import type JeopardyBoard from "$lib/game/JeopardyBoard.svelte";
-import { type ApiResponse, type DiscordUser, type UserSessionId } from "cult-common";
+
+import { type ApiResponse, type DiscordUser, type JeopardyBoard, type UserSessionId } from "cult-common";
 import { CookieStore, type SessionCookies } from "$lib/stores/cookies";
 
 /*

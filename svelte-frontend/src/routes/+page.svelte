@@ -31,45 +31,28 @@
         loaded = true;
     })
 
-    function arrayBufferToBinary(buffer: ArrayBuffer): string {
-        console.log("buffer" ,buffer.byteLength);
-      var uint8 = new Uint8Array(buffer);
-      console.log("uint8", uint8.length);
-      let u =  uint8.reduce((binary, uint8) => binary + uint8.toString(2), "");
-        console.log("u", u.length);
-
-        compressArrayBuffer(buffer).then(compressed => {
-        console.log('Compressed ArrayBuffer:', compressed.length);
-        fflate.inflate(compressed, (err, inflated) => {
-            if (err) {
-            console.error('Inflation error:', err);
-            } else {
-            console.log('Inflated ArrayBuffer:', inflated.length);
-            }
-        });
-        }).catch(error => {
-        console.error('Compression error:', error);
-        });
 
 
-
-
-      function compressArrayBuffer(arrayBuffer : ArrayBuffer): Promise<Uint8Array> {
-        const uint8Array = new Uint8Array(arrayBuffer);
-  
-        return new Promise((resolve, reject) => {
-            deflate(uint8Array, (err, compressed) => {
-            if (err) {
-                reject(err);
-            } else {
-                resolve(compressed);
-            }
-            });
-        });
+    function BinarytoaArrayBuffer(binary: string): ArrayBuffer {
+        var binary_string = window.atob(binary);
+        var len = binary_string.length;
+        var bytes = new Uint8Array(len);    
+        for (var i = 0; i < len; i++) {
+            bytes[i] = Number(binary_string.at(i));
         }
+        return bytes.buffer;
+    }
 
 
-      return u;
+    function arrayBufferToBinary(buffer: ArrayBuffer): string {
+        //use window.btoa to convert binary to base64 for data URI
+        var binary = '';
+        var bytes = new Uint8Array(buffer);
+        var len = bytes.byteLength;
+        for (var i = 0; i < len; i++) {
+            binary += String.fromCharCode(bytes[i]);
+        }
+        return window.btoa(binary);
     }
 
       function fileToBinary(file:File, callback: (binary: string) => void) {  

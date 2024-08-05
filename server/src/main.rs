@@ -12,7 +12,7 @@ use crate::apis::api::session_request;
 use actix_web::{web, App, HttpServer, HttpRequest, HttpResponse, get};
 use anyhow::Result;
 
-use apis::api::session_data_request;
+use apis::api::{session_data_request, upload};
 use tokio::runtime::Runtime;
 use cult_common::*;
 use cult_common::backend::JeopardyBoard;
@@ -67,6 +67,8 @@ async fn main() -> Result<()> {
             .service(create_game_lobby)
             .service(join_game)
             .service(download)
+            .service(upload)
+            .app_data(download)
             .default_service(
                 web::route().to(not_found)
             )

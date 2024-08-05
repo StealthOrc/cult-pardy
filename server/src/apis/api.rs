@@ -1,12 +1,15 @@
 use std::str::FromStr;
 use crate::data::SessionRequest;
+use crate::main;
+use crate::servers::db::{DBDatabase, MongoServer};
 use crate::servers::game::{CreateLobby, GetUserAndUpdateSession, GetUserSession, SessionToken};
 use actix::{Addr};
 
 use actix_web::cookie::Cookie;
 use actix_web::{get, HttpRequest, HttpResponse, post, web};
 use chrono::Local;
-use cult_common::wasm_lib::{ApiResponse, JeopardyMode};
+use cult_common::dto::DTOFileData;
+use cult_common::wasm_lib::{ApiResponse, JeopardyMode, FileData};
 use oauth2::http::header::COOKIE;
 use oauth2::http::HeaderValue;
 use serde::Serialize;
@@ -17,7 +20,7 @@ use cult_common::wasm_lib::ids::usersession::UserSessionId;
 use crate::apis::data::{extract_header_string, extract_value};
 use crate::authentication::discord::is_admin;
 use crate::servers::authentication::AuthenticationServer;
-use crate::servers::game;
+use crate::servers::{db, game};
 use crate::servers::game::UserSession;
 
 
@@ -56,6 +59,56 @@ async fn session_request(req: HttpRequest, srv: web::Data<Addr<game::GameServer>
     set_session_token_cookie(&mut response, &req, &user_session);
     Ok(response)
 }
+
+#[post("/api/upload")]
+async fn upload(req: HttpRequest,  db: web::Data<MongoServer> ,srv: web::Data<Addr<game::GameServer>>, json: web::Json<DTOFileData>, auth: web::Data<Addr<AuthenticationServer>> ) -> Result<HttpResponse, actix_web::Error> {
+    let user_session = get_session(&req, &srv).await;
+    if is_admin(user_session.clone(), auth).await == false {
+        return Ok(HttpResponse::from(HttpResponse::Unauthorized()));
+    }
+    let dto = json.into_inner();
+
+    if db.is_file_by_hash(&dto.video_hash()){
+        return Ok(HttpResponse::from(HttpResponse::Conflict()));
+    }
+    let data: chrono::DateTime<Local> = Local::now();
+    let mut response;
+    let file = dto.to_file_data(data, user_session.user_session_id.clone());
+    if db.add_file(FileData::from(file.clone())){
+        response = HttpResponse::from(HttpResponse::Ok().json(file));
+    }else{
+        response = HttpResponse::from(HttpResponse::InternalServerError());
+    }
+    set_session_token_cookie(&mut response, &req, &user_session);
+    Ok(response)
+}
+
+#[get("/api/file/{name}")]
+async fn download(req: HttpRequest,  db: web::Data<MongoServer> ,srv: web::Data<Addr<game::GameServer>>, auth: web::Data<Addr<AuthenticationServer>> ) -> Result<HttpResponse, actix_web::Error> {
+    let user_session = get_session(&req, &srv).await;
+
+    let name = match extract_header_string(&req, "name"){
+        Ok(data) => data,
+        Err(error) => return Ok(error),
+    };
+        
+    if is_admin(user_session.clone(), auth).await == false {
+        return Ok(HttpResponse::from(HttpResponse::Unauthorized()));
+    }
+
+    let file = db.get_file_by_name(&name);
+
+    let mut response = match file {
+        None => HttpResponse::from(HttpResponse::NotFound()),
+        Some(data) => HttpResponse::from(HttpResponse::Ok().json(data)),
+    };
+
+    set_session_token_cookie(&mut response, &req, &user_session);
+    Ok(response)
+}
+
+
+
 
 #[get("/api/session-data")]
 async fn session_data_request(req: HttpRequest, srv: web::Data<Addr<game::GameServer>>, auth: web::Data<Addr<AuthenticationServer>>) -> Result<HttpResponse, actix_web::Error> {
