@@ -158,8 +158,6 @@ impl Actor for WsSession {
                         }
                         Some(id) => {
                             act.player.websocket_session_id = Some(id);
-                            act.ping(ctx);
-                            act.get_pings(ctx);
                         }
                     },
 
