@@ -1,5 +1,5 @@
 
-import { type ApiResponse, type DiscordUser, type JeopardyBoard, type UserSessionId } from "cult-common";
+import { type ApiResponse, type DiscordUser, type JeopardyBoard, type myDTOFileData, type UserSessionId } from "cult-common";
 import { CookieStore, type SessionCookies } from "$lib/stores/cookies";
 
 /*
@@ -17,9 +17,6 @@ let cookies : SessionCookies | null = null;
 let updater : boolean = false;
 
 
-
-
-
 enum BackendApiRequests {
     INFO = 'api/info',
     SESSION_DATA = 'api/session-data',
@@ -28,12 +25,13 @@ enum BackendApiRequests {
     //CREATE = 'api/create',
     JOIN = 'api/join',
     BOARD = 'api/board',
+    UPLOAD = 'api/upload',
 }   
 
 
 
 export async function authorization(): Promise<ApiResponse> {
-    const response : Response | null = await api_request(BackendApiRequests.AUTHORIZATION);
+    const response : Response | null = await api_get_request(BackendApiRequests.AUTHORIZATION);
     if (response == null || !response.ok) {
         return {success: false};
     }
@@ -41,7 +39,7 @@ export async function authorization(): Promise<ApiResponse> {
 }
 
 export async function discord_session(): Promise<DiscordUser | null> {
-    const response : Response | null = await api_request(BackendApiRequests.DISCORD_SESSION);
+    const response : Response | null = await api_get_request(BackendApiRequests.DISCORD_SESSION);
     if (response == null || !response.ok) {
         return null;
     }
@@ -49,7 +47,7 @@ export async function discord_session(): Promise<DiscordUser | null> {
 }
 
 export async function session_data(): Promise<SessionData | null> {
-    const response : Response | null = await api_request(BackendApiRequests.SESSION_DATA);
+    const response : Response | null = await api_get_request(BackendApiRequests.SESSION_DATA);
     if (response == null || !response.ok) {
         return null;
     }
@@ -63,7 +61,7 @@ export async function session_data(): Promise<SessionData | null> {
 
 
 export async function join(): Promise<ApiResponse> {
-    const response : Response | null = await api_request(BackendApiRequests.JOIN);
+    const response : Response | null = await api_get_request(BackendApiRequests.JOIN);
     if (response == null || !response.ok) {
         return {success: false};
     }
@@ -71,7 +69,7 @@ export async function join(): Promise<ApiResponse> {
 }
 
 export async function board(): Promise<JeopardyBoard | null> {
-    const response : Response | null = await api_request(BackendApiRequests.BOARD);
+    const response : Response | null = await api_get_request(BackendApiRequests.BOARD);
     if (response == null || !response.ok) {
         return null;
     }
@@ -80,8 +78,8 @@ export async function board(): Promise<JeopardyBoard | null> {
 
 
 export async function UserInfo() {
-    const discord = api_request(BackendApiRequests.DISCORD_SESSION);
-    const auth = api_request(BackendApiRequests.AUTHORIZATION);
+    const discord = api_get_request(BackendApiRequests.DISCORD_SESSION);
+    const auth = api_get_request(BackendApiRequests.AUTHORIZATION);
 
     const [discord_response, auth_response] = await Promise.all([discord, auth]);
 
@@ -94,9 +92,40 @@ export async function UserInfo() {
 
 }
 
+export async function upload(data:myDTOFileData): Promise<ApiResponse> {
+    const response : Response | null = await api_post_request(BackendApiRequests.UPLOAD, data);
+    if (response == null || !response.ok) {
+        return {success: false};
+    }
+    return await response.json();
+}
 
 
-export async function api_request(request:BackendApiRequests): Promise<Response | null> {
+export async function api_post_request(request:BackendApiRequests, data:any): Promise<Response | null> {
+    try {
+        if (!updater) {
+            CookieStore.subscribe((c) => {
+                cookies = c;
+            });
+            updater = true;
+        }
+        if (cookies == null) {
+            return null;
+        }  
+        return await fetch(request + `?user-session-id=${cookies.userSessionId.id}&session-token=${cookies.sessionToken}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data),
+        });
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (e ) {
+        return null
+    }
+}
+export async function api_get_request(request:BackendApiRequests): Promise<Response | null> {
     try {
         if (!updater) {
             CookieStore.subscribe((c) => {
@@ -134,6 +163,7 @@ export class SessionData {
 
 
 import { DateTime } from 'ts-luxon';
+import { deflate, deflateSync } from "fflate";
 
 export class SessionToken {
     public token: string;

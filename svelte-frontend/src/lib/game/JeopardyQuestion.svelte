@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { WebsocketStore } from '$lib/stores/WebsocketStore';
-	import type { DtoQuestion, Vector2D, VideoEvent, WebsocketSessionEvent } from 'cult-common';
+	import type { DtoQuestion, Vector2D, WebsocketSessionEvent } from 'cult-common';
 	import type { WebSocketSubject } from 'rxjs/webSocket';
 	import { onMount } from 'svelte';
 	import { on } from 'svelte/events';
@@ -9,6 +9,7 @@
 	import type { YTPP_Options } from 'youtube-player-plus/types';
 	import JeopardyBoard from './JeopardyBoard.svelte';
 	import { JeopardyBoardStore } from '$lib/stores/JeopardyBoardStore';
+	import { binary_test } from '$lib/const';
     
     export let question: DtoQuestion;
     let open_request = false;
@@ -106,47 +107,42 @@
         return result;
     }
 
-    function play() {
-        if (player == null) {
-            return;
+    function binaryToByteArray(binaryString: string): Uint8Array {
+        if (binaryString.length % 8 !== 0) {
+            throw new Error('Binary string length must be a multiple of 8');
         }
-        if (ws == null ) {
-            return;
+        
+        const byteArray = new Uint8Array(binaryString.length / 8);
+        
+        for (let i = 0; i < byteArray.length; i++) {
+            byteArray[i] = parseInt(binaryString.slice(i * 8, (i + 1) * 8), 2);
         }
-        player.play();
-        let click : VideoEvent  = "Play" ;
-        let click2 : WebsocketSessionEvent = {ViedeoEvent : click};
-        ws.next(click2);
+        
+        return byteArray;
+    }
+    // Function to load the video into a Blob
+    let videoBlobUrl: string;
+    async function loadVideoToBlob(url: string) {
+        try {
+            const buf: ArrayBuffer = binaryToByteArray(binary_test);
+
+            const videoBlob: Blob = new Blob([buf], { type: 'video/mp4' });
+            console.log('type:', videoBlob.type);
+
+            // Create a URL for the Blob
+            videoBlobUrl = URL.createObjectURL(videoBlob);
+        } catch (error) {
+            console.error('Error loading video:', error);
+        }
     }
 
-    function pause() {
-        if (player == null) {
-            return;
-        }
-        if (ws == null ) {
-            return;
-        }
-        player.pause();
-        let click : VideoEvent ={ Pause: 12 };
-        let click2 : WebsocketSessionEvent = {ViedeoEvent : click};
-        ws.next(click2);
-    }
-
-    function stop() {
-        if (player == null) {
-            return;
-        }
-        if (ws == null ) {
-            return;
-        }
-        player.stop();
-        let click : VideoEvent ={ Resume: 12 };
-        let click2 : WebsocketSessionEvent = {ViedeoEvent : click};
-        ws.next(click2);
-    }
-
-
+    // Load the video when the component is mounted
+    onMount(() => {
+        const videoUrl = '/assets/FlyHigh.mp4';
+        loadVideoToBlob(videoUrl);
+    });
 </script>
+
 <div class="player" id="player"></div>
 <div class="jeopardy-question">
     {#if question.won_user_id !== null}
@@ -156,25 +152,32 @@
     {/if}
     {#if current && current.vector2d.x === question.vector2d.x && current.vector2d.y === question.vector2d.y}
         <div class="overlay" role="dialog">
-            {#if is_youtuve()}
-                <div class="overlay-content">
-                    //edit hier with tailwind
+            <div class="overlay-content">
+                {#if videoBlobUrl}
+                    <!-- Render the video element once the Blob URL is available -->
+                    <video src={videoBlobUrl} controls>
+                        <track kind="captions" />
+                    </video>
+                {:else}
+                    <p>Loading video...</p>
+                {/if}
+                {#if is_youtuve()}
+                    <!--edit hier with tailwind -->
                     <p class="player container mx-auto"></p>
                     <h1>${current.value}</h1>
                     <p>{current.question_type}</p>
+
                     {#if createYouTubePlayer()}
-                     
-                    <button on:click={() => play()}>Play</button>
-                    <button on:click={() => pause()}>Pause</button>
-                    <button on:click={() => stop()}>Stop</button>
-                {/if}
-                </div>
-            {:else}
-                <div class="overlay-content">
+
+                    <button on:click={() => player?.play()}>Play</button>
+                    <button on:click={() => player?.pause()}>Pause</button>
+                    <button on:click={() => player?.stop()}>Stop</button>
+                    {/if}
+                {:else}
                     <h1>${current.value}</h1>
                     <p>{current.question_text}</p>
-                </div>
-            {/if}
+                {/if}
+            </div>
             <button class="close-button" on:click={handleClose}>Close</button>
         </div>
     {/if}

@@ -11,6 +11,7 @@
 	import { discord_session} from "$lib/api/ApiRequests";
 	import LoadingPage from "./DevLoading.svelte";
 	import { deflate } from "fflate";
+	import BtnFileUpload from "$lib/create/BtnFileUpload.svelte";
     let lobbyid = '';
 
     let cookies : SessionCookies; 
@@ -99,7 +100,5 @@
         {:else}
             <LoadingPage/>
         {/if}
-        <input type="file" id="file" on:change={changed} />
-        <div id="binary" class="binary">Text</div>
-
+        <BtnFileUpload/>
 </div>
