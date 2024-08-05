@@ -110,7 +110,7 @@
         if (player == null) {
             return;
         }
-        if (open_request || ws == null ) {
+        if (ws == null ) {
             return;
         }
         player.play();
@@ -123,7 +123,7 @@
         if (player == null) {
             return;
         }
-        if (open_request || ws == null ) {
+        if (ws == null ) {
             return;
         }
         player.pause();
@@ -136,7 +136,7 @@
         if (player == null) {
             return;
         }
-        if (open_request || ws == null ) {
+        if (ws == null ) {
             return;
         }
         player.stop();

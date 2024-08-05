@@ -2,7 +2,7 @@
     import { base } from "$app/paths";
 
 
-
+    import * as fflate from 'fflate';
     import Cookies from "js-cookie";
 	import { onMount } from "svelte";
     import { CookieStore, dev_loaded,type SessionCookies } from "$lib/stores/cookies";
@@ -10,6 +10,7 @@
 	import PlayerIcon from "./PlayerIcon.svelte";
 	import { discord_session} from "$lib/api/ApiRequests";
 	import LoadingPage from "./DevLoading.svelte";
+	import { deflate } from "fflate";
     let lobbyid = '';
 
     let cookies : SessionCookies; 
@@ -30,10 +31,76 @@
         loaded = true;
     })
 
+    function arrayBufferToBinary(buffer: ArrayBuffer): string {
+        console.log("buffer" ,buffer.byteLength);
+      var uint8 = new Uint8Array(buffer);
+      console.log("uint8", uint8.length);
+      let u =  uint8.reduce((binary, uint8) => binary + uint8.toString(2), "");
+        console.log("u", u.length);
+
+        compressArrayBuffer(buffer).then(compressed => {
+        console.log('Compressed ArrayBuffer:', compressed.length);
+        fflate.inflate(compressed, (err, inflated) => {
+            if (err) {
+            console.error('Inflation error:', err);
+            } else {
+            console.log('Inflated ArrayBuffer:', inflated.length);
+            }
+        });
+        }).catch(error => {
+        console.error('Compression error:', error);
+        });
+
+
+
+
+      function compressArrayBuffer(arrayBuffer : ArrayBuffer): Promise<Uint8Array> {
+        const uint8Array = new Uint8Array(arrayBuffer);
+  
+        return new Promise((resolve, reject) => {
+            deflate(uint8Array, (err, compressed) => {
+            if (err) {
+                reject(err);
+            } else {
+                resolve(compressed);
+            }
+            });
+        });
+        }
+
+
+      return u;
+    }
+
+      function fileToBinary(file:File, callback: (binary: string) => void) {  
+        var reader: FileReader = new FileReader();
+        reader.onload = (event) => {
+            callback(arrayBufferToBinary(reader.result as ArrayBuffer));
+        };
+        reader.readAsArrayBuffer(file);
+      }
+
+      var input = document.getElementById("file");
+      var output = document.getElementsByClassName("binary");
+
+
+    function changed(event: Event) {
+        var input = event.target as HTMLInputElement;
+        console.log(input.files);
+        if (!input.files) return;
+        var file = input.files[0];
+        if (file) fileToBinary(file, (binary) => {
+            console.log(binary);
+            if (output == null) return;
+            output[0].textContent = binary
+            }
+        );
+    }
 
 </script>
 
-<h1>Cult Pardy</h1>
+
+
 <div class=" h-dvh w-dvw flex flex-col items-center justify-center gap-2">
         {#if loaded}
         <input bind:value={lobbyid} class="border-2 border-blue-600 placeholder-blue-600 p-2 rounded m-2" type="text" name="lobby-id" id="lobby-id" placeholder="Lobby ID"/>
@@ -49,4 +116,7 @@
         {:else}
             <LoadingPage/>
         {/if}
+        <input type="file" id="file" on:change={changed} />
+        <div id="binary" class="binary">Text</div>
+
 </div>

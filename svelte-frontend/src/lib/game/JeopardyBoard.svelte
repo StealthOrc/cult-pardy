@@ -12,6 +12,7 @@
 	import { SessionPingsStore } from '$lib/stores/SessionPings';
 	import { newWebSocketStore} from '$lib/stores/WebsocketStore';
 	import { JeopardyBoardStore } from '$lib/stores/JeopardyBoardStore';
+	import { deflate, inflate } from 'fflate';
 
     export let lobbyId: string = "main";	
 
@@ -57,13 +58,21 @@
             ws.subscribe({
                 next: (message) => {
                     if (message instanceof ArrayBuffer) {
-                        const decoder = new TextDecoder();
-                        let json : string = decoder.decode(message);
-                        const parsed : WebsocketServerEvents = JSON.parse(json);
-                        const updated = handleEvent(parsed);
-                        if (updated) {
-                            updateGridColumns();
-                        }
+                        let u8 = new Uint8Array(message);
+                        inflate(u8, (err, infalte) => {
+                            if (err) {
+                                console.error('Deflation error:', err);
+                            } else {
+                                const decoder = new TextDecoder();
+                                let json : string = decoder.decode(infalte);
+                                const parsed : WebsocketServerEvents = JSON.parse(json);
+                                const updated = handleEvent(parsed);
+                                if (updated) {
+                                    updateGridColumns();
+                                }
+                            }
+
+                        });
                     };
                 },
                 error: (error) => {

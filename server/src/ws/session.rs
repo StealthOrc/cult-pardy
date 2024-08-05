@@ -2,6 +2,7 @@ use std::time::{Duration, Instant};
 use std::vec;
 
 use actix::prelude::*;
+use cult_common::{compress, decompress};
 use serde::{Deserialize, Serialize};
 
 use crate::servers::game::{self, GameServer, SendSessionMessageType, SessionMessageResult};
@@ -72,8 +73,6 @@ impl WsSession {
     }
 
     fn hb(&mut self, ctx: &mut ws::WebsocketContext<Self>) {
-        self.ping(ctx);
-        self.get_pings(ctx);
         ctx.run_interval(HEARTBEAT_INTERVAL, |act: &mut WsSession, ctx| {
             let time_since = Instant::now().duration_since(act.hb);
             if time_since > CLIENT_TIMEOUT {
@@ -113,7 +112,9 @@ impl WsSession {
                 Ok(res) => {
                     if res.len() > 0 {
                         let binary: Vec<u8> = serde_json::to_vec(&WebsocketServerEvents::Session(SessionEvent::SessionsPing(res))).expect("Can´t convert to vec");
-                        ctx.binary(binary);
+                        if let Ok(bytes) = compress(&binary) {
+                            ctx.binary(bytes)
+                        }
                     }
                 }
                 _ => ctx.stop(),
@@ -157,6 +158,7 @@ impl Actor for WsSession {
                         }
                         Some(id) => {
                             act.player.websocket_session_id = Some(id);
+                            act.ping(ctx);
                             act.get_pings(ctx);
                         }
                     },
@@ -193,7 +195,9 @@ impl Handler<SessionMessageType> for WsSession {
                     SendSessionMessageType::SelfDisconnect => ctx.stop(),
                     SendSessionMessageType::Data(data) => {
                         let binary = serde_json::to_vec(&data).expect("Can´t convert to vec");
-                        ctx.binary(binary);
+                        if let Ok(bytes) = compress(&binary) {
+                            ctx.binary(bytes)
+                        }
                         //TODO: make deflate alogithm de-/activatable again for development
                         //if let Ok(bytes) = compress(&binary) {
                         //    ctx.binary(bytes)
@@ -251,8 +255,8 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
             }
             ws::Message::Binary(data) => {
                 //TODO: make deflate alogithm de-/activatable again for development
-                //if let Ok(bytes) = decompress(&data) {
-                    match serde_json::from_slice::<WebsocketSessionEvent>(&data) {
+                if let Ok(bytes) = decompress(&data) {
+                    match serde_json::from_slice::<WebsocketSessionEvent>(&bytes) {
                         Ok(event) => {
                             match event.clone() {
                                 WebsocketSessionEvent::Click(vector2d) => {
@@ -287,7 +291,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                             println!("Error deserializing JSON data:  {:?}", err);
                         }
                     }
-                //}
+                }
             }
             ws::Message::Close(reason) => {
                 ctx.close(reason);

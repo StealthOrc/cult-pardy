@@ -2,6 +2,7 @@
 	import { onMount } from "svelte";
 	import { session_data, SessionData } from "$lib/api/ApiRequests";
 	import { CookieStore, dev_loaded, type SessionCookies } from "$lib/stores/cookies";
+	import { on } from "svelte/events";
 
 
 
@@ -33,9 +34,12 @@
         }
     })
 
- </script>
+        
 
-<div class="absolute bg-white bg-opacity-60 z-10 h-full w-full flex items-center justify-center">
+
+
+ </script>
+<class class="absolute bg-white bg-opacity-60 z-10 h-full w-full flex items-center justify-center">
     <div class="flex items-center">
       <span class="text-3xl mr-4">Loading</span>
       <svg class="animate-spin h-8 w-8 text-gray-800" fill="none"
@@ -46,5 +50,5 @@
         </path>
       </svg>
     </div>
-  </div>
+</class>
         

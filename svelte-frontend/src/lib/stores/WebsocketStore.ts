@@ -4,6 +4,7 @@ import type { UserSessionId, WebsocketSessionEvent } from "cult-common";
 import { webSocket, WebSocketSubject } from "rxjs/webSocket";
 import { writable, type Subscriber, type Unsubscriber} from "svelte/store"; 
 import type { SessionCookies } from "./cookies";
+import { deflateSync } from "fflate";
 
 
 // eslint-disable-next-line no-var
@@ -46,7 +47,9 @@ function get_ws(lobbyId: string, userSessionId: UserSessionId, sessionToken: str
             const buffer = new ArrayBuffer(binaryData.length);
             const view = new Uint8Array(buffer);
             view.set(binaryData);
-            return buffer;
+            const u8 = new Uint8Array(buffer);
+            const deflated = deflateSync(u8);
+            return deflated;
         }
     });
 }
