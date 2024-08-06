@@ -141,14 +141,12 @@ impl MongoServer{
  */
 
     pub async fn add_file_data(&self, file: FileData) -> bool {
-        println!("Adding FileData");
         let result = self.collection::<FileData>(CultPardy(UserCollection::FileData)).insert_one(file, None);
         match result {
             Err(_) => {
                 return false;
             }
             Ok(_) => {
-                println!("Added FileData");
                 return true;
             }
         }
@@ -156,7 +154,6 @@ impl MongoServer{
 
 
     pub async fn add_file_chunk(&self, file_chunk: &FileChunk) -> bool {
-        println!("Adding FileChunk");
         let result = self.collection::<FileChunk>(CultPardy(UserCollection::FileChunks)).insert_one(file_chunk, None);
         match result {
             Err(_) => {
@@ -203,7 +200,6 @@ impl MongoServer{
 
 
     pub fn is_file_chunk_valide(&self, name:&str, hash: &FileChunkHash) -> bool {   
-        println!("Name: {:#?}", name);
         let file_data = match self.get_file_data_from_name(&name) {
             None => {
                 println!("No FileData");
@@ -211,9 +207,6 @@ impl MongoServer{
             },
             Some(file_chunk) => file_chunk,
         };
-        println!("FileData: {:#?}", file_data.get_hashs());
-        println!("Hash: {:#?}", hash);
-
         file_data.containts_file_chunk_hash(hash)
     }
 

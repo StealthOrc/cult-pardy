@@ -98,7 +98,7 @@ async fn upload_file_data(req: HttpRequest,  db: web::Data<MongoServer> ,srv: we
     let mut response;
     let file = dto_filedata.clone().to_file_data(&user_session.user_session_id);
     if db.add_file_data(FileData::from(file.clone())).await{
-        response = HttpResponse::from(HttpResponse::Ok().json(file));
+        response = HttpResponse::from(HttpResponse::Ok().json(ApiResponse::of(true)));
     }else{
         return Ok(session_error(&req, &user_session, "Can´t add file data"));
     }
@@ -147,7 +147,7 @@ async fn upload_file_chunk(req: HttpRequest,  db: web::Data<MongoServer> ,srv: w
     }
 
     if db.add_file_chunk(&file_chunk).await{
-        response = HttpResponse::from(HttpResponse::Ok().json(file_chunk));
+        response = HttpResponse::from(HttpResponse::Ok().json(ApiResponse::of(true)));
         if db.is_last_file_chunk(&name){
             println!("LAST CHUNK");
         }
