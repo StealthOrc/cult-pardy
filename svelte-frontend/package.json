@@ -19,6 +19,7 @@
 		"@types/eslint": "^9.6.0",
 		"@types/http-proxy-middleware": "^1.0.0",
 		"@types/js-cookie": "^3.0.6",
+		"@types/xxhashjs": "^0.2.4",
 		"autoprefixer": "^10.4.19",
 		"eslint": "^9.8.0",
 		"eslint-config-prettier": "^9.1.0",
@@ -46,6 +47,7 @@
 		"ts-luxon": "^5.0.5",
 		"ts-pattern": "^5.2.0",
 		"vite-plugin-wasm": "^3.3.0",
+		"xxh3-ts": "^1.0.6",
 		"youtube-player-plus": "^0.1.7"
 	}
 }

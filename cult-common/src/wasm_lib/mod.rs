@@ -1,13 +1,19 @@
+use bytes::Bytes;
 use chrono::{DateTime, Local};
 use ids::discord::DiscordID;
 use ids::usersession::UserSessionId;
+use mongodb::bson::{doc, Bson, Document};
 use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
+use twox_hash::XxHash;
+use core::hash;
+use std::f32::consts::E;
 use std::hash::{Hash, Hasher};
 use std::string::ToString;
 use wasm_bindgen::prelude::*;
 
 use crate::backend::{ActionState, MediaPlayer};
+use crate::dto::FileChunk;
 
 pub mod ids;
 pub mod websocket_events;
@@ -124,12 +130,92 @@ impl ApiResponse {
         ApiResponse { success }
     }
 }
-#[derive(Tsify, Debug, Clone, Serialize, Deserialize, Hash,Eq, PartialEq, Default)]
+#[derive(Tsify, Debug,Serialize,Deserialize ,Clone ,Hash,Eq, PartialEq, Default)]
 pub struct FileData {
-    pub image: Vec<u8>,
+    chunks: Vec<FileChunk>,
     pub file_name: String,
+    pub total_chunks: usize,
     pub file_type: String,
-    pub hash: String,
+    pub chunk_hash: String,
+    pub validate_hash: String,
     pub upload_data: DateTime<Local>,
     pub uploader: UserSessionId,
 }
+
+
+
+
+
+
+    
+
+
+impl FileData {
+
+    pub fn new(chunks: Vec<FileChunk>, file_name: String, total_chunks: usize, file_type: String, chunk_hash: String, validate_hash: String, upload_data: DateTime<Local>, uploader: UserSessionId) -> Self {
+        FileData {
+            chunks,
+            file_name,
+            total_chunks,
+            file_type,
+            chunk_hash,
+            validate_hash,
+            upload_data,
+            uploader,
+        }
+    }
+
+    pub fn current_chunks(&self) -> usize {
+        self.chunks.len()
+    }
+    
+    pub fn is_valid(&self) -> bool {
+        self.chunks.len() == self.total_chunks && self.validate_hash == self.video_chunk_hash()
+    }
+
+    pub fn get_chunk(&self, index: usize) -> Option<&FileChunk> {
+        self.chunks.get(index)
+    }
+
+   
+    pub fn try_to_add_chunk(&mut self, chunk: FileChunk) -> bool {
+        let index_chunk = self.get_chunk(chunk.index);
+        match index_chunk {
+            Some(index) => {
+                if index.chunk == chunk.chunk || index.hash == chunk.hash {
+                    return false
+                } 
+                self.add_chunk(chunk)
+            }
+            None => self.add_chunk(chunk)
+            
+        }
+    }
+
+    fn add_chunk(&mut self, chunk: FileChunk) -> bool {
+        if chunk.index >= self.total_chunks || !chunk.is_valid() {
+            return false
+        }
+        self.chunks.push(chunk);
+        self.chunk_hash = self.update_video_hash();
+        true
+    }
+    
+
+
+    pub fn video_chunk_hash(&self) -> String {
+        let mut hasher = XxHash::with_seed(0); // Seed is optional
+        hasher.write(&self.chunks.iter().map(|x| x.chunk.clone()).flatten().collect::<Vec<u8>>());
+        hasher.finish().to_string()
+    }
+
+    pub fn update_video_hash(&mut self) -> String {
+        self.chunk_hash = self.video_chunk_hash();
+        self.chunk_hash.clone()
+    }
+
+
+
+
+}
+

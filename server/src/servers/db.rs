@@ -1,8 +1,9 @@
 use std::collections::HashSet;
 
+use cult_common::dto::FileChunk;
 use cult_common::wasm_lib::ids::discord::DiscordID;
 use cult_common::wasm_lib::FileData;
-use mongodb::bson::doc;
+use mongodb::bson::{doc, to_bson};
 use mongodb::options::{ClientOptions, ServerApi, ServerApiVersion};
 use mongodb::sync::{Client, Collection};
 use ritelinked::LinkedHashSet;
@@ -123,7 +124,17 @@ impl MongoServer{
         }
     }
 
-    pub fn add_file(&self, file: FileData) -> bool {
+    /*  pub chunks: Vec<FileChunk>,
+        pub file_name: String,
+        pub total_chunks: usize,
+        pub file_type: String,
+        pub chunk_hash: String,
+        pub validate_hash: String,
+        pub upload_data: DateTime<Local>,
+        pub uploader: UserSessionId,
+     */
+
+    pub fn add_file_data(&self, file: FileData) -> bool {
         let result = self.collection::<FileData>(CultPardy(UserCollection::Files)).insert_one(file, None);
         match result {
             Err(_) => {
@@ -135,8 +146,39 @@ impl MongoServer{
         }
     }
 
+    pub fn update_file_data(&self, file: FileData) -> bool {
+        let bson = match to_bson(&file) {
+            Ok(bson) => bson,
+            Err(_) => {
+                return false;
+            }
+        };
+        let status = self.collection::<FileData>(CultPardy(UserCollection::Files)).update_one(
+            doc! {"validate_hash": &file.validate_hash, "file_name": &file.file_name, "uploader.id": &file.uploader.id},
+            doc! {"$set": bson},
+            None);
+        match status {
+            Err(_) => {
+                return false;
+            }
+            Ok(_) => {
+                return true;
+            }
+        }
+    }
+
+    pub fn is_file_valide(&self, name: &str) -> bool {
+        match self.get_file_by_name(name) {
+            None => false,
+            Some(file) => file.is_valid(),
+        }
+    }
+
+
+
+
     pub  fn get_files_from_user_session(&self, user_session_id: &UserSessionId) -> HashSet<FileData> {
-        let result = self.collection::<FileData>(CultPardy(UserCollection::Files)).find(doc! {"user_session_id.id": &user_session_id.id}, None);
+        let result = self.collection::<FileData>(CultPardy(UserCollection::Files)).find(doc! {"uploader.id": &user_session_id.id}, None);
         match result {
             Err(_) => {
                 return HashSet::new();
@@ -152,15 +194,40 @@ impl MongoServer{
             }
         }
     }
+    
 
-    pub fn is_file_by_hash(&self, hash: &str) -> bool {
-        self.collection::<FileData>(CultPardy(UserCollection::Files)).find_one(doc! {"hash": &hash}, None).is_ok()
+
+
+    pub fn is_file_by_chunk_hash(&self, hash: &str) -> bool {
+        match self.get_file_by_validate_hash(hash) {
+            None => false,
+            Some(_) => true,
+        }
+    }
+    
+
+
+    pub fn get_file_by_chunk_hash(&self, hash: &str) -> Option<FileData> {
+        let result = self.collection::<FileData>(CultPardy(UserCollection::Files)).find_one(doc! {"chunk_hash": &hash}, None);
+        match result {
+            Err(_) => {
+                return None;
+            }
+            Ok(data) => data,
+        }
     }
 
+    pub fn is_file_by_validate_hash(&self, hash: &str) -> bool {
+        match self.get_file_by_validate_hash(hash) {
+            None => false,
+            Some(_) => true,
+        }
+    }
+    
 
 
-    pub fn get_file_by_hash(&self, hash: &str) -> Option<FileData> {
-        let result = self.collection::<FileData>(CultPardy(UserCollection::Files)).find_one(doc! {"hash": &hash}, None);
+    pub fn get_file_by_validate_hash(&self, hash: &str) -> Option<FileData> {
+        let result = self.collection::<FileData>(CultPardy(UserCollection::Files)).find_one(doc! {"validate_hash": &hash}, None);
         match result {
             Err(_) => {
                 return None;

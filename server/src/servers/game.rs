@@ -300,7 +300,7 @@ impl<'de> Deserialize<'de> for SessionToken {
 
 impl From<&SessionToken> for Bson {
     fn from(token: &SessionToken) -> Self {
-        let mut doc = Document::new();
+        let mut doc: Document = Document::new();
         doc.insert("token", token.token.clone());
         doc.insert("create", token.create.clone().to_string());
         Bson::Document(doc)

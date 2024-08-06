@@ -9,10 +9,17 @@ mod data;
 use crate::apis::api::{board, create_game_lobby, discord_session, has_authorization, join_game};
 use crate::apis::api::session_request;
 
+use actix::Addr;
 use actix_web::{web, App, HttpServer, HttpRequest, HttpResponse, get};
 use anyhow::Result;
 
-use apis::api::{session_data_request, upload};
+use apis::api::{get_session, session_data_request, set_session_token_cookie,upload_file_chunk, upload_file_data};
+use apis::data::extract_header_string;
+use authentication::discord::is_admin;
+use dto::DTOFileData;
+use servers::authentication::AuthenticationServer;
+use servers::db::MongoServer;
+use servers::game::GameServer;
 use tokio::runtime::Runtime;
 use cult_common::*;
 use cult_common::backend::JeopardyBoard;
@@ -67,8 +74,9 @@ async fn main() -> Result<()> {
             .service(create_game_lobby)
             .service(join_game)
             .service(download)
-            .service(upload)
-            .app_data(download)
+            .service(upload_file_chunk)
+            .service(upload_file_data)
+            .service(get_file_from_name)
             .default_service(
                 web::route().to(not_found)
             )
@@ -97,4 +105,30 @@ async fn download(_req: HttpRequest) -> std::result::Result<HttpResponse, actix_
         .content_type("application/json")
         .append_header(("Content-Disposition", "attachment; filename=test.json"))
         .body(json_data))
+}
+
+
+
+#[get("/api/file/{name}")]
+async fn get_file_from_name(req: HttpRequest,  db: web::Data<MongoServer> ,srv: web::Data<Addr<GameServer>>, auth: web::Data<Addr<AuthenticationServer>> ) -> Result<HttpResponse, actix_web::Error> {
+    let user_session = get_session(&req, &srv).await;
+
+    let name = match extract_header_string(&req, "name"){
+        Ok(data) => data,
+        Err(error) => return Ok(error),
+    };
+        
+    if is_admin(user_session.clone(), auth).await == false {
+        return Ok(HttpResponse::from(HttpResponse::Unauthorized()));
+    }
+
+    let file = db.get_file_by_name(&name);
+
+    let mut response = match file {
+        None => HttpResponse::from(HttpResponse::NotFound()),
+        Some(data) => HttpResponse::from(HttpResponse::Ok().json(data)),
+    };
+
+    set_session_token_cookie(&mut response, &req, &user_session);
+    Ok(response)
 }

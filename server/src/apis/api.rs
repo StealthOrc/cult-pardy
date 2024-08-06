@@ -1,3 +1,4 @@
+use std::hash::Hash;
 use std::str::FromStr;
 use crate::data::SessionRequest;
 use crate::main;
@@ -7,21 +8,24 @@ use actix::{Addr};
 
 use actix_web::cookie::Cookie;
 use actix_web::{get, HttpRequest, HttpResponse, post, web};
+use attohttpc::body::File;
 use chrono::Local;
-use cult_common::dto::DTOFileData;
+use cult_common::dto::{DTOFileChunk, DTOFileData};
 use cult_common::wasm_lib::{ApiResponse, JeopardyMode, FileData};
 use oauth2::http::header::COOKIE;
-use oauth2::http::HeaderValue;
+use oauth2::http::{response, HeaderValue};
 use serde::Serialize;
 use serde_json::json;
 use cult_common::backend::JeopardyBoard;
 use cult_common::wasm_lib::ids::lobby::LobbyId;
 use cult_common::wasm_lib::ids::usersession::UserSessionId;
-use crate::apis::data::{extract_header_string, extract_value};
+use crate::apis::data::{extract_header_string, extract_value, get_internal_server_error_json};
 use crate::authentication::discord::is_admin;
 use crate::servers::authentication::AuthenticationServer;
 use crate::servers::{db, game};
 use crate::servers::game::UserSession;
+
+use super::data;
 
 
 #[get("/api/info")]
@@ -60,52 +64,120 @@ async fn session_request(req: HttpRequest, srv: web::Data<Addr<game::GameServer>
     Ok(response)
 }
 
-#[post("/api/upload")]
-async fn upload(req: HttpRequest,  db: web::Data<MongoServer> ,srv: web::Data<Addr<game::GameServer>>, json: web::Json<DTOFileData>, auth: web::Data<Addr<AuthenticationServer>> ) -> Result<HttpResponse, actix_web::Error> {
+#[post("/api/upload/filedata")]
+async fn upload_file_data(req: HttpRequest,  db: web::Data<MongoServer> ,srv: web::Data<Addr<game::GameServer>>, auth: web::Data<Addr<AuthenticationServer>>,  json: web::Json<DTOFileData>) -> Result<HttpResponse, actix_web::Error> {
     let user_session = get_session(&req, &srv).await;
+    let mut response;
     if is_admin(user_session.clone(), auth).await == false {
-        return Ok(HttpResponse::from(HttpResponse::Unauthorized()));
-    }
-    let dto = json.into_inner();
+        response = get_internal_server_error_json({
+            json!({
+                "Error": "Unauthorized",
+                "User": user_session.user_session_id.id.to_string()
+            })
+        });
+        set_session_token_cookie(&mut response, &req, &user_session);
+        return Ok(response)
+    } 
 
-    if db.is_file_by_hash(&dto.video_hash()){
-        return Ok(HttpResponse::from(HttpResponse::Conflict()));
+
+    let dto_filedata = json.into_inner();
+    println!("DATA HASH {:?} ", dto_filedata.validate_hash);
+
+
+    if db.is_file_by_validate_hash(&dto_filedata.validate_hash){   
+        response = get_internal_server_error_json({
+            json!({
+                "Error": "File already exists",
+                "File": dto_filedata.file_name
+            })
+        });
+        set_session_token_cookie(&mut response, &req, &user_session);
+        return Ok(response);
     }
+    
     let data: chrono::DateTime<Local> = Local::now();
     let mut response;
-    let file = dto.to_file_data(data, user_session.user_session_id.clone());
-    if db.add_file(FileData::from(file.clone())){
+    let file = dto_filedata.clone().to_file_data(data, user_session.user_session_id.clone());
+    if db.add_file_data(FileData::from(file.clone())){
         response = HttpResponse::from(HttpResponse::Ok().json(file));
     }else{
-        response = HttpResponse::from(HttpResponse::InternalServerError());
+        response = get_internal_server_error_json({
+            json!({
+                "Error": "Can´t add file",
+                "File": dto_filedata.file_name
+            })
+        });
     }
     set_session_token_cookie(&mut response, &req, &user_session);
     Ok(response)
 }
 
-#[get("/api/file/{name}")]
-async fn download(req: HttpRequest,  db: web::Data<MongoServer> ,srv: web::Data<Addr<game::GameServer>>, auth: web::Data<Addr<AuthenticationServer>> ) -> Result<HttpResponse, actix_web::Error> {
+
+pub static mut test: Option<FileData> = None;
+
+
+
+#[post("/api/upload/filechunk")]
+async fn upload_file_chunk(req: HttpRequest,  db: web::Data<MongoServer> ,srv: web::Data<Addr<game::GameServer>>, auth: web::Data<Addr<AuthenticationServer>>, json: web::Json<DTOFileChunk>) -> Result<HttpResponse, actix_web::Error> {
     let user_session = get_session(&req, &srv).await;
-
-    let name = match extract_header_string(&req, "name"){
-        Ok(data) => data,
-        Err(error) => return Ok(error),
-    };
-        
+    let mut response;
     if is_admin(user_session.clone(), auth).await == false {
-        return Ok(HttpResponse::from(HttpResponse::Unauthorized()));
-    }
+        response = get_internal_server_error_json({
+            json!({
+                "Error": "Unauthorized",
+                "User": user_session.user_session_id.id.to_string()
+            })
+        });
+        set_session_token_cookie(&mut response, &req, &user_session);
+        return Ok(response)
+    } 
 
-    let file = db.get_file_by_name(&name);
+    let dto_filechunk = json.into_inner();
 
-    let mut response = match file {
-        None => HttpResponse::from(HttpResponse::NotFound()),
-        Some(data) => HttpResponse::from(HttpResponse::Ok().json(data)),
+    let file_chunk = dto_filechunk.clone().to_file_chunk();
+
+    println!("HASH: {:?} - Validate: {:?}", file_chunk.hash.clone(), file_chunk.validate_hash);
+
+
+    let mut file = match db.get_file_by_name(&dto_filechunk.file_name){
+        Some(file) => file,
+        None => {
+            response = get_internal_server_error_json({
+                json!({
+                    "Error": "File not found",
+                    "File": dto_filechunk.file_name
+                })
+            });
+            set_session_token_cookie(&mut response, &req, &user_session);
+            return Ok(response);
+        }
     };
+
+    let added = file.try_to_add_chunk(file_chunk);
+
+
+    println!("ADDED: {:?}", added);
+    println!("CHUNKS: {:?} - TOTAL CHUNKS: {:?}", file.current_chunks(), file.total_chunks);
+    println!("Is Valid: {:?}", file.is_valid());
+
+
+    if db.update_file_data(file.clone()){
+        response = HttpResponse::from(HttpResponse::Ok().json(file));
+    }else{
+        response = get_internal_server_error_json({
+            json!({
+                "Error": "Can´t update file",
+                "File": dto_filechunk.file_name
+            })
+        });
+    }
 
     set_session_token_cookie(&mut response, &req, &user_session);
     Ok(response)
 }
+
+
+
 
 
 

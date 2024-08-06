@@ -1,6 +1,10 @@
+use bytes::Bytes;
 use chrono::{DateTime, Local};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use tsify_next::Tsify;
+use twox_hash::XxHash;
+use std::collections::HashSet;
+use std::fs::File;
 use std::hash::{Hash, Hasher};
 use std::string::ToString;
 use wasm_bindgen::prelude::*;
@@ -98,30 +102,73 @@ pub struct DtoQuestion {
 }
 
 
-#[derive(Tsify, Debug, Clone, Serialize, Deserialize, Hash,Eq, PartialEq, Default)]
+#[derive(Tsify, Debug, Clone,Serialize,Deserialize, Hash,Eq, PartialEq, Default)]
 pub struct DTOFileData {
-    pub image: Vec<u8>,
     pub file_name: String,
     pub file_type: String,
+    pub total_chunks: usize,
+    pub validate_hash: String,
 }
+
+
+
+#[derive(Tsify, Debug, Clone,Serialize,Deserialize, Hash,Eq, PartialEq, Default)]
+pub struct DTOFileChunk {
+    pub file_name: String,
+    pub index: usize,
+    pub chunk: Vec<u8>,
+    pub validate_hash: String,
+}
+
+impl DTOFileChunk {
+    pub fn to_file_chunk(self) -> FileChunk {
+        let hash = self.to_chunk_hash();
+        FileChunk {
+            index: self.index,
+            chunk: self.chunk,
+            hash: hash,
+            validate_hash: self.validate_hash,
+        }
+    }
+
+    pub fn to_chunk_hash(&self) -> String {
+        let mut hasher = XxHash::with_seed(0); // Seed is optional
+        hasher.write(&self.chunk);
+        hasher.finish().to_string()
+    }
+    
+}
+
+
+#[derive(Tsify, Debug, Clone,Serialize,Deserialize, Hash,Eq, PartialEq, Default)]
+pub struct FileChunk {
+    pub index: usize,
+    pub chunk: Vec<u8>,
+    pub hash: String,
+    pub validate_hash: String,
+}
+
+
+
+impl FileChunk {
+
+    pub fn is_valid(&self) -> bool {
+        self.hash == self.validate_hash 
+    }
+
+
+}
+
 
 impl DTOFileData {
     
     pub fn to_file_data(self,upload_data:DateTime<Local>, uploader: UserSessionId) -> FileData {
-        let hash = self.video_hash();
-        FileData {
-            image: self.image,
-            file_name: self.file_name,
-            file_type: self.file_type,
-            hash,
-            upload_data,
-            uploader,
-        }
+        FileData::new(vec![], self.file_name, self.total_chunks, self.file_type, "".to_string(), self.validate_hash, upload_data, uploader)
+  
     }
 
-    pub fn video_hash(&self) -> String {
-        let mut hasher = std::collections::hash_map::DefaultHasher::new();
-        self.image.hash(&mut hasher);
-        hasher.finish().to_string()
-    }
+
+
+
+
 }

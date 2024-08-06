@@ -20,7 +20,7 @@ export function arrayBufferToBinary(arrayBuffer: ArrayBuffer): string {
 }
 
 export function fileToBinary(file:File, callback:(value: ArrayBuffer)=>void): void{  
-    var reader: FileReader = new FileReader();
+    const reader: FileReader = new FileReader();
     console.log(file.size);
     reader.onload = async function() {
         callback(reader.result as ArrayBuffer);

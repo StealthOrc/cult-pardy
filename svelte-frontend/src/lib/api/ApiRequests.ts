@@ -1,5 +1,5 @@
 
-import { type ApiResponse, type DiscordUser, type JeopardyBoard, type myDTOFileData, type UserSessionId } from "cult-common";
+import { type ApiResponse, type DiscordUser, type DTOFileChunk, type DTOFileData, type JeopardyBoard, type UserSessionId } from "cult-common";
 import { CookieStore, type SessionCookies } from "$lib/stores/cookies";
 
 /*
@@ -25,7 +25,9 @@ enum BackendApiRequests {
     //CREATE = 'api/create',
     JOIN = 'api/join',
     BOARD = 'api/board',
-    UPLOAD = 'api/upload',
+    FILEDATA = 'api/upload/filedata',
+    FILECHUNK = 'api/upload/filechunk',
+    
 }   
 
 
@@ -92,8 +94,16 @@ export async function UserInfo() {
 
 }
 
-export async function upload(data:myDTOFileData): Promise<ApiResponse> {
-    const response : Response | null = await api_post_request(BackendApiRequests.UPLOAD, data);
+export async function upload_data(data:DTOFileData): Promise<ApiResponse> {
+    const response : Response | null = await api_post_request(BackendApiRequests.FILEDATA, data);
+    if (response == null || !response.ok) {
+        return {success: false};
+    }
+    return await response.json();
+}
+
+export async function upload_chunk(data:DTOFileChunk): Promise<ApiResponse> {
+    const response : Response | null = await api_post_request(BackendApiRequests.FILECHUNK, data);
     if (response == null || !response.ok) {
         return {success: false};
     }
@@ -101,7 +111,7 @@ export async function upload(data:myDTOFileData): Promise<ApiResponse> {
 }
 
 
-export async function api_post_request(request:BackendApiRequests, data:any): Promise<Response | null> {
+export async function api_post_request(request:BackendApiRequests, data:unknown): Promise<Response | null> {
     try {
         if (!updater) {
             CookieStore.subscribe((c) => {
@@ -163,7 +173,6 @@ export class SessionData {
 
 
 import { DateTime } from 'ts-luxon';
-import { deflate, deflateSync } from "fflate";
 
 export class SessionToken {
     public token: string;
