@@ -1,8 +1,10 @@
 use bytes::Bytes;
 use chrono::{DateTime, Local};
+use hashs::filechunk::FileChunkHash;
+use hashs::filedata::FileDataHash;
+use hashs::validate::ValidateHash;
 use ids::discord::DiscordID;
-use ids::usersession::UserSessionId;
-use mongodb::bson::{doc, Bson, Document};
+use ids::usersession::{self, UserSessionId};
 use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
 use twox_hash::XxHash;
@@ -17,7 +19,7 @@ use crate::dto::FileChunk;
 
 pub mod ids;
 pub mod websocket_events;
-
+pub mod hashs;
 
 
 #[derive(Tsify,Clone, Copy,Serialize,Deserialize)]
@@ -130,89 +132,72 @@ impl ApiResponse {
         ApiResponse { success }
     }
 }
+
+
+#[derive(Tsify,Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Default)]
+pub struct CFile {
+    pub file_chunks: Vec<FileChunk>,
+    pub file_data: FileData,
+}
+
+impl CFile {
+
+
+    pub fn current_chunks(&self) -> usize {
+        self.file_chunks.len()
+    }
+    
+    pub fn is_valid(&self) -> bool {
+        self.file_chunks.len() == self.file_data.total_chunks && self.file_data.validate_hash.validate_file_data(&self.file_data.filedata_hash)
+    }
+
+    pub fn get_chunk(&self, index: usize) -> Option<&FileChunk> {
+        self.file_chunks.iter().find(|x| x.index == index)
+    }
+
+   
+}
+
 #[derive(Tsify, Debug,Serialize,Deserialize ,Clone ,Hash,Eq, PartialEq, Default)]
 pub struct FileData {
-    chunks: Vec<FileChunk>,
+    file_chunks_hashs: Vec<FileChunkHash>,
     pub file_name: String,
     pub total_chunks: usize,
     pub file_type: String,
-    pub chunk_hash: String,
-    pub validate_hash: String,
+    pub filedata_hash: FileDataHash,
+    pub validate_hash: ValidateHash,
     pub upload_data: DateTime<Local>,
     pub uploader: UserSessionId,
 }
 
 
 
-
-
-
-    
-
-
 impl FileData {
 
-    pub fn new(chunks: Vec<FileChunk>, file_name: String, total_chunks: usize, file_type: String, chunk_hash: String, validate_hash: String, upload_data: DateTime<Local>, uploader: UserSessionId) -> Self {
+
+    pub fn new(file_chunks_hashs: Vec<FileChunkHash>, file_name: String, total_chunks: usize, file_type: String, validate_hash:ValidateHash,uploader: &UserSessionId) -> Self {
+        let filedata_hash = FileDataHash::default();
+        let upload_data = Local::now();
         FileData {
-            chunks,
+            file_chunks_hashs,
             file_name,
             total_chunks,
             file_type,
-            chunk_hash,
+            filedata_hash,
             validate_hash,
             upload_data,
-            uploader,
+            uploader: uploader.clone(),
         }
     }
 
-    pub fn current_chunks(&self) -> usize {
-        self.chunks.len()
-    }
-    
-    pub fn is_valid(&self) -> bool {
-        self.chunks.len() == self.total_chunks && self.validate_hash == self.video_chunk_hash()
+    pub fn containts_file_chunk_hash(&self, hash: &FileChunkHash) -> bool {
+        self.file_chunks_hashs.iter().any(|x| x.hash == hash.hash)
     }
 
-    pub fn get_chunk(&self, index: usize) -> Option<&FileChunk> {
-        self.chunks.get(index)
+    pub fn get_hashs(&self) -> Vec<FileChunkHash> {
+        self.file_chunks_hashs.clone()
     }
 
-   
-    pub fn try_to_add_chunk(&mut self, chunk: FileChunk) -> bool {
-        let index_chunk = self.get_chunk(chunk.index);
-        match index_chunk {
-            Some(index) => {
-                if index.chunk == chunk.chunk || index.hash == chunk.hash {
-                    return false
-                } 
-                self.add_chunk(chunk)
-            }
-            None => self.add_chunk(chunk)
-            
-        }
-    }
-
-    fn add_chunk(&mut self, chunk: FileChunk) -> bool {
-        if chunk.index >= self.total_chunks || !chunk.is_valid() {
-            return false
-        }
-        self.chunks.push(chunk);
-        self.chunk_hash = self.update_video_hash();
-        true
-    }
-    
-
-
-    pub fn video_chunk_hash(&self) -> String {
-        let mut hasher = XxHash::with_seed(0); // Seed is optional
-        hasher.write(&self.chunks.iter().map(|x| x.chunk.clone()).flatten().collect::<Vec<u8>>());
-        hasher.finish().to_string()
-    }
-
-    pub fn update_video_hash(&mut self) -> String {
-        self.chunk_hash = self.video_chunk_hash();
-        self.chunk_hash.clone()
-    }
 
 
 

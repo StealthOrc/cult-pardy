@@ -1,3 +1,4 @@
+use std::any;
 use std::hash::Hash;
 use std::str::FromStr;
 use crate::data::SessionRequest;
@@ -12,6 +13,7 @@ use attohttpc::body::File;
 use chrono::Local;
 use cult_common::dto::{DTOFileChunk, DTOFileData};
 use cult_common::wasm_lib::{ApiResponse, JeopardyMode, FileData};
+use mongodb::change_stream::session;
 use oauth2::http::header::COOKIE;
 use oauth2::http::{response, HeaderValue};
 use serde::Serialize;
@@ -66,6 +68,7 @@ async fn session_request(req: HttpRequest, srv: web::Data<Addr<game::GameServer>
 
 #[post("/api/upload/filedata")]
 async fn upload_file_data(req: HttpRequest,  db: web::Data<MongoServer> ,srv: web::Data<Addr<game::GameServer>>, auth: web::Data<Addr<AuthenticationServer>>,  json: web::Json<DTOFileData>) -> Result<HttpResponse, actix_web::Error> {
+    println!("UPLOAD FILE DATA");
     let user_session = get_session(&req, &srv).await;
     let mut response;
     if is_admin(user_session.clone(), auth).await == false {
@@ -84,29 +87,20 @@ async fn upload_file_data(req: HttpRequest,  db: web::Data<MongoServer> ,srv: we
     println!("DATA HASH {:?} ", dto_filedata.validate_hash);
 
 
-    if db.is_file_by_validate_hash(&dto_filedata.validate_hash){   
-        response = get_internal_server_error_json({
-            json!({
-                "Error": "File already exists",
-                "File": dto_filedata.file_name
-            })
-        });
-        set_session_token_cookie(&mut response, &req, &user_session);
-        return Ok(response);
+
+
+    if db.is_file_data(&dto_filedata.file_name) {
+        return Ok(session_error(&req, &user_session, "File already exists"))
     }
-    
-    let data: chrono::DateTime<Local> = Local::now();
+
+
+
     let mut response;
-    let file = dto_filedata.clone().to_file_data(data, user_session.user_session_id.clone());
-    if db.add_file_data(FileData::from(file.clone())){
+    let file = dto_filedata.clone().to_file_data(&user_session.user_session_id);
+    if db.add_file_data(FileData::from(file.clone())).await{
         response = HttpResponse::from(HttpResponse::Ok().json(file));
     }else{
-        response = get_internal_server_error_json({
-            json!({
-                "Error": "Can´t add file",
-                "File": dto_filedata.file_name
-            })
-        });
+        return Ok(session_error(&req, &user_session, "Can´t add file data"));
     }
     set_session_token_cookie(&mut response, &req, &user_session);
     Ok(response)
@@ -119,57 +113,47 @@ pub static mut test: Option<FileData> = None;
 
 #[post("/api/upload/filechunk")]
 async fn upload_file_chunk(req: HttpRequest,  db: web::Data<MongoServer> ,srv: web::Data<Addr<game::GameServer>>, auth: web::Data<Addr<AuthenticationServer>>, json: web::Json<DTOFileChunk>) -> Result<HttpResponse, actix_web::Error> {
+    println!("UPLOAD FILE CHUNK");
     let user_session = get_session(&req, &srv).await;
     let mut response;
     if is_admin(user_session.clone(), auth).await == false {
-        response = get_internal_server_error_json({
-            json!({
-                "Error": "Unauthorized",
-                "User": user_session.user_session_id.id.to_string()
-            })
-        });
-        set_session_token_cookie(&mut response, &req, &user_session);
-        return Ok(response)
+        return Ok(session_error(&req, &user_session, "Unauthorized"));
     } 
 
     let dto_filechunk = json.into_inner();
 
     let file_chunk = dto_filechunk.clone().to_file_chunk();
+    let name = file_chunk.file_name.clone();
+    let hash = file_chunk.filechunk_hash.clone();
 
-    println!("HASH: {:?} - Validate: {:?}", file_chunk.hash.clone(), file_chunk.validate_hash);
+    println!("HASH: {:?} - Validate: {:?}", hash, file_chunk.validate_hash.get_hash());
 
 
-    let mut file = match db.get_file_by_name(&dto_filechunk.file_name){
-        Some(file) => file,
-        None => {
-            response = get_internal_server_error_json({
-                json!({
-                    "Error": "File not found",
-                    "File": dto_filechunk.file_name
-                })
-            });
-            set_session_token_cookie(&mut response, &req, &user_session);
-            return Ok(response);
+
+    if file_chunk.validate_hash.validate_file_chunk(&hash) == false {
+        return Ok(session_error(&req, &user_session, "Invalid File Chunk"));
+    }
+
+    match db.get_file_chunks_by_index(&name, &file_chunk.index){
+        Some(found_chunk) => {
+            println!("File chunk already exists {} - {}", file_chunk.file_name, found_chunk.file_name);
+            return Ok(session_error(&req, &user_session, "File chunk already exists"));
+        },
+        None => (),
+    }
+
+    if db.is_file_chunk_valide(&name, &hash) == false {
+        return Ok(session_error(&req, &user_session, "File chunk is not valid"));
+    }
+
+    if db.add_file_chunk(&file_chunk).await{
+        response = HttpResponse::from(HttpResponse::Ok().json(file_chunk));
+        if db.is_last_file_chunk(&name){
+            println!("LAST CHUNK");
         }
-    };
-
-    let added = file.try_to_add_chunk(file_chunk);
-
-
-    println!("ADDED: {:?}", added);
-    println!("CHUNKS: {:?} - TOTAL CHUNKS: {:?}", file.current_chunks(), file.total_chunks);
-    println!("Is Valid: {:?}", file.is_valid());
-
-
-    if db.update_file_data(file.clone()){
-        response = HttpResponse::from(HttpResponse::Ok().json(file));
-    }else{
-        response = get_internal_server_error_json({
-            json!({
-                "Error": "Can´t update file",
-                "File": dto_filechunk.file_name
-            })
-        });
+    }
+    else{
+       response = session_error(&req, &user_session, "Can´t add file chunk");
     }
 
     set_session_token_cookie(&mut response, &req, &user_session);
@@ -179,6 +163,14 @@ async fn upload_file_chunk(req: HttpRequest,  db: web::Data<MongoServer> ,srv: w
 
 
 
+
+pub fn session_error(req: &HttpRequest, user_session:&UserSession, str:&str) -> HttpResponse {
+    let mut response = HttpResponse::InternalServerError().json(json!({
+        "Error": str
+    }));
+    set_session_token_cookie(&mut response, &req, &user_session);
+    response
+}
 
 
 

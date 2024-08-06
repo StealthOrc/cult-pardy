@@ -24,5 +24,3 @@ tsify-next = { version = "0.5.3" }
 getrandom = { version = "0.2", features = ["js"] }
 bytes = { version = "1.7.1", features = ["serde"] }
 twox-hash = "1.6"
-mongodb = { version = "2.8.2", features = ["sync"], default-features = false }
-serde_bson = "0.0.1"

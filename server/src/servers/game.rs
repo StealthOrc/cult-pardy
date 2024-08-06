@@ -1061,8 +1061,10 @@ impl Handler<GetUserSession> for GameServer {
         if user_session.clone().session_token.token.eq(&token.token) {
                 return MessageResult(user_session.clone())
         }
+        println!("Session token was noit eq user_token:{:?}={:?}", user_session.clone().session_token.token,&token.token );
         MessageResult(self.new_session())
     }
+
 }
 
 

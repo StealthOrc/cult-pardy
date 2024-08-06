@@ -110,19 +110,19 @@ async fn download(_req: HttpRequest) -> std::result::Result<HttpResponse, actix_
 
 
 #[get("/api/file/{name}")]
-async fn get_file_from_name(req: HttpRequest,  db: web::Data<MongoServer> ,srv: web::Data<Addr<GameServer>>, auth: web::Data<Addr<AuthenticationServer>> ) -> Result<HttpResponse, actix_web::Error> {
+async fn get_file_from_name(path: web::Path<String>, req: HttpRequest,  db: web::Data<MongoServer> ,srv: web::Data<Addr<GameServer>>, auth: web::Data<Addr<AuthenticationServer>> ) -> Result<HttpResponse, actix_web::Error> {
     let user_session = get_session(&req, &srv).await;
 
-    let name = match extract_header_string(&req, "name"){
-        Ok(data) => data,
-        Err(error) => return Ok(error),
-    };
+    let name = path.into_inner();
+    if name.is_empty() {
+        return Ok(HttpResponse::from(HttpResponse::BadRequest()));
+    }
         
     if is_admin(user_session.clone(), auth).await == false {
         return Ok(HttpResponse::from(HttpResponse::Unauthorized()));
     }
 
-    let file = db.get_file_by_name(&name);
+    let file = db.get_cfile_from_name(&name);
 
     let mut response = match file {
         None => HttpResponse::from(HttpResponse::NotFound()),

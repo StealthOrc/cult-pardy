@@ -9,7 +9,9 @@ use std::hash::{Hash, Hasher};
 use std::string::ToString;
 use wasm_bindgen::prelude::*;
 
-use crate::wasm_lib::ids::usersession::UserSessionId;
+use crate::wasm_lib::hashs::filechunk::FileChunkHash;
+use crate::wasm_lib::hashs::validate::ValidateHash;
+use crate::wasm_lib::ids::usersession::{self, UserSessionId};
 use crate::wasm_lib::{DiscordUser, FileData, QuestionType, Vector2D};
 
 
@@ -107,7 +109,8 @@ pub struct DTOFileData {
     pub file_name: String,
     pub file_type: String,
     pub total_chunks: usize,
-    pub validate_hash: String,
+    pub file_chunks_hashs: Vec<FileChunkHash>,
+    pub validate_hash: ValidateHash,
 }
 
 
@@ -117,24 +120,28 @@ pub struct DTOFileChunk {
     pub file_name: String,
     pub index: usize,
     pub chunk: Vec<u8>,
-    pub validate_hash: String,
+    pub validate_hash: ValidateHash,
 }
 
 impl DTOFileChunk {
+
     pub fn to_file_chunk(self) -> FileChunk {
         let hash = self.to_chunk_hash();
         FileChunk {
+            file_name: self.file_name,
             index: self.index,
             chunk: self.chunk,
-            hash: hash,
+            filechunk_hash: hash,
             validate_hash: self.validate_hash,
         }
     }
 
-    pub fn to_chunk_hash(&self) -> String {
+    pub fn to_chunk_hash(&self) -> FileChunkHash {
         let mut hasher = XxHash::with_seed(0); // Seed is optional
         hasher.write(&self.chunk);
-        hasher.finish().to_string()
+        FileChunkHash {
+            hash: hasher.finish().to_string(),
+        }
     }
     
 }
@@ -142,10 +149,11 @@ impl DTOFileChunk {
 
 #[derive(Tsify, Debug, Clone,Serialize,Deserialize, Hash,Eq, PartialEq, Default)]
 pub struct FileChunk {
+    pub file_name : String,
     pub index: usize,
     pub chunk: Vec<u8>,
-    pub hash: String,
-    pub validate_hash: String,
+    pub filechunk_hash: FileChunkHash,
+    pub validate_hash: ValidateHash,
 }
 
 
@@ -153,7 +161,7 @@ pub struct FileChunk {
 impl FileChunk {
 
     pub fn is_valid(&self) -> bool {
-        self.hash == self.validate_hash 
+        self.validate_hash.validate_file_chunk(&self.filechunk_hash)
     }
 
 
@@ -162,9 +170,8 @@ impl FileChunk {
 
 impl DTOFileData {
     
-    pub fn to_file_data(self,upload_data:DateTime<Local>, uploader: UserSessionId) -> FileData {
-        FileData::new(vec![], self.file_name, self.total_chunks, self.file_type, "".to_string(), self.validate_hash, upload_data, uploader)
-  
+    pub fn to_file_data(self, usersession:&UserSessionId) -> FileData {
+        FileData::new(self.file_chunks_hashs, self.file_name, self.total_chunks, self.file_type, self.validate_hash, usersession)
     }
 
 

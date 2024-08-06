@@ -2,7 +2,7 @@
 use serde::{Deserialize, Serialize};
 use strum::Display;
 use tsify_next::Tsify;
-use std::hash::{Hash, Hasher};
+use std::hash::{Hash};
 use std::string::ToString;
 
 use crate::backend::ActionState;

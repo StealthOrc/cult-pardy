@@ -1,8 +1,10 @@
 use std::collections::HashSet;
 
 use cult_common::dto::FileChunk;
+use cult_common::wasm_lib::hashs::filechunk::FileChunkHash;
+use cult_common::wasm_lib::hashs::validate::ValidateHash;
 use cult_common::wasm_lib::ids::discord::DiscordID;
-use cult_common::wasm_lib::FileData;
+use cult_common::wasm_lib::{CFile, FileData};
 use mongodb::bson::{doc, to_bson};
 use mongodb::options::{ClientOptions, ServerApi, ServerApiVersion};
 use mongodb::sync::{Client, Collection};
@@ -31,7 +33,8 @@ pub enum UserCollection{
     #[default]
     UserSessions,
     Admins,
-    Files,
+    FileData,
+    FileChunks
 }
 
 
@@ -124,41 +127,40 @@ impl MongoServer{
         }
     }
 
-    /*  pub chunks: Vec<FileChunk>,
+    /*#[derive(Tsify, Debug,Serialize,Deserialize ,Clone ,Hash,Eq, PartialEq, Default)]
+    pub struct FileData {
+        chunks: Vec<FileChunkHash>,
         pub file_name: String,
         pub total_chunks: usize,
         pub file_type: String,
-        pub chunk_hash: String,
-        pub validate_hash: String,
+        pub filedata: FileDataHash,
+        pub validate_hash: ValidateHash,
         pub upload_data: DateTime<Local>,
         pub uploader: UserSessionId,
-     */
+}
+ */
 
-    pub fn add_file_data(&self, file: FileData) -> bool {
-        let result = self.collection::<FileData>(CultPardy(UserCollection::Files)).insert_one(file, None);
+    pub async fn add_file_data(&self, file: FileData) -> bool {
+        println!("Adding FileData");
+        let result = self.collection::<FileData>(CultPardy(UserCollection::FileData)).insert_one(file, None);
         match result {
             Err(_) => {
                 return false;
             }
             Ok(_) => {
+                println!("Added FileData");
                 return true;
             }
         }
     }
 
-    pub fn update_file_data(&self, file: FileData) -> bool {
-        let bson = match to_bson(&file) {
-            Ok(bson) => bson,
+
+    pub async fn add_file_chunk(&self, file_chunk: &FileChunk) -> bool {
+        println!("Adding FileChunk");
+        let result = self.collection::<FileChunk>(CultPardy(UserCollection::FileChunks)).insert_one(file_chunk, None);
+        match result {
             Err(_) => {
-                return false;
-            }
-        };
-        let status = self.collection::<FileData>(CultPardy(UserCollection::Files)).update_one(
-            doc! {"validate_hash": &file.validate_hash, "file_name": &file.file_name, "uploader.id": &file.uploader.id},
-            doc! {"$set": bson},
-            None);
-        match status {
-            Err(_) => {
+                
                 return false;
             }
             Ok(_) => {
@@ -167,18 +169,102 @@ impl MongoServer{
         }
     }
 
+
+
+
+
+    pub fn update_file_data_hash(&self, file: FileData) -> bool {
+        let status = self.collection::<FileData>(CultPardy(UserCollection::FileData)).update_one(
+            doc! {"validate_hash.hash": &file.validate_hash.get_hash(), "file_name": &file.file_name, "uploader.id": &file.uploader.id},
+                 doc! {"$set": {"filedata_hash.hash": &file.filedata_hash.get_hash()}},
+            None);
+        match status {
+            Err(_) => {
+                return false;
+            }
+            Ok(update) => {
+                match update.modified_count {
+                    0 => return false,
+                    _ => return true,
+                }
+            }
+        }
+    }
+
+
+
     pub fn is_file_valide(&self, name: &str) -> bool {
-        match self.get_file_by_name(name) {
-            None => false,
-            Some(file) => file.is_valid(),
+        let file = match self.get_cfile_from_name(name) {
+            None => return false,
+            Some(file) => file,
+        };
+        file.is_valid()
+    }
+
+
+    pub fn is_file_chunk_valide(&self, name:&str, hash: &FileChunkHash) -> bool {   
+        println!("Name: {:#?}", name);
+        let file_data = match self.get_file_data_from_name(&name) {
+            None => {
+                println!("No FileData");
+                return false;
+            },
+            Some(file_chunk) => file_chunk,
+        };
+        println!("FileData: {:#?}", file_data.get_hashs());
+        println!("Hash: {:#?}", hash);
+
+        file_data.containts_file_chunk_hash(hash)
+    }
+
+    pub fn is_last_file_chunk(&self, name: &str) -> bool {
+        let file_data: FileData = match self.get_file_data_from_name(&name) {
+            None => return false,
+            Some(file_chunk) => file_chunk,
+        };
+
+        let count = match self.get_file_chunks_count(name) {
+            None => return false,
+            Some(count) => count,
+        };
+        file_data.total_chunks.clone() as u64  == count
+    }
+
+
+    pub fn get_file_chunks_count(&self, name: &str) -> Option<u64> {
+        let result = self.collection::<FileChunk>(CultPardy(UserCollection::FileChunks)).count_documents(doc! {"file_name": &name}, None);
+        match result {
+            Err(_) => {
+                return None;
+            }
+            Ok(data) => Some(data),
         }
     }
 
 
 
 
-    pub  fn get_files_from_user_session(&self, user_session_id: &UserSessionId) -> HashSet<FileData> {
-        let result = self.collection::<FileData>(CultPardy(UserCollection::Files)).find(doc! {"uploader.id": &user_session_id.id}, None);
+
+    pub  fn get_file_data_from_user_session(&self, user_session_id: &UserSessionId) -> HashSet<FileData> {
+        let result = self.collection::<FileData>(CultPardy(UserCollection::FileData)).find(doc! {"uploader.id": &user_session_id.id}, None);
+        match result {
+            Err(_) => {
+                return HashSet::new();
+            }
+            Ok(data) => {
+                let mut set = HashSet::new();
+                for doc in data {
+                    if let Ok(doc) = doc {
+                        set.insert(doc);
+                    }
+                }
+                return set;
+            }
+        }
+    }
+
+    pub fn get_file_chunks_from_user_session(&self, user_session_id: &UserSessionId) -> HashSet<FileChunk> {
+        let result = self.collection::<FileChunk>(CultPardy(UserCollection::FileChunks)).find(doc! {"uploader.id": &user_session_id.id}, None);
         match result {
             Err(_) => {
                 return HashSet::new();
@@ -196,19 +282,27 @@ impl MongoServer{
     }
     
 
-
-
-    pub fn is_file_by_chunk_hash(&self, hash: &str) -> bool {
-        match self.get_file_by_validate_hash(hash) {
-            None => false,
-            Some(_) => true,
+    pub fn get_file_chunks(&self, file_name: &str) -> Vec<FileChunk> {
+        let result = self.collection::<FileChunk>(CultPardy(UserCollection::FileChunks)).find(doc! {"file_name": &file_name}, None);
+        match result {
+            Err(_) => {
+                return Vec::new();
+            }
+            Ok(data) => {
+                let mut set = Vec::new();
+                for doc in data {
+                    if let Ok(doc) = doc {
+                        set.push(doc);
+                    }
+                }
+                return set;
+            }
         }
     }
-    
 
-
-    pub fn get_file_by_chunk_hash(&self, hash: &str) -> Option<FileData> {
-        let result = self.collection::<FileData>(CultPardy(UserCollection::Files)).find_one(doc! {"chunk_hash": &hash}, None);
+    pub fn get_file_chunks_by_index(&self, file_name: &str, index: &usize) -> Option<FileChunk> {
+        let index = index.clone() as i64;
+        let result = self.collection::<FileChunk>(CultPardy(UserCollection::FileChunks)).find_one(doc! {"file_name": &file_name.to_string(), "index": &index}, None);
         match result {
             Err(_) => {
                 return None;
@@ -217,17 +311,9 @@ impl MongoServer{
         }
     }
 
-    pub fn is_file_by_validate_hash(&self, hash: &str) -> bool {
-        match self.get_file_by_validate_hash(hash) {
-            None => false,
-            Some(_) => true,
-        }
-    }
-    
 
-
-    pub fn get_file_by_validate_hash(&self, hash: &str) -> Option<FileData> {
-        let result = self.collection::<FileData>(CultPardy(UserCollection::Files)).find_one(doc! {"validate_hash": &hash}, None);
+    pub fn get_file_chunk_by_hash(&self, hash: &FileChunkHash) -> Option<FileChunk> {
+        let result = self.collection::<FileChunk>(CultPardy(UserCollection::FileChunks)).find_one(doc! {"filechunk_hash.hash": &hash.get_hash()}, None);
         match result {
             Err(_) => {
                 return None;
@@ -235,9 +321,40 @@ impl MongoServer{
             Ok(data) => data,
         }
     }
+    
+    
+    pub fn get_cfile_from_name(&self, name: &str) -> Option<CFile> {
+        let file_data = match self.get_file_data_from_name(name) {
+            None =>  return None,
+            Some(file_data) => file_data,
+        };
+        let file_chunks = self.get_file_chunks(name);
+        Some(CFile{
+            file_data,
+            file_chunks,
+        })
+    }
 
-    pub fn get_file_by_name(&self, name: &str) -> Option<FileData> {
-        let result = self.collection::<FileData>(CultPardy(UserCollection::Files)).find_one(doc! {"file_name": &name}, None);
+    pub fn is_file_data(&self, name: &str) -> bool {
+        let result = self.collection::<FileData>(CultPardy(UserCollection::FileData)).find_one(doc! {"file_name": &name}, None);
+        match result {
+            Err(_) => {
+                return false;
+            }
+            Ok(result) => {
+                match result {
+                    None =>  return false,
+                    Some(_) =>  return true,
+            
+                }
+            }
+        }
+    }
+
+
+
+    pub fn get_file_data_from_name(&self, name: &str) -> Option<FileData> {
+        let result = self.collection::<FileData>(CultPardy(UserCollection::FileData)).find_one(doc! {"file_name": &name}, None);
         match result {
             Err(_) => {
                 return None;

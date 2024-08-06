@@ -1,5 +1,5 @@
 
-import { type ApiResponse, type DiscordUser, type DTOFileChunk, type DTOFileData, type JeopardyBoard, type UserSessionId } from "cult-common";
+import { type ApiResponse, type DiscordUser, type DTOFileChunk, type DTOFileData,type JeopardyBoard, type UserSessionId } from "cult-common";
 import { CookieStore, type SessionCookies } from "$lib/stores/cookies";
 
 /*
@@ -95,6 +95,7 @@ export async function UserInfo() {
 }
 
 export async function upload_data(data:DTOFileData): Promise<ApiResponse> {
+    console.log("STARTING data");
     const response : Response | null = await api_post_request(BackendApiRequests.FILEDATA, data);
     if (response == null || !response.ok) {
         return {success: false};
@@ -103,6 +104,7 @@ export async function upload_data(data:DTOFileData): Promise<ApiResponse> {
 }
 
 export async function upload_chunk(data:DTOFileChunk): Promise<ApiResponse> {
+    console.log("STARTING CHUNK");
     const response : Response | null = await api_post_request(BackendApiRequests.FILECHUNK, data);
     if (response == null || !response.ok) {
         return {success: false};

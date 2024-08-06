@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { upload_chunk, upload_data } from "$lib/api/ApiRequests";
 	import { fileToBinary } from "$lib/BinaryConversion";
-	import type { DTOFileChunk, DTOFileData } from "cult-common";
+	import type { ApiResponse, DTOFileChunk, DTOFileData, FileChunk, ValidateHash } from "cult-common";
 	import { deflateSync } from "fflate";
     import { XXH64 } from 'xxh3-ts';
     import { Buffer } from 'buffer';
@@ -29,42 +29,63 @@
                 
                 let number = Math.ceil(file.size / max_size);
 
-                let uploadData: DTOFileData = {
-                    file_name: file.name,
-                    file_type: file.type,
-                    total_chunks: number,
-                    validate_hash: validate_hash,
-                }
 
 
-
-                await upload_data(uploadData);
-
-
-                
-                let fileChunks: Array<DTOFileChunk> = [];
+                let hashes :ValidateHash[] = [];
+                let requests : DTOFileChunk[] = [];
                 for (let i = 0; i < number; i++) {
                     let start = i * max_size;
                     let end = Math.min((i + 1) * max_size, file.size);
                     let chunkArray = new Uint8Array(data.slice(start, end));
+                    let hash =  {
+                            hash: XXH64(Buffer.from(chunkArray.buffer,0)).toString()
+                        };
+
                     let chunk :DTOFileChunk =  {
                         file_name: file.name,
                         index: i,
                         chunk: Array.from(chunkArray),
-                        validate_hash: XXH64(Buffer.from(chunkArray.buffer,0)).toString(),
+                        validate_hash: hash
                     }
-                    fileChunks.push(chunk);
+                    hashes.push(hash);
+                    requests.push(chunk);
                 }
 
-
-
-
-                console.log(uploadData);
-                console.log(fileChunks);
-
-                for (let i = 0; i < fileChunks.length; i++) {
-                    await upload_chunk(fileChunks[i]);
+                let uploadData: DTOFileData = {
+                    file_name: file.name,
+                    file_type: file.type,
+                    total_chunks: number,
+                    file_chunks_hashs: hashes,
+                    validate_hash: {
+                        hash: validate_hash
+                    },
                 }
+                
+                console.log("Uploading Data");
+
+
+
+
+                upload_data(uploadData).then((response) => {
+                    console.log("Data Response" + response);
+                    //promise all chunks with upload_chunk
+                    let chunks : Promise<ApiResponse>[]= [];
+                    requests.forEach((chunk) => {
+                        chunks.push(upload_chunk(chunk));
+                    });
+                    Promise.all(chunks).then((responses) => {
+                        console.log("Chunk Responses" + responses);
+                    }
+                ).catch((error) => {
+                    console.log(error);
+                });
+
+
+                }).catch((error) => {
+                    console.log(error);
+                });
+
+        
             });
         }
 
