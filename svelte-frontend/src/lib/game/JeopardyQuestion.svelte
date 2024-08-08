@@ -128,21 +128,10 @@
     let videoBlobUrl: string;
     async function loadVideoToBlob(url: string) {
         try {
-            const data: DTOCFile = await get_file('FlyHigh.mp4');
+                const data: ArrayBuffer = await get_file('FlyHigh.mp4');
 
                 console.log("loadVideoToBlob",);
-                let dataChunks: DTOFileChunk[] = data.file_chunks;
-                
-
-                
-                dataChunks.sort((a, b) => a.index - b.index);
-                let chunks: Uint8Array[] = [];
-                for (let i = 0; i < data.file_chunks.length; i++) {
-                    chunks.push(new Uint8Array(dataChunks[i].chunk));
-                }
-                const buf: ArrayBuffer = buildUint8ArrayFromChunks(chunks);
-                let u8 = new Uint8Array(buf);
-                const decom : Uint8Array = await decompressData(u8);
+                const decom : ArrayBuffer = await decompressData(data);
 
                 const videoBlob: Blob = new Blob([decom], { type: 'video/mp4' });
 

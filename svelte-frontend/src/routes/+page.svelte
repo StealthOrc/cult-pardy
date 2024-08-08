@@ -1,17 +1,11 @@
 <script lang="ts">
     import { base } from "$app/paths";
-
-
-    import * as fflate from 'fflate';
-    import Cookies from "js-cookie";
 	import { onMount } from "svelte";
     import { CookieStore, dev_loaded,type SessionCookies } from "$lib/stores/cookies";
 	import { type DiscordUser } from "cult-common";
 	import PlayerIcon from "./PlayerIcon.svelte";
 	import { discord_session} from "$lib/api/ApiRequests";
 	import LoadingPage from "./DevLoading.svelte";
-	import { deflate } from "fflate";
-	import BtnFileUpload from "$lib/create/BtnFileUpload.svelte";
 	import FileUpload from "$lib/create/FileUpload.svelte";
     let lobbyid = '';
 
