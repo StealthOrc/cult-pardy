@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { upload_chunk, upload_data } from "$lib/api/ApiRequests";
-	import { fileToBinary } from "$lib/BinaryConversion";
 	import type { ApiResponse, DTOFileChunk, DTOFileData, FileChunk, ValidateHash } from "cult-common";
 	import { deflateSync } from "fflate";
     import { XXH64 } from 'xxh3-ts';
     import { Buffer } from 'buffer';
+	import { loadfile } from '$lib/BinaryConversion';
 
 
     async function changed(event: Event) {
@@ -12,9 +12,17 @@
         console.log(input.files);
         if (!input.files) return;
         var file = input.files[0];
+        
+
+
+
         if (file) {
-            fileToBinary(file, async (data) => {
-                console.log("File Data");
+
+            loadfile(file, async (data : ArrayBuffer ) => {
+                file
+
+
+
                 console.log(data);
                 console.log("Deflating");
                 console.log(new Uint8Array(data));
@@ -64,14 +72,12 @@
                 console.log("Uploading Data");
 
 
-
-
-                upload_data(uploadData).then((response) => {
+               upload_data(uploadData).then((response) => {
                     console.log("Data Response" + response);
                     //promise all chunks with upload_chunk
                     let chunks : Promise<ApiResponse>[]= [];
                     requests.forEach((chunk) => {
-                        chunks.push(upload_chunk(chunk));
+                       // chunks.push(upload_chunk(chunk));
                     });
                     Promise.all(chunks).then((responses) => {
                         console.log("Chunk Responses" + responses);
@@ -90,6 +96,8 @@
         }
 
     }
+
+
 </script>
 
 <input class="rounded bg-gray-700 p-2" type="file" id="file" accept="image/*, video/*" on:change={changed} />

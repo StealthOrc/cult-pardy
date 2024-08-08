@@ -15,7 +15,7 @@ use std::string::ToString;
 use strum::Display;
 use wasm_bindgen::prelude::*;
 
-use crate::dto::{DtoCategory, DtoJeopardyBoard, DtoQuestion};
+use crate::dto::board::{DtoCategory, DtoJeopardyBoard, DtoQuestion};
 use crate::wasm_lib::ids::lobby::LobbyId;
 use crate::wasm_lib::ids::usersession::UserSessionId;
 use crate::wasm_lib::{JeopardyMode, QuestionType, Vector2D};
@@ -81,7 +81,7 @@ impl JeopardyBoard {
     }
 
     
-    pub fn dto(self, creator:UserSessionId) -> DtoJeopardyBoard {
+    pub fn dto(&self, creator:UserSessionId) -> DtoJeopardyBoard {
         let cat = self
             .categories
             .iter()
@@ -124,7 +124,7 @@ impl JeopardyBoard {
         }
     }
 
-    pub fn get_question(self, vector2d: Vector2D) -> Option<Question> {
+    pub fn get_question(&self, vector2d: Vector2D) -> Option<Question> {
         if let Some(categories) = self.categories.get(vector2d.x) {
             if let Some(question) = categories.questions.get(vector2d.y) {
                 return Some(question.clone());

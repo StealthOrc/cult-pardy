@@ -1,16 +1,20 @@
+
 use std::collections::HashSet;
-use std::fs::{File};
-use std::io::{BufReader, BufWriter, Write};
-use std::path::Path;
+use std::sync::Arc;
 use std::time::Duration;
-use actix::{Actor, Addr, Context, Handler, Message, MessageResult};
-use futures::AsyncWriteExt;
-use rand::{random};
+use actix::{Actor, Addr, Context, Handler, Message, MessageResult, ResponseActFuture, WrapFuture};
+use anyhow::Ok;
+use cult_common::wasm_lib::ids::usersession::UserSessionId;
+use mongodb::bson::doc;
+use rand::random;
 use serde::{Deserialize, Serialize};
 use cult_common::wasm_lib::ids::discord::DiscordID;
+use strum::{Display, EnumIter};
 
-use super::db::MongoServer;
-use super::StartingServices;
+use crate::data::SessionRequest;
+
+use super::{db::MongoServer, game::DiscordData};
+use anyhow::Result;
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Hash, Clone)]
 pub struct Admin{
@@ -82,7 +86,9 @@ impl actix::Message for CheckAdminAccess {
     type Result = bool;
 }
 
-pub struct GetAdminAccess {}
+pub struct GetAdminAccess {
+
+}
 impl actix::Message for GetAdminAccess {
     type Result = Vec<DiscordID>;
 }
@@ -98,6 +104,30 @@ impl AdminAccessTokenResponse {
 
 }
 
+#[derive(Message)]
+#[rtype(result = "DiscordAccountStatus")]
+pub struct AddDiscordAccount {
+    pub user_session_id: UserSessionId,
+    pub discord_data: DiscordData,
+}
+
+#[derive(Debug, Clone,PartialEq, EnumIter, Display)]
+pub enum DiscordAccountStatus {
+    Added,
+    Updated(SessionRequest),
+    NotAdded,
+}
+
+impl DiscordAccountStatus {
+    pub fn to_help(self) -> bool {
+    match self {
+        DiscordAccountStatus::Added => true,
+        DiscordAccountStatus::Updated(_) => true,
+        DiscordAccountStatus::NotAdded => false,
+        }
+    }
+}
+
 
 
 
@@ -107,13 +137,13 @@ pub struct AuthenticationServer {
     admin_token: HashSet<AdminAccessTokenResponse>,
     ////Maybe only IDs? DISCORD_ID
     // Mongodb
-    mongo_server: MongoServer,
+    mongo_server: Arc<MongoServer>,
 }
 
 
 
 impl AuthenticationServer {
-    pub fn new(mongo_server:MongoServer ) -> Self {
+    pub fn new(mongo_server:Arc<MongoServer>) -> Self {
         let mut token = HashSet::new();
         token.insert(AdminAccessTokenResponse {
             token: 123,
@@ -121,13 +151,13 @@ impl AuthenticationServer {
         });
         AuthenticationServer{
             admin_token: token,
-            mongo_server: mongo_server,
+            mongo_server,
         }
     }
 
-    fn add_admin_access(&mut self, admin: Admin) -> bool {
-        if self.mongo_server.find_admin(&admin.discord_id).is_none(){
-            self.mongo_server.add_admin(admin.clone())
+    async fn add_admin_access(&mut self, admin: Admin) -> bool {
+        if self.mongo_server.find_admin(&admin.discord_id).await.is_none(){
+            self.mongo_server.add_admin(admin.clone()).await
         } else {
             false
         }
@@ -159,39 +189,68 @@ impl Handler<NewAdminAccessToken> for AuthenticationServer {
 }
 
 impl Handler<AddAdminAccess> for AuthenticationServer {
-    type Result = bool;
+    type Result = ResponseActFuture<Self, bool>;
 
     fn handle(&mut self, msg: AddAdminAccess, _ctx: &mut Self::Context) -> Self::Result {
-        let admin = Admin{ discord_id:msg.discord_id };
-        self.add_admin_access(admin)
+        let db = self.mongo_server.clone();
+        Box::pin(
+            async move {
+                if db.find_admin(&msg.discord_id).await.is_none(){
+                    db.add_admin(Admin{
+                        discord_id: msg.discord_id.clone(),
+                    }).await
+                } else {
+                    false
+                }
+            }
+            .into_actor(self)
+        )
     }
 }
 
 
 
 impl Handler<RedeemAdminAccessToken> for AuthenticationServer {
-    type Result = bool;
+    type Result = ResponseActFuture<Self, bool>;
 
     fn handle(&mut self, msg: RedeemAdminAccessToken, _ctx: &mut Self::Context) -> Self::Result {
         let original_len = self.admin_token.len().clone();
         self.admin_token.retain(|token| token.token != msg.token);
         let token_removed = self.admin_token.len() < original_len;
+        let admin = Admin{
+            discord_id: msg.discord_id.clone(),
+        };
 
-        if token_removed {
-            let admin = Admin { discord_id: msg.discord_id };
-            self.add_admin_access(admin);
-            true
-        } else {
-            false
-        }
+        let db: Arc<MongoServer> = self.mongo_server.clone();
+        Box::pin(
+            async move {
+                if token_removed {
+                    if db.find_admin(&admin.discord_id).await.is_none(){
+                        db.add_admin(admin.clone()).await
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            }
+            .into_actor(self)
+        )
     }
+    
 }
 
 impl Handler<CheckAdminAccess> for AuthenticationServer {
-    type Result = bool;
+    type Result = ResponseActFuture<Self, bool>;
 
     fn handle(&mut self, msg: CheckAdminAccess, _ctx: &mut Self::Context) -> Self::Result {
-        return self.mongo_server.find_admin(&msg.discord_id).is_some();
+        let db = self.mongo_server.clone();
+        Box::pin(
+            async move {
+                db.find_admin(&msg.discord_id).await.is_some()
+            }
+            .into_actor(self)
+        )
     }
 }
 
@@ -204,9 +263,89 @@ impl Handler<CheckAdminAccessToken> for AuthenticationServer {
 }
 
 impl Handler<GetAdminAccess> for AuthenticationServer {
-    type Result = Vec<DiscordID>;
+    type Result = ResponseActFuture<Self, Vec<DiscordID>>;
 
     fn handle(&mut self, _msg: GetAdminAccess, _ctx: &mut Self::Context) -> Self::Result {
-        self.mongo_server.get_admins().iter().map(|admin| admin.discord_id.clone()).collect::<Vec<DiscordID>>()
+        let db = self.mongo_server.clone();
+        Box::pin(
+            async move {
+                let test = db.get_admins().await.iter().map(|admin| admin.discord_id.clone()).collect::<Vec<DiscordID>>();
+                test
+            }
+            .into_actor(self)
+        )
+    }
+}
+
+
+impl Handler<AddDiscordAccount> for AuthenticationServer {
+    type Result = ResponseActFuture<Self, DiscordAccountStatus>;
+
+    fn handle(&mut self, msg: AddDiscordAccount, _ctx: &mut Context<Self>) -> Self::Result {
+        let db = self.mongo_server.clone();
+        Box::pin(
+            async move {
+                if let Some(session) = db.find_user_session_with_discord(&msg.discord_data).await{
+                    return DiscordAccountStatus::Updated(SessionRequest{
+                        user_session_id: session.user_session_id,
+                        session_token: session.session_token,
+                    });
+                }
+                if !db.update_discord_data(&msg.user_session_id, &msg.discord_data).await {
+                    return DiscordAccountStatus::NotAdded
+                }
+                DiscordAccountStatus::Added
+            }
+            .into_actor(self)
+        )
+        
+    }
+}
+
+
+
+
+
+
+
+#[derive(Message)]
+#[rtype(result = "Result<DiscordAccountStatus, anyhow::Error>")]
+struct Msg{
+    pub u :usize
+}
+
+struct MyActor{
+    pub u:usize
+}
+
+impl MyActor {
+    pub fn new(u:usize) -> Self {
+        MyActor {
+            u
+        }
+    }
+    
+}
+
+impl Actor for MyActor {
+    type Context = Context<Self>;
+}
+
+impl Handler<Msg> for MyActor {
+    type Result = ResponseActFuture<Self, Result<DiscordAccountStatus, anyhow::Error>>;
+
+    fn handle(&mut self, _: Msg, _: &mut Context<Self>) -> Self::Result {
+        let u = self.u;
+        Box::pin(
+            async move {
+                let status : DiscordAccountStatus = DiscordAccountStatus::Added;
+
+                println!("Hello World {}", u);
+                // Some async computation
+                Ok(status)
+            }
+            .into_actor(self) // converts future to ActorFuture
+        )
+        
     }
 }

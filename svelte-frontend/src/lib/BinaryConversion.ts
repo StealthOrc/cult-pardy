@@ -19,11 +19,10 @@ export function arrayBufferToBinary(arrayBuffer: ArrayBuffer): string {
         .join('');
 }
 
-export function fileToBinary(file:File, callback:(value: ArrayBuffer)=>void): void{  
+export function loadfile(file:File, callback:(value: ArrayBuffer )=> void): void{  
     const reader: FileReader = new FileReader();
-    console.log(file.size);
+    reader.readAsArrayBuffer(file)
     reader.onload = async function() {
         callback(reader.result as ArrayBuffer);
     }
-    reader.readAsArrayBuffer(file);
 }

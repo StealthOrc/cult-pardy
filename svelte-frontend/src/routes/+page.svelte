@@ -12,6 +12,7 @@
 	import LoadingPage from "./DevLoading.svelte";
 	import { deflate } from "fflate";
 	import BtnFileUpload from "$lib/create/BtnFileUpload.svelte";
+	import FileUpload from "$lib/create/FileUpload.svelte";
     let lobbyid = '';
 
     let cookies : SessionCookies; 
@@ -100,5 +101,5 @@
         {:else}
             <LoadingPage/>
         {/if}
-        <BtnFileUpload/>
+        <FileUpload/>
 </div>

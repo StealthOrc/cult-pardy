@@ -10,6 +10,7 @@ cult-common = { path = "../cult-common/" }
 actix = "0.13.3"
 actix-web = "4.5.1"
 actix-web-actors = "4.3.0"
+actix-rt = "2.6.0"
 tokio = { version = "1.37", features = ["full"] }
 actix-files = "0.6.5"
 anyhow = "1.0.82"
@@ -23,7 +24,9 @@ attohttpc = { version = "0.28.0", features = ["json"] }
 strum = { version = "0.26.2", features = ["derive"] }
 chrono = { version = "0.4.38", features = ["serde"] }
 flate2 = "1.0.30"
-mongodb = { version = "2.8.2", features = ["sync"], default-features = false }
+mongodb = { version = "3.0.1", features = ["sync", "rustls-tls"]}
 ritelinked = "0.3.2"
 bytes = { version = "1.7.1", features = ["serde"] }
 serde_bson = "0.0.1"
+bson = {version = "2.11.0", features = ["chrono-0_4"]}
+env_logger = "0.11.5"

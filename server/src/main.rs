@@ -6,19 +6,23 @@ mod servers;
 mod data;
 
 
+use std::sync::Arc;
+
 use crate::apis::api::{board, create_game_lobby, discord_session, has_authorization, join_game};
-use crate::apis::api::session_request;
+use crate::apis::api::api_session_request;
 
 use actix::Addr;
-use actix_web::{web, App, HttpServer, HttpRequest, HttpResponse, get};
+use actix_web::web::Data;
+use actix_web::{get, post, web, App, HttpRequest, HttpResponse, HttpServer};
 use anyhow::Result;
 
-use apis::api::{get_session, session_data_request, set_session_token_cookie,upload_file_chunk, upload_file_data};
+use apis::api::{ get_session_or_create_new, session_data_request, set_session_token_cookie, upload_file_chunk, upload_file_data};
 use apis::data::extract_header_string;
 use authentication::discord::is_admin;
 use dto::DTOFileData;
+use futures::StreamExt;
 use servers::authentication::AuthenticationServer;
-use servers::db::MongoServer;
+use servers::db::{self, MongoServer};
 use servers::game::GameServer;
 use tokio::runtime::Runtime;
 use cult_common::*;
@@ -44,14 +48,17 @@ async fn main() -> Result<()> {
 
     let services = Services::init().await;
 
+    std::env::set_var("RUST_LOG", "debug");
+    //env_logger::init();
 
 
     let input_server =  InputServer::init(services.authentication_server.clone());
     let rt = Runtime::new().expect("Somethings wrong with the Runtime");
     rt.spawn(input_server.read_input());
 
-
-    let server = HttpServer::new(move || {
+    println!("Starting HTTP server at {}", addr); 
+    let server = 
+    HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(services.mongo_server.clone()))
             .app_data(web::Data::new(services.grant_client.clone()))
@@ -65,7 +72,7 @@ async fn main() -> Result<()> {
             .service(index)
             .service(find_game)
             .service(assets)
-            .service(session_request)
+            .service(api_session_request)
             .service(session_data_request)
             .service(grant_admin_access)
             .service(has_authorization)
@@ -77,13 +84,13 @@ async fn main() -> Result<()> {
             .service(upload_file_chunk)
             .service(upload_file_data)
             .service(get_file_from_name)
+            .service(upload_streaming_data)
             .default_service(
                 web::route().to(not_found)
             )
     })
     .bind(addr)?
     .run();
-    println!("Started {} HttpServer! ", addr);
     server.await?;
     rt.shutdown_background();
     Ok(())
@@ -107,28 +114,46 @@ async fn download(_req: HttpRequest) -> std::result::Result<HttpResponse, actix_
         .body(json_data))
 }
 
+#[post("/api/upload")]
+async fn upload_streaming_data(mut payload: web::Payload) -> std::result::Result<HttpResponse, actix_web::Error> {
+
+    let bytes = &mut Vec::new();
+
+    while let Some(chunk) = payload.next().await {
+        let result =  match chunk {
+            Ok(data) => data,
+            Err(_) => return Ok(HttpResponse::BadRequest().finish()),
+        };
+        bytes.extend_from_slice(&result);
+
+    }
+    println!("Received {} bytes", bytes.len());
+
+    Ok(HttpResponse::Ok().finish())
+}
+
 
 
 #[get("/api/file/{name}")]
-async fn get_file_from_name(path: web::Path<String>, req: HttpRequest,  db: web::Data<MongoServer> ,srv: web::Data<Addr<GameServer>>, auth: web::Data<Addr<AuthenticationServer>> ) -> Result<HttpResponse, actix_web::Error> {
-    let user_session = get_session(&req, &srv).await;
+async fn get_file_from_name(path: web::Path<String>, req: HttpRequest,  db: web::Data<Arc<MongoServer>> , auth: web::Data<Addr<AuthenticationServer>> ) -> Result<HttpResponse, actix_web::Error> {
+    let user_session = get_session_or_create_new(&req, &db).await;
 
     let name = path.into_inner();
     if name.is_empty() {
         return Ok(HttpResponse::from(HttpResponse::BadRequest()));
     }
         
-    if is_admin(user_session.clone(), auth).await == false {
+    if is_admin(&user_session, &db).await == false {
         return Ok(HttpResponse::from(HttpResponse::Unauthorized()));
     }
 
-    let file = db.get_cfile_from_name(&name);
+    let file = db.get_cfile_from_name(&name).await;
 
     let mut response = match file {
         None => HttpResponse::from(HttpResponse::NotFound()),
         Some(data) => HttpResponse::from(HttpResponse::Ok().json(data)),
     };
 
-    set_session_token_cookie(&mut response, &req, &user_session);
+    set_session_token_cookie(&mut response, &user_session);
     Ok(response)
 }

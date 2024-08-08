@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 use std::vec;
 
@@ -5,8 +6,8 @@ use actix::prelude::*;
 use cult_common::{compress, decompress};
 use serde::{Deserialize, Serialize};
 
-use crate::servers::game::{self, GameServer, SendSessionMessageType, SessionMessageResult};
-use crate::servers::game::{WebsocketDisconnect, SessionMessageType};
+use crate::servers::game::{self, GameServer};
+use crate::servers::lobby::{AddLobbySessionScore, ClientMessage, Lobby, LobbyBackClick, LobbyClick, ReciveVideoEvent, UpdateWebsocketPing, WebsocketConnect, WebsocketDisconnect};
 use actix_web::web;
 use actix_web_actors::ws;
 use actix_web_actors::ws::WebsocketContext;
@@ -37,7 +38,8 @@ impl Message for GetPing {
 pub struct WsSession {
     pub player: UserData,
     pub hb: Instant,
-    pub handler: Addr<game::GameServer>,
+    pub game_server_addr: Addr<game::GameServer>,
+    pub lobby_addr:Addr<Lobby>
 }
 
 #[derive(Debug, Clone)]
@@ -60,69 +62,41 @@ impl UserData {
 }
 
 impl WsSession {
-    pub fn default(
-        user_session_id: UserSessionId,
-        lobby: LobbyId,
-        srv: web::Data<Addr<game::GameServer>>,
-    ) -> Self {
-        WsSession {
-            player: UserData::default(user_session_id, lobby),
-            hb: Instant::now(),
-            handler: srv.get_ref().clone(),
-        }
-    }
-
-    fn hb(&mut self, ctx: &mut ws::WebsocketContext<Self>) {
-        ctx.run_interval(HEARTBEAT_INTERVAL, |act: &mut WsSession, ctx| {
-            let time_since = Instant::now().duration_since(act.hb);
-            if time_since > CLIENT_TIMEOUT {
-                println!("Websocket Client heartbeat failed, disconnecting!");
-                ctx.stop();
-                return;
+        pub fn default(user_session_id: &UserSessionId,lobby_id: &LobbyId, srv: &web::Data<Addr<game::GameServer>>, lobby: &Addr<Lobby>) -> Self {
+            WsSession {
+                player: UserData::default(user_session_id.clone(), lobby_id.clone()),
+                hb: Instant::now(),
+                game_server_addr: srv.get_ref().clone(),
+                lobby_addr: lobby.clone(),
             }
-            act.ping(ctx);
-            act.get_pings(ctx);
-        });
-
-    }
-
-    fn set_ping(&mut self, _: &mut ws::WebsocketContext<Self>) {
-        if let Some(websocket_id) = &self.player.websocket_session_id {
-            self.handler
-                .do_send(game::UpdateWebsocketsPing {
-                    lobby_id: self.player.lobby_id.clone(),
-                    websocket_session_id: websocket_id.clone(),
-                    ping: self.player.ping,
-                });
-
         }
 
-    }
-
-
-
-    fn get_pings(&mut self, ctx: &mut ws::WebsocketContext<Self>) {
-        self.handler
-        .send(game::GetSessionsPings {
-            lobby_id: self.player.lobby_id.clone(),
-        })
-        .into_actor(self)
-        .then(|res, _, ctx| {
-            match res {
-                Ok(res) => {
-                    if res.len() > 0 {
-                        let binary: Vec<u8> = serde_json::to_vec(&WebsocketServerEvents::Session(SessionEvent::SessionsPing(res))).expect("Can´t convert to vec");
-                        if let Ok(bytes) = compress(&binary) {
-                            ctx.binary(bytes)
-                        }
-                    }
+        fn hb(&mut self, ctx: &mut ws::WebsocketContext<Self>) {
+            ctx.run_interval(HEARTBEAT_INTERVAL, |act: &mut WsSession, ctx| {
+                let time_since = Instant::now().duration_since(act.hb);
+                if time_since > CLIENT_TIMEOUT {
+                    println!("Websocket Client heartbeat failed, disconnecting!");
+                    ctx.stop();
+                    return;
                 }
-                _ => ctx.stop(),
+                act.ping(ctx);
+            });
+
+        }
+
+        fn is_available(&self) -> bool {
+          self.player.websocket_session_id.is_some()
+        }
+
+        fn set_ping(&mut self, _: &mut ws::WebsocketContext<Self>) {
+            if let Some(websocket_id) = &self.player.websocket_session_id {
+                    self.lobby_addr.do_send(UpdateWebsocketPing {
+                        websocket_session_id: websocket_id.clone(),
+                        ping: self.player.ping,
+                    });
+                
             }
-            fut::ready(())
-        })
-        .wait(ctx);
-    }
+        }
 
 
     fn ping(&mut self, ctx: &mut ws::WebsocketContext<Self>) {
@@ -132,7 +106,30 @@ impl WsSession {
     
     }
 
-
+    fn get_websocket_session(&mut self, ctx: &mut ws::WebsocketContext<Self>) {
+        self.lobby_addr.send(WebsocketConnect {
+            user_session_id: self.player.user_session_id.clone(),
+            addr: ctx.address().recipient(),
+            ping: self.player.ping,
+        })
+        .into_actor(self)
+        .then(|res, act, ctx| {
+            match res {
+                Ok(res) => match res {
+                    None => {
+                        println!("Something happens 2");
+                        ctx.stop()
+                    }
+                    Some(websocket_session_id) => {
+                      act.player.websocket_session_id = Some(websocket_session_id);
+                    }
+                },
+                _ => ctx.stop(),
+            }
+            fut::ready(())
+        })
+        .wait(ctx);
+    }
 }
 
 impl Actor for WsSession {
@@ -140,39 +137,13 @@ impl Actor for WsSession {
 
     fn started(&mut self, ctx: &mut Self::Context) {
         self.hb(ctx);
-        let addr = ctx.address();
-        self.handler
-            .send(game::WebsocketConnect {
-                lobby_id: self.player.lobby_id.clone(),
-                user_session_id: self.player.user_session_id.clone(),
-                addr: addr.recipient(),
-                ping: self.player.ping,
-            })
-            .into_actor(self)
-            .then(|res, act, ctx| {
-                match res {
-                    Ok(res) => match res {
-                        None => {
-                            println!("Something happens 3");
-                            ctx.stop()
-                        }
-                        Some(id) => {
-                            act.player.websocket_session_id = Some(id);
-                        }
-                    },
-
-                    _ => ctx.stop(),
-                }
-                fut::ready(())
-            })
-            .wait(ctx);
+        self.get_websocket_session(ctx);
     }
-
 
   
     fn stopping(&mut self, _: &mut Self::Context) -> Running {
-        self.handler.do_send(WebsocketDisconnect {
-            user_data: self.player.clone(),
+        self.lobby_addr.do_send(WebsocketDisconnect {
+                user_data: self.player.clone(),
         });
         Running::Stop
     }
@@ -180,37 +151,25 @@ impl Actor for WsSession {
 
 
 
+#[derive(Message, Serialize, Deserialize, Debug)]
+#[rtype(result = "()")]
+pub enum SendSessionMessageType {
+    Data(WebsocketServerEvents),
+    SelfDisconnect,
+}
 
-/// Handle messages from chat server, we simply send it to peer websocket
-impl Handler<SessionMessageType> for WsSession {
-    type Result = MessageResult<SessionMessageType>;
+impl Handler<SendSessionMessageType> for WsSession {
+    type Result = ();
 
-    fn handle(&mut self, msg: game::SessionMessageType, ctx: &mut Self::Context) -> Self::Result {
-        match msg {
-            SessionMessageType::Send(send) => 
-            {
-                match send  {
-                    SendSessionMessageType::SelfDisconnect => ctx.stop(),
-                    SendSessionMessageType::Data(data) => {
-                        let binary = serde_json::to_vec(&data).expect("Can´t convert to vec");
-                        if let Ok(bytes) = compress(&binary) {
-                            ctx.binary(bytes)
-                        }
-                        //TODO: make deflate alogithm de-/activatable again for development
-                        //if let Ok(bytes) = compress(&binary) {
-                        //    ctx.binary(bytes)
-                        //}
-                    }
+    fn handle(&mut self, msg: SendSessionMessageType, ctx: &mut Self::Context) -> Self::Result {
+        match msg  {
+            SendSessionMessageType::SelfDisconnect => ctx.stop(),
+            SendSessionMessageType::Data(data) => {
+                let binary = serde_json::to_vec(&data).expect("Can´t convert to vec");
+                if let Ok(bytes) = compress(&binary) {
+                    ctx.binary(bytes)
                 }
-                MessageResult(SessionMessageResult::Void)
             }
-            SessionMessageType::Get(get) => {
-                match get {
-                    game::GetSessionMessageType::GetPing => { 
-                        MessageResult(SessionMessageResult::U64(self.player.ping as u64))
-                    }
-                }
-            },
         }
     }
 }
@@ -249,46 +208,47 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
             }
             ws::Message::Text(text) => {
                 let text = text.trim();
-                send_chat_message(self, text)
+                //send_chat_message(self, text)
             }
             ws::Message::Binary(data) => {
-                //TODO: make deflate alogithm de-/activatable again for development
-                if let Ok(bytes) = decompress(&data) {
-                    match serde_json::from_slice::<WebsocketSessionEvent>(&bytes) {
-                        Ok(event) => {
-                            match event.clone() {
-                                WebsocketSessionEvent::Click(vector2d) => {
-                                    self.handler.do_send(game::LobbyClick {
-                                        vector_2d: vector2d,
-                                        user_data: self.player.clone(),
-                                    });
-                                },
-                                WebsocketSessionEvent::Back => {
-                                    self.handler.do_send(game::LobbyBackClick{
-                                        user_data: self.player.clone(),
-                                    });
+                    //TODO: make deflate alogithm de-/activatable again for development
+                    if let Ok(bytes) = decompress(&data) {
+                        match serde_json::from_slice::<WebsocketSessionEvent>(&bytes) {
+                            Ok(event) => {
+                                match event.clone() {
+                                    WebsocketSessionEvent::Click(vector2d) => {
+                                        self.lobby_addr.do_send(LobbyClick {
+                                            vector_2d: vector2d,
+                                            user_data: self.player.clone(),
+                                        });
+                                    },
+                                    WebsocketSessionEvent::Back => {
+                                        self.lobby_addr.do_send(LobbyBackClick{
+                                            user_data: self.player.clone(),
+                                        });
+                                    }
+                                    WebsocketSessionEvent::AddUserSessionScore(grant_score_user_session_id,  vector2d) => {
+                                        self.lobby_addr.do_send(AddLobbySessionScore{
+                                            user_data: self.player.clone(),
+                                            grant_score_user_session_id,
+                                            vector2d
+                                        });
+                                    }
+                                    WebsocketSessionEvent::ViedeoEvent(event) => {
+                                        self.lobby_addr.do_send(ReciveVideoEvent{
+                                        user_session_id: self.player.user_session_id.clone(),
+                                        lobby_id: self.player.lobby_id.clone(),
+                                        event
+                                    })
+                                    }
                                 }
-                                WebsocketSessionEvent::AddUserSessionScore(grant_score_user_session_id,  vector2d) => {
-                                    self.handler.do_send(game::AddLobbySessionScore{
-                                        user_data: self.player.clone(),
-                                        grant_score_user_session_id,
-                                        vector2d
-                                    });
-                                }
-                                WebsocketSessionEvent::ViedeoEvent(event) => {
-                                self.handler.do_send(game::ReciveVideoEvent{
-                                    user_session_id: self.player.user_session_id.clone(),
-                                    lobby_id: self.player.lobby_id.clone(),
-                                    event
-                                })
-                                }
+                                println!("Receive an client event {:?}", event);
                             }
-                            println!("Receive an client event {:?}", event);
+                            Err(err) => {
+                                println!("Error deserializing JSON data:  {:?}", err);
+                            }
                         }
-                        Err(err) => {
-                            println!("Error deserializing JSON data:  {:?}", err);
-                        }
-                    }
+                    
                 }
             }
             ws::Message::Close(reason) => {
@@ -303,13 +263,4 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
     }
 }
 
-
-
-fn send_chat_message(handler: &mut WsSession, msg: &str) {
-    // Send message to chat server
-    handler.handler.do_send(game::ClientMessage {
-        player_data: handler.player.clone(),
-        msg: msg.to_owned(),
-    });
-}
 

@@ -1,18 +1,21 @@
 use std::any;
 use std::hash::Hash;
 use std::str::FromStr;
+use std::sync::Arc;
 use crate::data::SessionRequest;
 use crate::main;
 use crate::servers::db::{DBDatabase, MongoServer};
-use crate::servers::game::{CreateLobby, GetUserAndUpdateSession, GetUserSession, SessionToken};
-use actix::{Addr};
+use crate::servers::game::{CreateLobby, SessionToken};
+use crate::servers::lobby::CanJoinLobby;
+use actix::Addr;
 
 use actix_web::cookie::Cookie;
 use actix_web::{get, HttpRequest, HttpResponse, post, web};
 use attohttpc::body::File;
 use chrono::Local;
+use cult_common::dto::api::{ApiResponse, DTOFileToken, FileDataReponse};
 use cult_common::dto::{DTOFileChunk, DTOFileData};
-use cult_common::wasm_lib::{ApiResponse, JeopardyMode, FileData};
+use cult_common::wasm_lib::{JeopardyMode, FileData};
 use mongodb::change_stream::session;
 use oauth2::http::header::COOKIE;
 use oauth2::http::{response, HeaderValue};
@@ -21,7 +24,7 @@ use serde_json::json;
 use cult_common::backend::JeopardyBoard;
 use cult_common::wasm_lib::ids::lobby::LobbyId;
 use cult_common::wasm_lib::ids::usersession::UserSessionId;
-use crate::apis::data::{extract_header_string, extract_value, get_internal_server_error_json};
+use crate::apis::data::{extract_header_string, extract_value, get_internal_server_error_json, get_lobby_id_from_header};
 use crate::authentication::discord::is_admin;
 use crate::servers::authentication::AuthenticationServer;
 use crate::servers::{db, game};
@@ -59,104 +62,90 @@ struct UserSessionWithAdmin{
 }
 
 #[get("/api/session")]
-async fn session_request(req: HttpRequest, srv: web::Data<Addr<game::GameServer>>, auth: web::Data<Addr<AuthenticationServer>>) -> Result<HttpResponse, actix_web::Error> {
-    let user_session = get_session(&req, &srv).await;
-    let mut response = HttpResponse::from(HttpResponse::Ok().json(UserSessionWithAdmin{user_session:user_session.clone(), is_admin:is_admin(user_session.clone(), auth).await}));
-    set_session_token_cookie(&mut response, &req, &user_session);
+async fn api_session_request(req: HttpRequest ,db:web::Data<Arc<MongoServer>> ) -> Result<HttpResponse, actix_web::Error> {
+    let user_session = get_session_or_create_new(&req, &db).await;
+    let is_admin = is_admin(&user_session, &db).await;
+    let mut response = HttpResponse::from(HttpResponse::Ok().json(UserSessionWithAdmin{user_session:user_session.clone(), is_admin}));
+    set_session_token_cookie(&mut response,  &user_session);
     Ok(response)
 }
 
-#[post("/api/upload/filedata")]
-async fn upload_file_data(req: HttpRequest,  db: web::Data<MongoServer> ,srv: web::Data<Addr<game::GameServer>>, auth: web::Data<Addr<AuthenticationServer>>,  json: web::Json<DTOFileData>) -> Result<HttpResponse, actix_web::Error> {
-    println!("UPLOAD FILE DATA");
-    let user_session = get_session(&req, &srv).await;
-    let mut response;
-    if is_admin(user_session.clone(), auth).await == false {
-        response = get_internal_server_error_json({
-            json!({
-                "Error": "Unauthorized",
-                "User": user_session.user_session_id.id.to_string()
-            })
-        });
-        set_session_token_cookie(&mut response, &req, &user_session);
-        return Ok(response)
-    } 
 
+fn file_data_response_send(req: &HttpRequest, user_session:&UserSession, file_upload_response:&FileDataReponse) -> HttpResponse {
+    let mut response = match file_upload_response {
+        FileDataReponse::Successful(_) => HttpResponse::from(HttpResponse::Ok().json(file_upload_response)),
+        FileDataReponse::Failed(_) =>  HttpResponse::InternalServerError().json(file_upload_response)
+    };
+    set_session_token_cookie(&mut response,  &user_session);
+    response
+}
+
+
+#[post("/api/upload/filedata")]
+async fn upload_file_data(req: HttpRequest,  db: web::Data<Arc<MongoServer>>,  json: web::Json<DTOFileData>) -> Result<HttpResponse, actix_web::Error> {
+    println!("UPLOAD FILE DATA");
+    let user_session = get_session_or_create_new(&req, &db).await;
+    if is_admin(&user_session, &db).await == false {
+        return Ok(file_data_response_send(&req, &user_session, &FileDataReponse::Failed("No Admin".to_string())));
+    } 
 
     let dto_filedata = json.into_inner();
     println!("DATA HASH {:?} ", dto_filedata.validate_hash);
 
-
-
-
-    if db.is_file_data(&dto_filedata.file_name) {
-        return Ok(session_error(&req, &user_session, "File already exists"))
+    if db.is_file_data(&dto_filedata.file_name).await {
+        return Ok(file_data_response_send(&req, &user_session, &FileDataReponse::Failed("File already exists".to_string())));
     }
 
-
-
-    let mut response;
-    let file = dto_filedata.clone().to_file_data(&user_session.user_session_id);
-    if db.add_file_data(FileData::from(file.clone())).await{
-        response = HttpResponse::from(HttpResponse::Ok().json(ApiResponse::of(true)));
-    }else{
-        return Ok(session_error(&req, &user_session, "Can´t add file data"));
+    let file: FileData = dto_filedata.clone().to_file_data(&user_session.user_session_id);
+    if !db.add_file_data(file.clone()).await {
+        return Ok(file_data_response_send(&req, &user_session, &FileDataReponse::Failed("Can´t add file data".to_string())));
     }
-    set_session_token_cookie(&mut response, &req, &user_session);
+    let mut response = file_data_response_send(&req, &user_session, &FileDataReponse::Successful(file.file_token.to_dto_file_token()));
+    set_session_token_cookie(&mut response, &user_session);
     Ok(response)
 }
 
 
-pub static mut test: Option<FileData> = None;
-
-
-
 #[post("/api/upload/filechunk")]
-async fn upload_file_chunk(req: HttpRequest,  db: web::Data<MongoServer> ,srv: web::Data<Addr<game::GameServer>>, auth: web::Data<Addr<AuthenticationServer>>, json: web::Json<DTOFileChunk>) -> Result<HttpResponse, actix_web::Error> {
+async fn upload_file_chunk(req: HttpRequest,db: web::Data<Arc<MongoServer>> , json: web::Json<DTOFileChunk>) -> Result<HttpResponse, actix_web::Error> {
+    let start_time = Local::now();
     println!("UPLOAD FILE CHUNK");
-    let user_session = get_session(&req, &srv).await;
-    let mut response;
-    if is_admin(user_session.clone(), auth).await == false {
-        return Ok(session_error(&req, &user_session, "Unauthorized"));
-    } 
 
+    let file_token = match get_file_token_from_value(&req) {
+        Some(data) => data,
+        None => return Ok(HttpResponse::from(HttpResponse::NotFound().json("File token not found"))),
+    };
+    
     let dto_filechunk = json.into_inner();
+    let file_data = match db.get_file_data_from_name(&dto_filechunk.file_name).await {
+        Some(data) => data,
+        None => return Ok(HttpResponse::from(HttpResponse::NotFound().json("File not found"))),
+    };
 
-    let file_chunk = dto_filechunk.clone().to_file_chunk();
-    let name = file_chunk.file_name.clone();
-    let hash = file_chunk.filechunk_hash.clone();
-
-    println!("HASH: {:?} - Validate: {:?}", hash, file_chunk.validate_hash.get_hash());
-
-
-
-    if file_chunk.validate_hash.validate_file_chunk(&hash) == false {
-        return Ok(session_error(&req, &user_session, "Invalid File Chunk"));
+    if file_data.validate_file_token(&file_token) == false {
+        return Ok(HttpResponse::from(HttpResponse::NotFound().json("File token not found")))
     }
 
-    match db.get_file_chunks_by_index(&name, &file_chunk.index){
-        Some(found_chunk) => {
-            println!("File chunk already exists {} - {}", file_chunk.file_name, found_chunk.file_name);
-            return Ok(session_error(&req, &user_session, "File chunk already exists"));
-        },
-        None => (),
+    let file_chunk = match dto_filechunk.to_file_chunk() {
+        Some(data) => data,
+        None => return Ok(HttpResponse::from(HttpResponse::NotFound().json("File chunk not found"))),
+    };
+    let file_name = file_chunk.file_name.clone();
+    if db.get_file_chunks_by_index(&file_name, &file_chunk.index).await.is_some(){
+        return Ok(HttpResponse::from(HttpResponse::NotFound().json("File chunk already exists")));
+    }
+    if file_data.containts_file_chunk_hash(&file_chunk.validate_hash) == false {
+        return Ok(HttpResponse::from(HttpResponse::NotFound().json("File chunk hash not found")));
     }
 
-    if db.is_file_chunk_valide(&name, &hash) == false {
-        return Ok(session_error(&req, &user_session, "File chunk is not valid"));
+    if !db.add_file_chunk(&file_chunk).await{
+        return Ok(HttpResponse::from(HttpResponse::NotFound().json("Can´t add file chunk")));
     }
-
-    if db.add_file_chunk(&file_chunk).await{
-        response = HttpResponse::from(HttpResponse::Ok().json(ApiResponse::of(true)));
-        if db.is_last_file_chunk(&name){
-            println!("LAST CHUNK");
-        }
+    let response = HttpResponse::from(HttpResponse::Ok().json(ApiResponse::of(true)));
+    if db.is_last_file_chunk(&file_name).await {
+        println!("LAST CHUNK");
     }
-    else{
-       response = session_error(&req, &user_session, "Can´t add file chunk");
-    }
-
-    set_session_token_cookie(&mut response, &req, &user_session);
+    println!("Upload File Chunk: {:?} ms", Local::now().signed_duration_since(start_time));
     Ok(response)
 }
 
@@ -168,42 +157,104 @@ pub fn session_error(req: &HttpRequest, user_session:&UserSession, str:&str) -> 
     let mut response = HttpResponse::InternalServerError().json(json!({
         "Error": str
     }));
-    set_session_token_cookie(&mut response, &req, &user_session);
+    set_session_token_cookie(&mut response,  &user_session);
     response
 }
 
 
 
 #[get("/api/session-data")]
-async fn session_data_request(req: HttpRequest, srv: web::Data<Addr<game::GameServer>>, auth: web::Data<Addr<AuthenticationServer>>) -> Result<HttpResponse, actix_web::Error> {
-    let user_session = get_session(&req, &srv).await;
+async fn session_data_request(req: HttpRequest, db: web::Data<Arc<MongoServer>>) -> Result<HttpResponse, actix_web::Error> {
+    println!("SESSION DATA REQUEST");
+    let user_session = get_session_or_create_new(&req, &db).await;
     let sessionrequest : SessionRequest = SessionRequest{
      user_session_id: user_session.user_session_id.clone(), 
      session_token: user_session.session_token.clone() 
     };
 
     let mut response = HttpResponse::from(HttpResponse::Ok().json(sessionrequest));
-    set_session_token_cookie(&mut response, &req, &user_session);
+    set_session_token_cookie(&mut response, &user_session);
     Ok(response)
 }
 
 
-pub async fn get_updated_session(req: &HttpRequest, srv: &web::Data<Addr<game::GameServer>>) -> UserSession {
-    let user_session_id = get_user_id_from_cookie(&req);
-    let session_token = get_session_token_from_cookie(&req);
-    srv.send(GetUserAndUpdateSession {user_session_id, session_token}).await.expect("Something happens by getting the user")
+
+
+pub async fn get_session_with_token_update_or_create_new(req: &HttpRequest, db: &web::Data<Arc<MongoServer>>) -> UserSession {
+    let user_session_id = match get_user_id_from_value(&req).or(get_user_id_from_cookie(&req)) {
+        Some(data) => data,
+        None =>  {
+            println!("User-session-id cookie not found");
+            return db.new_user_session().await
+        }
+    };
+    let session_token = match get_session_token_from_value(&req).or(get_session_token_from_cookie(&req)) {
+        Some(data) => data,
+        None =>  {
+            println!("Session-cookie not found");
+            return db.new_user_session().await
+        }
+    };
+    db.get_user_session_with_token_check(&user_session_id, &session_token).await
 }
 
-pub async fn get_updated_session_with_request(sessionRequest:SessionRequest, srv: &web::Data<Addr<game::GameServer>>) -> UserSession {
-    let user_session_id = Some(sessionRequest.user_session_id);
-    let session_token = Some(sessionRequest.session_token);
-    srv.send(GetUserAndUpdateSession {user_session_id, session_token}).await.expect("Something happens by getting the user")
+
+pub async fn get_session_or_create_new_session_request(session_request:&SessionRequest, db: &web::Data<Arc<MongoServer>>) -> UserSession {
+    db.get_user_session_with_token(&session_request.user_session_id, &session_request.session_token).await
+
 }
 
-pub async fn get_session(req: &HttpRequest, srv: &web::Data<Addr<game::GameServer>>) -> UserSession {
-    let user_session_id = get_user_id_from_value(&req).or(get_user_id_from_cookie(&req));
-    let session_token = get_session_token_from_value(&req).or(get_session_token_from_cookie(&req));
-    srv.send(GetUserSession {user_session_id, session_token}).await.expect("Something happens by getting the user")
+
+
+pub async fn get_session_or_create_new(req: &HttpRequest, db: &web::Data<Arc<MongoServer>>) -> UserSession {
+    let user_session_id = match get_user_id_from_value(&req).or(get_user_id_from_cookie(&req)) {
+        Some(data) => data,
+        None => {
+            println!("User-session-id cookie not found");
+            return db.new_user_session().await
+        }
+    };
+    let session_token = match get_session_token_from_value(&req).or(get_session_token_from_cookie(&req)) {
+        Some(data) => data,
+        None => {
+            println!("Session-cookie not found");
+            return db.new_user_session().await
+        }
+    };
+    db.get_user_session_with_token(&user_session_id, &session_token).await
+
+}
+
+
+
+pub async fn find_session(req: &HttpRequest, db: &web::Data<Arc<MongoServer>>) -> Option<UserSession> {
+    let user_session_id = match get_user_id_from_value(&req).or(get_user_id_from_cookie(&req)) {
+        Some(data) => data,
+        None => {
+            println!("User-session-id cookie not found");
+            return None
+        }
+    };
+    let session_token = match get_session_token_from_value(&req).or(get_session_token_from_cookie(&req)) {
+        Some(data) => data,
+        None => {
+            println!("Session-cookie not found");
+            return None
+        }
+    };
+    
+    let user = match db.find_user_session(&user_session_id).await {
+        Some(data) => data,
+        None => {
+            println!("User-session not found");
+            return None
+        }
+    };
+    if user.session_token.token.eq(&session_token.token) {
+        return Some(user);
+    }
+    None
+
 }
 
 
@@ -222,7 +273,7 @@ pub fn get_token(req: &HttpRequest) -> Option<usize> {
 
 
 
-pub fn set_cookie(res: &mut HttpResponse,req: &HttpRequest, cookie_name: &str, value: &String){
+pub fn set_cookie(res: &mut HttpResponse, cookie_name: &str, value: &String){
     let cookie = format!("{}={}", cookie_name, value);
     res.headers_mut().append(COOKIE, HeaderValue::from_str(&cookie).unwrap());
     let _cookie = Cookie::build(cookie_name, value)
@@ -241,9 +292,9 @@ pub fn set_cookie(res: &mut HttpResponse,req: &HttpRequest, cookie_name: &str, v
 }
 
 
-pub fn set_session_token_cookie(response: &mut HttpResponse, req: &HttpRequest, user_session: &UserSession){
-    set_cookie(response, &req, "user-session-id", &user_session.user_session_id.id.to_string());
-    set_cookie(response, &req, "session-token", &user_session.session_token.token);
+pub fn set_session_token_cookie(response: &mut HttpResponse, user_session: &UserSession){
+    set_cookie(response, "user-session-id", &user_session.user_session_id.id.to_string());
+    set_cookie(response, "session-token", &user_session.session_token.token);
 }
 
 
@@ -262,30 +313,31 @@ pub fn remove_cookie(res: &mut HttpResponse, req: &HttpRequest, cookie_name: &st
 
 
 #[get("/api/authorization")]
-async fn has_authorization(req: HttpRequest, srv: web::Data<Addr<game::GameServer>>, auth: web::Data<Addr<AuthenticationServer>>) -> HttpResponse {
-    let user_session = get_session(&req, &srv).await;
-    let mut response = HttpResponse::from(HttpResponse::Ok().json(ApiResponse::new(is_admin(user_session.clone(), auth).await)));
-    set_session_token_cookie(&mut response, &req, &user_session);
+async fn has_authorization(req: HttpRequest, db: web::Data<Arc<MongoServer>>) -> HttpResponse {
+    let user_session = get_session_or_create_new(&req, &db).await;
+    let admin = is_admin(&user_session, &db).await;
+    let mut response = HttpResponse::from(HttpResponse::Ok().json(ApiResponse::new(admin)));
+    set_session_token_cookie(&mut response, &user_session);
     response
 }
 
 #[get("/api/discord_session")]
-async fn discord_session(req: HttpRequest, srv: web::Data<Addr<game::GameServer>>, _auth: web::Data<Addr<AuthenticationServer>>) -> HttpResponse {
-    let user_session = get_session(&req, &srv).await;
+async fn discord_session(req: HttpRequest, db: web::Data<Arc<MongoServer>>) -> HttpResponse {
+    let user_session = get_session_or_create_new(&req, &db).await;
     let discord_user = match user_session.clone().discord_auth{
         None => None,
         Some(data) => data.discord_user,
     };
     let mut response = HttpResponse::from(HttpResponse::Ok().json(discord_user));
-    set_session_token_cookie(&mut response, &req, &user_session);
+    set_session_token_cookie(&mut response, &user_session);
     response
 }
 
 #[post("/api/create")]
-async fn create_game_lobby(req: HttpRequest,json: web::Json<Option<JeopardyBoard>>, srv: web::Data<Addr<game::GameServer>>, auth: web::Data<Addr<AuthenticationServer>>) -> HttpResponse {
-    let user_session = get_session(&req, &srv).await;
+async fn create_game_lobby(req: HttpRequest,json: web::Json<Option<JeopardyBoard>>, srv: web::Data<Addr<game::GameServer>>, db: web::Data<Arc<MongoServer>>) -> HttpResponse {
+    let user_session = get_session_or_create_new(&req, &db).await;
     let mut response =   HttpResponse::from(HttpResponse::NotFound());
-    if is_admin(user_session.clone(), auth).await{
+    if is_admin(&user_session, &db).await{
         if let Some(discord_data) = user_session.clone().discord_auth {
             if let Some(discord_user) = discord_data.discord_user {
                 let data = srv.send(CreateLobby { user_session_id: user_session.user_session_id.clone(), discord_id: discord_user.discord_id, jeopardy_board: json.into_inner() }).await.expect("Something happens by getting the user");
@@ -293,23 +345,32 @@ async fn create_game_lobby(req: HttpRequest,json: web::Json<Option<JeopardyBoard
             }
         }
     }
-    set_session_token_cookie(&mut response, &req, &user_session);
+    set_session_token_cookie(&mut response, &user_session);
     response
 }
 
 
 #[get("/api/join")]
-async fn join_game(req: HttpRequest, srv: web::Data<Addr<game::GameServer>>) -> Result<HttpResponse, actix_web::Error> {
+async fn join_game(req: HttpRequest, srv: web::Data<Addr<game::GameServer>>, db: web::Data<Arc<MongoServer>>) -> Result<HttpResponse, actix_web::Error> {
     println!("{:?}", extract_header_string(&req, "lobby-id"));
-    let lobby_id = match extract_header_string(&req, "lobby-id") {
-        Ok(data) => data,
-        Err(error) => return Ok(error),
+    let lobby_id = match get_lobby_id_from_header(&req){
+        Some(data) => data,
+        None => return Ok(get_internal_server_error_json(json!({"Error": "No Lobby ID Found"}))),
     };
-    let user_session = get_session(&req, &srv).await;
-    let can_join = srv.send(game::CanJoinLobby { user_session_id: user_session.user_session_id.clone(), lobby_id: LobbyId::of(lobby_id.clone())}).await.expect("No Lobby found!");
+    let user_session = get_session_or_create_new(&req, &db).await;
+
+
+    let lobby_adrr = match srv.send(game::LobbyAddrRequest{lobby_id:lobby_id.clone()}).await.expect("No Lobby found!") {
+        Some(data) => data,
+        None => return Ok(session_error(&req, &user_session, "No Lobby Found")),
+    };
+
+
+
+    let can_join = lobby_adrr.send(CanJoinLobby { user_session_id: user_session.user_session_id.clone()}).await.expect("No Lobby found!");
 
     let mut response = HttpResponse::from(HttpResponse::Ok().json(ApiResponse::new(can_join)));
-    set_session_token_cookie(&mut response, &req, &user_session);
+    set_session_token_cookie(&mut response, &user_session);
     Ok(response)
 }
 
@@ -333,7 +394,7 @@ pub fn get_session_token_from_cookie(req: &HttpRequest) -> Option<SessionToken> 
     if let Some(cookie) = req.cookie("session-token"){
         return Some(SessionToken {
             token:cookie.value().to_string(),
-            create: Local::now(),
+            expire: Local::now(),
         })
     };
     None
@@ -352,8 +413,24 @@ pub fn get_session_token_from_value(req: &HttpRequest) -> Option<SessionToken> {
     if let Ok(cookie) = extract_value(&req,"session-token"){
         return Some(SessionToken {
             token:cookie,
-            create: Local::now(),
+            expire: Local::now(),
         })
     };
+    None
+}
+
+pub fn get_file_token_from_value(req: &HttpRequest) -> Option<DTOFileToken> {
+    if let Ok(cookie) = extract_value(&req,"file-token"){
+        return Some(DTOFileToken {
+            token:cookie,
+        })
+    };
+    None
+}
+
+pub fn get_lobby_id_from_value(req: &HttpRequest) -> Option<LobbyId> {
+    if let Ok(cookie) = extract_value(&req,"lobby-id"){
+        return Some(LobbyId::of(cookie));
+    }
     None
 }

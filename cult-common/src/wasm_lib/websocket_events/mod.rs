@@ -6,7 +6,7 @@ use std::hash::{Hash};
 use std::string::ToString;
 
 use crate::backend::ActionState;
-use crate::dto::{DTOSession, DtoJeopardyBoard, DtoQuestion};
+use crate::dto::board::{DTOSession, DtoJeopardyBoard, DtoQuestion};
 
 use super::ids::lobby::LobbyId;
 use super::ids::usersession::UserSessionId;

@@ -2,6 +2,7 @@
 
 use std::process;
 use std::str::{FromStr};
+use std::sync::Arc;
 use actix::{Actor, Addr};
 use tokio::{io};
 use tokio::io::{AsyncBufReadExt};
@@ -79,17 +80,13 @@ impl FromStr for Commands {
         };
 
 
-
-
-
-
         match first_word.as_str() {
             "/STOP"  => Ok(Commands::STOP),
             "/ADMINCODE"  => Ok(Commands::ADMINCODE),
             "/PERMIT" => {
                 let second_word = parts.next();
                 let second_word = match second_word {
-                    None => return return Err(()),
+                    None => return Err(()),
                     Some(word ) => word
                 };
                 Ok(Commands::PERMIT(second_word.into()))
@@ -136,7 +133,6 @@ impl InputServer {
         }
 
 
-        Ok(())
     }
 
 

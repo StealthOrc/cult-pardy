@@ -6,6 +6,7 @@ use hashs::validate::ValidateHash;
 use ids::discord::DiscordID;
 use ids::usersession::{self, UserSessionId};
 use serde::{Deserialize, Serialize};
+use token::File::FileToken;
 use tsify_next::Tsify;
 use twox_hash::XxHash;
 use core::hash;
@@ -15,11 +16,13 @@ use std::string::ToString;
 use wasm_bindgen::prelude::*;
 
 use crate::backend::{ActionState, MediaPlayer};
-use crate::dto::FileChunk;
+use crate::dto::api::DTOFileToken;
+use crate::dto::{FileChunk};
 
 pub mod ids;
 pub mod websocket_events;
 pub mod hashs;
+pub mod token;
 
 
 #[derive(Tsify,Clone, Copy,Serialize,Deserialize)]
@@ -119,19 +122,7 @@ impl QuestionType {
 }
 
 
-#[derive(Tsify,Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Default)]
-pub struct ApiResponse {
-    pub success: bool,
 
-}
-impl ApiResponse {
-    pub fn new(success: bool) -> Self {
-        ApiResponse { success }
-    }
-    pub fn of(success: bool) -> Self {
-        ApiResponse { success }
-    }
-}
 
 
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Default)]
@@ -168,12 +159,12 @@ pub struct FileData {
     pub validate_hash: ValidateHash,
     pub upload_data: DateTime<Local>,
     pub uploader: UserSessionId,
+    pub file_token: FileToken,
 }
 
 
 
 impl FileData {
-
 
     pub fn new(file_chunks_hashs: Vec<FileChunkHash>, file_name: String, total_chunks: usize, file_type: String, validate_hash:ValidateHash,uploader: &UserSessionId) -> Self {
         let filedata_hash = FileDataHash::default();
@@ -187,17 +178,21 @@ impl FileData {
             validate_hash,
             upload_data,
             uploader: uploader.clone(),
+            file_token: FileToken::new(),
         }
     }
 
-    pub fn containts_file_chunk_hash(&self, hash: &FileChunkHash) -> bool {
-        self.file_chunks_hashs.iter().any(|x| x.hash == hash.hash)
+    pub fn containts_file_chunk_hash(&self, hash: &ValidateHash) -> bool {
+        self.file_chunks_hashs.iter().any(|x| x.hash == hash.get_hash())
     }
 
     pub fn get_hashs(&self) -> Vec<FileChunkHash> {
         self.file_chunks_hashs.clone()
     }
 
+    pub fn validate_file_token(&self, token: &DTOFileToken) -> bool {
+        self.file_token.token.eq(&token.token) && !self.file_token.is_expired()
+    }
 
 
 

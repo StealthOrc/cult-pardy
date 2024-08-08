@@ -1,5 +1,5 @@
 
-import { type ApiResponse, type DiscordUser, type DTOFileChunk, type DTOFileData,type JeopardyBoard, type UserSessionId } from "cult-common";
+import { type ApiResponse, type DiscordUser, type DTOFileChunk, type DTOFileData,type DTOFileToken,type FileDataReponse,type JeopardyBoard, type UserSessionId } from "cult-common";
 import { CookieStore, type SessionCookies } from "$lib/stores/cookies";
 
 /*
@@ -33,26 +33,23 @@ enum BackendApiRequests {
 
 
 export async function authorization(): Promise<ApiResponse> {
-    const response : Response | null = await api_get_request(BackendApiRequests.AUTHORIZATION);
+    const response : Response  = await api_get_request(BackendApiRequests.AUTHORIZATION);
     if (response == null || !response.ok) {
         return {success: false};
     }
     return await response.json();
 }
 
-export async function discord_session(): Promise<DiscordUser | null> {
-    const response : Response | null = await api_get_request(BackendApiRequests.DISCORD_SESSION);
+export async function discord_session(): Promise<DiscordUser> {
+    const response : Response = await api_get_request(BackendApiRequests.DISCORD_SESSION);
     if (response == null || !response.ok) {
-        return null;
+        throw new Error("Failed to fetch discord session");
     }
     return await response.json();
 }
 
-export async function session_data(): Promise<SessionData | null> {
-    const response : Response | null = await api_get_request(BackendApiRequests.SESSION_DATA);
-    if (response == null || !response.ok) {
-        return null;
-    }
+export async function session_data(): Promise<SessionData> {
+    const response : Response = await api_get_request(BackendApiRequests.SESSION_DATA);
     const json = await response.json();
     const user_session_id: UserSessionId = json.user_session_id;
     const session_token: SessionToken = json.session_token;
@@ -63,17 +60,17 @@ export async function session_data(): Promise<SessionData | null> {
 
 
 export async function join(): Promise<ApiResponse> {
-    const response : Response | null = await api_get_request(BackendApiRequests.JOIN);
+    const response : Response = await api_get_request(BackendApiRequests.JOIN);
     if (response == null || !response.ok) {
         return {success: false};
     }
     return await response.json();
 }
 
-export async function board(): Promise<JeopardyBoard | null> {
-    const response : Response | null = await api_get_request(BackendApiRequests.BOARD);
+export async function board(): Promise<JeopardyBoard> {
+    const response : Response= await api_get_request(BackendApiRequests.BOARD);
     if (response == null || !response.ok) {
-        return null;
+        throw new Error("Failed to fetch board");
     }
     return await response.json();
 }
@@ -94,26 +91,24 @@ export async function UserInfo() {
 
 }
 
-export async function upload_data(data:DTOFileData): Promise<ApiResponse> {
+export async function upload_data(data:DTOFileData): Promise<FileDataReponse> {
     console.log("STARTING data");
-    const response : Response | null = await api_post_request(BackendApiRequests.FILEDATA, data);
+    const response : Response | null = await api_post_request(BackendApiRequests.FILEDATA, data, "");
     if (response == null || !response.ok) {
-        return {success: false};
+        return {
+            Failed: "Failed to upload data"
+        }
     }
     return await response.json();
 }
 
-export async function upload_chunk(data:DTOFileChunk): Promise<ApiResponse> {
-    console.log("STARTING CHUNK");
-    const response : Response | null = await api_post_request(BackendApiRequests.FILECHUNK, data);
-    if (response == null || !response.ok) {
-        return {success: false};
-    }
-    return await response.json();
+export async function upload_chunk(data:DTOFileChunk, token:DTOFileToken): Promise<Response> {
+    return await api_post_request(BackendApiRequests.FILECHUNK, data, token.token);
+
 }
 
 
-export async function api_post_request(request:BackendApiRequests, data:unknown): Promise<Response | null> {
+export async function api_post_request(request:BackendApiRequests, data:unknown, addon:string): Promise<Response> {
     try {
         if (!updater) {
             CookieStore.subscribe((c) => {
@@ -122,9 +117,10 @@ export async function api_post_request(request:BackendApiRequests, data:unknown)
             updater = true;
         }
         if (cookies == null) {
-            return null;
+            throw new Error("No cookies");
         }  
-        return await fetch(request + `?user-session-id=${cookies.userSessionId.id}&session-token=${cookies.sessionToken}`, {
+
+        return await fetch(request  + `?user-session-id=${cookies.userSessionId.id}&session-token=${cookies.sessionToken}&file-token=${addon}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -134,10 +130,10 @@ export async function api_post_request(request:BackendApiRequests, data:unknown)
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (e ) {
-        return null
+        throw new Error("Failed to fetch");
     }
 }
-export async function api_get_request(request:BackendApiRequests): Promise<Response | null> {
+export async function api_get_request(request:BackendApiRequests): Promise<Response> {
     try {
         if (!updater) {
             CookieStore.subscribe((c) => {
@@ -146,7 +142,7 @@ export async function api_get_request(request:BackendApiRequests): Promise<Respo
             updater = true;
         }
         if (cookies == null) {
-            return null;
+            throw new Error("No cookies");
         }  
         return await fetch(request + `?user-session-id=${cookies.userSessionId.id}&session-token=${cookies.sessionToken}`, {
             method: 'GET',
@@ -158,7 +154,7 @@ export async function api_get_request(request:BackendApiRequests): Promise<Respo
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (e ) {
-        return null
+        throw new Error("Failed to fetch");
     }
 }
 

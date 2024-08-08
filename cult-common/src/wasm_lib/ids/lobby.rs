@@ -5,6 +5,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use tsify_next::Tsify;
 use wasm_bindgen::prelude::wasm_bindgen;
 
+
 #[derive(Tsify, Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 #[wasm_bindgen]
 pub struct LobbyId {
@@ -44,4 +45,5 @@ impl Display for LobbyId {
         write!(f, "{}", self.id)
     }
 }
+
 

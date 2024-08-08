@@ -1,6 +1,9 @@
 use actix_web::{HttpRequest, HttpResponse};
+use cult_common::wasm_lib::ids::lobby::LobbyId;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+
+use crate::servers::lobby::Lobby;
 
 
 #[derive(Deserialize, Serialize)]
@@ -67,5 +70,12 @@ pub fn extract_header_string(req: &HttpRequest, header_name: &str) -> Result<Str
                 }
             }
         }
+    }
+}
+
+pub fn get_lobby_id_from_header(req: &HttpRequest) -> Option<LobbyId> {
+    match extract_header_string(req, "lobby_id") {
+        Ok(lobby_id) => Some(LobbyId::of(lobby_id)),
+        Err(_) => None,
     }
 }
