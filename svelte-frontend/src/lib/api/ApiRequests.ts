@@ -104,15 +104,14 @@ export async function upload_data(data:DTOFileData): Promise<FileDataReponse> {
     return await response.json();
 }
 
-export async function upload_chunk(data:DTOFileChunk, token:DTOFileToken): Promise<Response> {
-    return await api_post_request(FILECHUNK_URL, data, token.token);
+export async function upload_chunk(data:ArrayBuffer, filename: string, fileindex: number, validate_hash: string, token:DTOFileToken): Promise<Response> {
+    const myblob = new Blob([data], { type: "application/octet-stream" })
+    return await api_post_binrequest(FILECHUNK_URL, myblob, filename, fileindex, validate_hash, token.token);
 }
 
-export async function get_file(filename: string): Promise<DTOCFile> {
-    console.log("getting file:",GETFILE_URL + filename);
+export async function get_file(filename: string): Promise<ArrayBuffer> {
     const response: Response | null = await api_get_request(GETFILE_URL + filename);
-    const json = await response.json();
-    return json;
+    return await response.arrayBuffer();
 }
 
 export async function api_post_request(url: string, data:unknown,token:string ): Promise<Response> {
@@ -132,6 +131,32 @@ export async function api_post_request(url: string, data:unknown,token:string ):
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify(data),
+        });
+
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (e ) {
+        throw new Error("Failed to fetch");
+    }
+}
+
+export async function api_post_binrequest(url: string, data:any, filename: string, fileindex: number, validatehash: string, token:string): Promise<Response> {
+    try {
+        if (!updater) {
+            CookieStore.subscribe((c) => {
+                cookies = c;
+            });
+            updater = true;
+        }
+        if (cookies == null) {
+            throw new Error("No cookies");
+        }
+        return await fetch(url + `?file-name=${filename}&file-index=${fileindex}&validate-hash=${validatehash}&file-token=${token}`, {
+
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/octet-stream'
+            },
+            body: data,
         });
 
         // eslint-disable-next-line @typescript-eslint/no-unused-vars

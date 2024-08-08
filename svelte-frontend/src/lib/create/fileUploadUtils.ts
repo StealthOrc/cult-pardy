@@ -1,4 +1,4 @@
-import { Deflate, Inflate,} from 'fflate';
+import { inflate, deflate } from 'fflate';
 import { XXH64 } from 'xxh3-ts';
 import { Buffer } from 'buffer';
 import type { DTOFileChunk, DTOFileData, DTOFileToken, FileChunkHash, FileDataReponse } from 'cult-common';
@@ -17,11 +17,10 @@ export type FileUploadProgress = {
 };
 
 export async function handleFileUpload(file: File, onProgress: (progress: FileUploadProgress) => void): Promise<void> {
-    const arrayBuffer = await file.arrayBuffer();
-    const uint8Array = new Uint8Array(arrayBuffer);
+    const arrayBuffer = await file.arrayBuffer(); 
 
     // Compress the file data asynchronously
-    const deflatedData = await compressData(uint8Array);
+    const deflatedData = await compressData(arrayBuffer);
 
     // Calculate hash of the deflated data
     const validateHash = XXH64(Buffer.from(deflatedData)).toString();
@@ -44,7 +43,7 @@ export async function handleFileUpload(file: File, onProgress: (progress: FileUp
         fileChunks.push({
             file_name: file.name,
             index: i,
-            chunk: Array.from(chunkArray),
+            chunk: chunkArray,
             validate_hash: { hash: chunkHash }
         });
     }
@@ -112,46 +111,34 @@ async function processChunksWithLimit(token: DTOFileToken, chunks: DTOFileChunk[
     }
 }
 
-export async function compressData(data: Uint8Array): Promise<Uint8Array> {
+export async function compressData(data: ArrayBuffer): Promise<ArrayBuffer> {
     return new Promise((resolve, reject) => {
-        try {
-            const compressedChunks: Uint8Array[] = [];
-            const deflate = new Deflate((u8array, final) => {
-                compressedChunks.push(u8array);
-                if (final) {
-                    resolve(concatenateUint8Arrays(compressedChunks));
-                }
-
-            });
-            deflate.push(data, true);
-        } catch (error) {
-            reject(error);
-        }
+        deflate(new Uint8Array(data), (err, compressedData) => {
+            if (err) {
+                reject(err);
+            } else {
+                resolve(compressedData.buffer); // Return the compressed data as an ArrayBuffer
+            }
+        });
     });
 }
 
-export async function decompressData(data: Uint8Array): Promise<Uint8Array> {
+export async function decompressData(data: ArrayBuffer): Promise<ArrayBuffer> {
     return new Promise((resolve, reject) => {
-        try {
-            const decompressedChunks: Uint8Array[] = [];
-            const inflate = new Inflate((u8array, final) => {
-                decompressedChunks.push(u8array);
-                if (final) {
-                    resolve(concatenateUint8Arrays(decompressedChunks));
-                }
-            });
-            inflate.push(data, true);
-        } catch (error) {
-            reject(error);
-        }
+        inflate(new Uint8Array(data), (err, decompressedData) => {
+            if (err) {
+                reject(err);
+            } else {
+                resolve(decompressedData.buffer); // Return the compressed data as an ArrayBuffer
+            }
+        });
     });
 }
-
 
 
 async function upload_file_chunk(chunk: DTOFileChunk, token:DTOFileToken): Promise<boolean> {
     try {
-        const res = await upload_chunk(chunk, token);
+        const res = await upload_chunk(chunk.chunk, chunk.file_name, chunk.index, chunk.validate_hash.hash, token);
         if (!res.ok) {
             throw new Error(`Failed to upload chunk ${chunk.index}`);
         }
