@@ -156,6 +156,11 @@ async fn get_file_from_name(path: web::Path<String>, req: HttpRequest,  db: web:
         Some(data) => {
             let bytes = data.get_as_bytes();
             HttpResponse::Ok()
+            .insert_header(("file-name", data.file_data.file_name))
+            .insert_header(("validate-hash", data.file_data.validate_hash.get_hash()))
+            .insert_header(("file-type", data.file_data.file_type))
+            .insert_header(("uploader", data.file_data.uploader.id))
+            .insert_header(("upload-data", data.file_data.upload_data.to_string()))
             .content_type("application/octet-stream")
             .body(bytes)
         }
