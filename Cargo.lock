@@ -2215,6 +2215,7 @@ dependencies = [
  "serde_json",
  "strum",
  "tokio",
+ "twox-hash",
 ]
 
 [[package]]

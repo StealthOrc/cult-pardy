@@ -5,6 +5,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use tsify_next::Tsify;
 use twox_hash::XxHash;
 use std::collections::HashSet;
+use std::fmt::Binary;
 use std::fs::File;
 use std::hash::{Hash, Hasher};
 use std::string::ToString;
@@ -46,24 +47,12 @@ impl DTOFileData {
 pub struct DTOFileChunk {
     pub file_name: String,
     pub index: usize,
-    pub chunk: Vec<u8>,
+    pub chunk: Bytes,
     pub validate_hash: ValidateHash,
 }
 
 impl DTOFileChunk {
 
-    pub fn to_file_chunk(self) -> Option<FileChunk> {
-        let hash = self.to_chunk_hash();
-        if !self.validate_hash.validate_file_chunk(&hash) {
-            return None;
-        }
-        Some(FileChunk {
-            file_name: self.file_name,
-            index: self.index,
-            chunk: self.chunk,
-            validate_hash: self.validate_hash,
-        })
-    }
 
     pub fn to_chunk_hash(&self) -> FileChunkHash {
         let mut hasher = XxHash::with_seed(0); // Seed is optional
@@ -75,28 +64,3 @@ impl DTOFileChunk {
     
 }
 
-
-#[derive(Tsify, Debug, Clone,Serialize,Deserialize, Hash,Eq, PartialEq, Default)]
-pub struct FileChunk {
-    pub file_name : String,
-    pub index: usize,
-    pub chunk: Vec<u8>,
-    pub validate_hash: ValidateHash,
-}
-
-
-
-impl FileChunk {
-
-    pub fn is_valid(&self) -> bool {
-        self.validate_hash.validate_file_chunk(&self.to_chunk_hash())
-    }
-    pub fn to_chunk_hash(&self) -> FileChunkHash {
-        let mut hasher = XxHash::with_seed(0); // Seed is optional
-        hasher.write(&self.chunk);
-        FileChunkHash {
-            hash: hasher.finish().to_string(),
-        }
-    }
-
-}

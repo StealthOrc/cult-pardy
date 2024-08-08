@@ -2,7 +2,7 @@ use std::any;
 use std::hash::Hash;
 use std::str::FromStr;
 use std::sync::Arc;
-use crate::data::SessionRequest;
+use crate::data::{FileChunk, SessionRequest};
 use crate::main;
 use crate::servers::db::{DBDatabase, MongoServer};
 use crate::servers::game::{CreateLobby, SessionToken};
@@ -126,7 +126,7 @@ async fn upload_file_chunk(req: HttpRequest,db: web::Data<Arc<MongoServer>> , js
         return Ok(HttpResponse::from(HttpResponse::NotFound().json("File token not found")))
     }
 
-    let file_chunk = match dto_filechunk.to_file_chunk() {
+    let file_chunk = match FileChunk::to_file_chunk(dto_filechunk) {
         Some(data) => data,
         None => return Ok(HttpResponse::from(HttpResponse::NotFound().json("File chunk not found"))),
     };

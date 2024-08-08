@@ -15,7 +15,6 @@ use crate::wasm_lib::hashs::validate::ValidateHash;
 use crate::wasm_lib::ids::usersession::{self, UserSessionId};
 use crate::wasm_lib::{DiscordUser, FileData, QuestionType, Vector2D};
 
-use super::FileChunk;
 
 
 
@@ -31,40 +30,18 @@ pub struct DTOFileData {
 
 
 
-#[derive(Tsify, Debug, Clone,Serialize,Deserialize, Hash,Eq, PartialEq, Default)]
-pub struct DTOFileChunk {
-    pub file_name: String,
-    pub index: usize,
-    pub chunk: Vec<u8>,
-    pub validate_hash: ValidateHash,
-}
-
-impl DTOFileChunk {
-
-    pub fn to_file_chunk(self) -> FileChunk {
-        FileChunk {
-            file_name: self.file_name,
-            index: self.index,
-            chunk: self.chunk,
-            validate_hash: self.validate_hash,
-        }
-    }
-
-    pub fn to_chunk_hash(&self) -> FileChunkHash {
-        let mut hasher = XxHash::with_seed(0); // Seed is optional
-        hasher.write(&self.chunk);
-        FileChunkHash {
-            hash: hasher.finish().to_string(),
-        }
-    }
-    
-}
-
-
 impl DTOFileData {
     
     pub fn to_file_data(self, usersession:&UserSessionId) -> FileData {
         FileData::new(self.file_chunks_hashs, self.file_name, self.total_chunks, self.file_type, self.validate_hash, usersession)
     }
 
+}
+
+#[derive(Tsify,Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DTOCFile{
+    pub file_name: String,
+    pub file_type: String,
+    pub file: Bytes,
+    pub validate_hash: ValidateHash,
 }

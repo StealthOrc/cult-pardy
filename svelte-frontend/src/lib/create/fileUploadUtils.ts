@@ -1,9 +1,10 @@
-import { Deflate,} from 'fflate';
+import { Deflate, Inflate,} from 'fflate';
 import { XXH64 } from 'xxh3-ts';
 import { Buffer } from 'buffer';
 import type { DTOFileChunk, DTOFileData, DTOFileToken, FileChunkHash, FileDataReponse } from 'cult-common';
 import { upload_chunk, upload_data } from '$lib/api/ApiRequests';
 import { match, P } from 'ts-pattern';
+
 
 const CHUNK_SIZE = 200_000; // 200 KB
 const MAX_PARALLEL_UPLOADS = 5; // Maximum number of parallel uploads
@@ -59,10 +60,12 @@ export async function handleFileUpload(file: File, onProgress: (progress: FileUp
 
     // Upload metadata
     const data : FileDataReponse = await upload_data(uploadData);
+    
 
     match(data)
     //BoardEvents
     .with({ Successful: P.select() }, async (boardEvent) => {
+        await new Promise(r => setTimeout(r, 1000));
         await processChunksWithLimit(boardEvent, fileChunks, uploadData.total_chunks, onProgress);
     })
     .with({ Failed: P.select() }, (error) => console.error(error))
@@ -109,7 +112,7 @@ async function processChunksWithLimit(token: DTOFileToken, chunks: DTOFileChunk[
     }
 }
 
-async function compressData(data: Uint8Array): Promise<Uint8Array> {
+export async function compressData(data: Uint8Array): Promise<Uint8Array> {
     return new Promise((resolve, reject) => {
         try {
             const compressedChunks: Uint8Array[] = [];
@@ -121,6 +124,23 @@ async function compressData(data: Uint8Array): Promise<Uint8Array> {
 
             });
             deflate.push(data, true);
+        } catch (error) {
+            reject(error);
+        }
+    });
+}
+
+export async function decompressData(data: Uint8Array): Promise<Uint8Array> {
+    return new Promise((resolve, reject) => {
+        try {
+            const decompressedChunks: Uint8Array[] = [];
+            const inflate = new Inflate((u8array, final) => {
+                decompressedChunks.push(u8array);
+                if (final) {
+                    resolve(concatenateUint8Arrays(decompressedChunks));
+                }
+            });
+            inflate.push(data, true);
         } catch (error) {
             reject(error);
         }

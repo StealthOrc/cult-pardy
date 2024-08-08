@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { WebsocketStore } from '$lib/stores/WebsocketStore';
-	import type { ApiResponse, CFile, DtoQuestion, FileChunk, Vector2D, WebsocketSessionEvent } from 'cult-common';
+	import type { ApiResponse, DTOCFile, DTOFileChunk, DtoQuestion, Vector2D, WebsocketSessionEvent } from 'cult-common';
 	import type { WebSocketSubject } from 'rxjs/webSocket';
 	import { onMount } from 'svelte';
 	import { on } from 'svelte/events';
@@ -12,6 +12,8 @@
 	import { binary_test } from '$lib/const';
 	import { get_file } from '$lib/api/ApiRequests';
 	import { buildUint8ArrayFromChunks} from '$lib/BinaryConversion';
+	import { decompress } from 'fflate';
+	import { decompressData } from '$lib/create/fileUploadUtils';
     
     export let question: DtoQuestion;
     let open_request = false;
@@ -126,18 +128,23 @@
     let videoBlobUrl: string;
     async function loadVideoToBlob(url: string) {
         try {
-            const data: CFile = await get_file('FlyHigh.mp4');
+            const data: DTOCFile = await get_file('FlyHigh.mp4');
 
                 console.log("loadVideoToBlob",);
-                let dataChunks: FileChunk[] = data.file_chunks;
+                let dataChunks: DTOFileChunk[] = data.file_chunks;
+                
+
+                
                 dataChunks.sort((a, b) => a.index - b.index);
                 let chunks: Uint8Array[] = [];
                 for (let i = 0; i < data.file_chunks.length; i++) {
                     chunks.push(new Uint8Array(dataChunks[i].chunk));
                 }
                 const buf: ArrayBuffer = buildUint8ArrayFromChunks(chunks);
+                let u8 = new Uint8Array(buf);
+                const decom : Uint8Array = await decompressData(u8);
 
-                const videoBlob: Blob = new Blob([buf], { type: 'video/mp4' });
+                const videoBlob: Blob = new Blob([decom], { type: 'video/mp4' });
 
                 // Create a URL for the Blob
                 videoBlobUrl = URL.createObjectURL(videoBlob);

@@ -1,11 +1,10 @@
 use std::collections::HashSet;
 
 use chrono::TimeDelta;
-use cult_common::dto::FileChunk;
 use cult_common::wasm_lib::hashs::filechunk::FileChunkHash;
 use cult_common::wasm_lib::hashs::validate::ValidateHash;
 use cult_common::wasm_lib::ids::discord::DiscordID;
-use cult_common::wasm_lib::{CFile, FileData};
+use cult_common::wasm_lib::{FileData};
 use futures::StreamExt;
 use mongodb::bson::{doc, to_bson};
 use mongodb::options::{ClientOptions, ServerApi, ServerApiVersion};
@@ -13,6 +12,7 @@ use mongodb::{Client, Collection};
 use ritelinked::LinkedHashSet;
 use strum::{Display, EnumIter};
 use cult_common::wasm_lib::ids::usersession::UserSessionId;
+use crate::data::{CFile, FileChunk};
 use crate::servers::db::DBDatabase::CultPardy;
 use crate::servers::game::UserSession;
 use crate::ws::session;
@@ -62,6 +62,8 @@ impl MongoServer {
             file_data: db.collection("FileData"),
             file_chunks : db.collection("FileChunks"),
         };
+
+
 
         MongoServer{
             mongo_client,

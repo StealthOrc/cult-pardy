@@ -17,7 +17,6 @@ use wasm_bindgen::prelude::*;
 
 use crate::backend::{ActionState, MediaPlayer};
 use crate::dto::api::DTOFileToken;
-use crate::dto::{FileChunk};
 
 pub mod ids;
 pub mod websocket_events;
@@ -125,29 +124,6 @@ impl QuestionType {
 
 
 
-#[derive(Tsify,Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Default)]
-pub struct CFile {
-    pub file_chunks: Vec<FileChunk>,
-    pub file_data: FileData,
-}
-
-impl CFile {
-
-
-    pub fn current_chunks(&self) -> usize {
-        self.file_chunks.len()
-    }
-    
-    pub fn is_valid(&self) -> bool {
-        self.file_chunks.len() == self.file_data.total_chunks && self.file_data.validate_hash.validate_file_data(&self.file_data.filedata_hash)
-    }
-
-    pub fn get_chunk(&self, index: usize) -> Option<&FileChunk> {
-        self.file_chunks.iter().find(|x| x.index == index)
-    }
-
-   
-}
 
 #[derive(Tsify, Debug,Serialize,Deserialize ,Clone ,Hash,Eq, PartialEq, Default)]
 pub struct FileData {

@@ -1,7 +1,7 @@
 
 import {
     type ApiResponse,
-    type CFile,
+    type DTOCFile,
     type DiscordUser,
     type DTOFileChunk,
     type DTOFileData, type DTOFileToken,
@@ -108,7 +108,7 @@ export async function upload_chunk(data:DTOFileChunk, token:DTOFileToken): Promi
     return await api_post_request(FILECHUNK_URL, data, token.token);
 }
 
-export async function get_file(filename: string): Promise<CFile> {
+export async function get_file(filename: string): Promise<DTOCFile> {
     console.log("getting file:",GETFILE_URL + filename);
     const response: Response | null = await api_get_request(GETFILE_URL + filename);
     const json = await response.json();
