@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
 
-use crate::wasm_lib::token::File::FileToken;
+use crate::wasm_lib::token::file::FileToken;
 
 use super::file;
 

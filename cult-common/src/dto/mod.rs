@@ -13,7 +13,7 @@ use wasm_bindgen::prelude::*;
 use crate::wasm_lib::hashs::filechunk::FileChunkHash;
 use crate::wasm_lib::hashs::validate::ValidateHash;
 use crate::wasm_lib::ids::usersession::{self, UserSessionId};
-use crate::wasm_lib::token::File::FileToken;
+use crate::wasm_lib::token::file::FileToken;
 use crate::wasm_lib::{DiscordUser, FileData, QuestionType, Vector2D};
 
 

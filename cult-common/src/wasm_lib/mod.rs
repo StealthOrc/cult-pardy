@@ -6,7 +6,7 @@ use hashs::validate::ValidateHash;
 use ids::discord::DiscordID;
 use ids::usersession::{self, UserSessionId};
 use serde::{Deserialize, Serialize};
-use token::File::FileToken;
+use token::file::FileToken;
 use tsify_next::Tsify;
 use twox_hash::XxHash;
 use core::hash;
