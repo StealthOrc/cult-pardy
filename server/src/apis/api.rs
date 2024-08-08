@@ -16,7 +16,6 @@ use bytes::Bytes;
 use chrono::Local;
 use cult_common::dto::api::{ApiResponse, DTOFileToken, FileDataReponse};
 use cult_common::dto::{DTOFileChunk, DTOFileData};
-use cult_common::wasm_lib::hashs::validate::ValidateHash;
 use cult_common::wasm_lib::{JeopardyMode, FileData};
 use mongodb::change_stream::session;
 use oauth2::http::header::COOKIE;
@@ -108,39 +107,62 @@ async fn upload_file_data(req: HttpRequest,  db: web::Data<Arc<MongoServer>>,  j
 }
 
 
+#[post("/api/upload/filechunk2")]
+async fn uploadfile_chunk2(req: HttpRequest,db: web::Data<Arc<MongoServer>>, payload: Bytes) -> Result<HttpResponse, actix_web::Error> {
+    let start_time = Local::now();
+    println!("UPLOAD FILE CHUNK");
 
+    let dto_filechunk  = match serde_json::from_slice::<DTOFileChunk>(&payload) {
+        Ok(data) => data,
+        Err(_) => return Ok(HttpResponse::from(HttpResponse::NotFound().json("File chunk not found"))),
+    };
+    let file_token = match get_file_token_from_value(&req) {
+        Some(data) => data,
+        None => return Ok(HttpResponse::from(HttpResponse::NotFound().json("File token not found"))),
+    };
+
+    let file_data = match db.get_file_data_from_name(&dto_filechunk.file_name).await {
+        Some(data) => data,
+        None => return Ok(HttpResponse::from(HttpResponse::NotFound().json("File not found"))),
+    };
+
+    if file_data.validate_file_token(&file_token) == false {
+        return Ok(HttpResponse::from(HttpResponse::NotFound().json("File token not found")))
+    }
+
+    let file_chunk = match FileChunk::to_file_chunk(dto_filechunk) {
+        Some(data) => data,
+        None => return Ok(HttpResponse::from(HttpResponse::NotFound().json("File chunk not found"))),
+    };
+    let file_name = file_chunk.file_name.clone();
+    if db.get_file_chunks_by_index(&file_name, &file_chunk.index).await.is_some(){
+        return Ok(HttpResponse::from(HttpResponse::NotFound().json("File chunk already exists")));
+    }
+    if file_data.containts_file_chunk_hash(&file_chunk.validate_hash) == false {
+        return Ok(HttpResponse::from(HttpResponse::NotFound().json("File chunk hash not found")));
+    }
+
+    if !db.add_file_chunk(&file_chunk).await{
+        return Ok(HttpResponse::from(HttpResponse::NotFound().json("Can´t add file chunk")));
+    }
+    let response = HttpResponse::from(HttpResponse::Ok().json(ApiResponse::of(true)));
+    if db.is_last_file_chunk(&file_name).await {
+        println!("LAST CHUNK");
+    }
+    println!("Upload File Chunk: {:?} ms", Local::now().signed_duration_since(start_time));
+    Ok(response)
+}
 #[post("/api/upload/filechunk")]
-async fn upload_file_chunk(req: HttpRequest,db: web::Data<Arc<MongoServer>>, payload: Bytes) -> Result<HttpResponse, actix_web::Error> {
-    let start_time: chrono::DateTime<Local> = Local::now();
+async fn upload_file_chunk(req: HttpRequest,db: web::Data<Arc<MongoServer>> , json: web::Json<DTOFileChunk>) -> Result<HttpResponse, actix_web::Error> {
+    let start_time = Local::now();
     println!("UPLOAD FILE CHUNK");
 
     let file_token = match get_file_token_from_value(&req) {
         Some(data) => data,
         None => return Ok(HttpResponse::from(HttpResponse::NotFound().json("File token not found"))),
     };
-
-    let file_name = match get_file_name_from_value(&req) {
-        Some(data) => data,
-        None => return Ok(HttpResponse::from(HttpResponse::NotFound().json("File name not found"))),
-    };
-
-    let index = match get_file_index_from_value(&req) {
-        Some(data) => data,
-        None => return Ok(HttpResponse::from(HttpResponse::NotFound().json("File index not found"))),
-    };
-
-    let validate_hash = match get_validate_hash_from_value(&req) {
-        Some(data) => data,
-        None => return Ok(HttpResponse::from(HttpResponse::NotFound().json("File validate hash not found"))),
-    };
-
-    let dto_filechunk = DTOFileChunk {
-        file_name,
-        index,
-        chunk: payload,
-        validate_hash,
-    };
     
+    let dto_filechunk = json.into_inner();
     let file_data = match db.get_file_data_from_name(&dto_filechunk.file_name).await {
         Some(data) => data,
         None => return Ok(HttpResponse::from(HttpResponse::NotFound().json("File not found"))),
@@ -443,15 +465,6 @@ pub fn get_session_token_from_value(req: &HttpRequest) -> Option<SessionToken> {
     None
 }
 
-
-pub fn get_lobby_id_from_value(req: &HttpRequest) -> Option<LobbyId> {
-    if let Ok(cookie) = extract_value(&req,"lobby-id"){
-        return Some(LobbyId::of(cookie));
-    }
-    None
-}
-
-
 pub fn get_file_token_from_value(req: &HttpRequest) -> Option<DTOFileToken> {
     if let Ok(cookie) = extract_value(&req,"file-token"){
         return Some(DTOFileToken {
@@ -461,25 +474,9 @@ pub fn get_file_token_from_value(req: &HttpRequest) -> Option<DTOFileToken> {
     None
 }
 
-pub fn get_file_name_from_value(req: &HttpRequest) -> Option<String> {
-    if let Ok(cookie) = extract_value(&req,"file-name"){
-        return Some(cookie);
-    };
-    None
-}
-
-pub fn get_file_index_from_value(req: &HttpRequest) -> Option<usize> {
-    if let Ok(cookie) = extract_value(&req,"file-index"){
-        if let Ok(id) =  cookie.parse::<usize>(){
-            return Some(id);
-        }
-    }
-    None
-}
-
-pub fn get_validate_hash_from_value(req: &HttpRequest) -> Option<ValidateHash> {
-    if let Ok(cookie) = extract_value(&req,"validate-hash"){
-        return Some(ValidateHash::new(cookie));
+pub fn get_lobby_id_from_value(req: &HttpRequest) -> Option<LobbyId> {
+    if let Ok(cookie) = extract_value(&req,"lobby-id"){
+        return Some(LobbyId::of(cookie));
     }
     None
 }
