@@ -1,6 +1,6 @@
 
 use bytes::Bytes;
-use cult_common::{dto::DTOFileChunk, wasm_lib::{hashs::{filechunk::FileChunkHash, validate::ValidateHash}, ids::usersession::UserSessionId, FileData}};
+use cult_common::{dto::{file::DTOCFile, DTOFileChunk}, wasm_lib::{hashs::{filechunk::FileChunkHash, validate::ValidateHash}, ids::usersession::UserSessionId, FileData}};
 use serde::{Deserialize, Serialize};
 use twox_hash::XxHash;
 use crate::servers::game::SessionToken;
@@ -19,7 +19,14 @@ pub struct FileChunk {
 impl FileChunk {
 
 
-   
+   pub fn to_dto(&self) -> DTOFileChunk {
+        DTOFileChunk {
+            file_name: self.file_name.clone(),
+            index: self.index,
+            chunk: self.chunk.clone(),
+            validate_hash: self.validate_hash.clone(),
+        }
+    }
 
     pub fn to_file_chunk(dto_file_chunk:DTOFileChunk) -> Option<FileChunk> {
         let hash = dto_file_chunk.to_chunk_hash();
@@ -57,6 +64,17 @@ impl CFile {
     pub fn get_chunk(&self, index: usize) -> Option<&FileChunk> {
         self.file_chunks.iter().find(|x| x.index == index)
     }
+
+    pub fn to_dto(&self) -> DTOCFile {
+        let chunks = self.file_chunks.iter().map(|x| x.to_dto()).collect::<Vec<DTOFileChunk>>();
+        DTOCFile {
+            file_name: self.file_data.file_name.clone(),
+            file_type: self.file_data.file_type.clone(),
+            chunks,
+            validate_hash: self.file_data.validate_hash.clone(),
+        }
+    }
+
 }
 
 

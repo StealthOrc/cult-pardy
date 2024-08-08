@@ -15,6 +15,8 @@ use crate::wasm_lib::hashs::validate::ValidateHash;
 use crate::wasm_lib::ids::usersession::{self, UserSessionId};
 use crate::wasm_lib::{DiscordUser, FileData, QuestionType, Vector2D};
 
+use super::DTOFileChunk;
+
 
 
 
@@ -42,6 +44,6 @@ impl DTOFileData {
 pub struct DTOCFile{
     pub file_name: String,
     pub file_type: String,
-    pub file: Bytes,
+    pub chunks: Vec<DTOFileChunk>,
     pub validate_hash: ValidateHash,
 }

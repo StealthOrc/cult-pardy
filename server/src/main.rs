@@ -149,9 +149,10 @@ async fn get_file_from_name(path: web::Path<String>, req: HttpRequest,  db: web:
 
     let file = db.get_cfile_from_name(&name).await;
 
+
     let mut response = match file {
         None => HttpResponse::from(HttpResponse::NotFound()),
-        Some(data) => HttpResponse::from(HttpResponse::Ok().json(data)),
+        Some(data) => HttpResponse::from(HttpResponse::Ok().json(data.to_dto())),
     };
 
     set_session_token_cookie(&mut response, &user_session);
