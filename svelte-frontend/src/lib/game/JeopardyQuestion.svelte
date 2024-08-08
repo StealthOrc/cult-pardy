@@ -126,9 +126,8 @@
     let videoBlobUrl: string;
     async function loadVideoToBlob(url: string) {
         try {
-            const res: ApiResponse = await get_file('FlyHigh.mp4');
-            if (res.success) {
-                let data: CFile = res.data as CFile;
+            const data: CFile = await get_file('FlyHigh.mp4');
+
                 console.log("loadVideoToBlob",);
                 let dataChunks: FileChunk[] = data.file_chunks;
                 dataChunks.sort((a, b) => a.index - b.index);
@@ -142,10 +141,8 @@
 
                 // Create a URL for the Blob
                 videoBlobUrl = URL.createObjectURL(videoBlob);
-            }
-            else{
-                return;
-            }
+            
+            
         } catch (error) {
             console.error('Error loading video:', error);
         }

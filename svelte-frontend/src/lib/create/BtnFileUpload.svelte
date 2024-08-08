@@ -4,8 +4,6 @@
 	import { deflateSync } from "fflate";
     import { XXH64 } from 'xxh3-ts';
     import { Buffer } from 'buffer';
-	import { loadfile } from '$lib/BinaryConversion';
-
 
     async function changed(event: Event) {
         var input = event.target as HTMLInputElement;

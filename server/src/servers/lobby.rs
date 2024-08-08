@@ -518,6 +518,7 @@ impl Handler<AddLobbySessionScore> for Lobby {
                 let dto_board = lobby.jeopardy_board.dto(lobby.creator.clone());
                 let event = WebsocketServerEvents::Board(BoardEvent::CurrentBoard(dto_board));
                 lobby.send_lobby_message(&event);
+                //FIXME: Send the user session id
                 lobby.send_current_sessions();
             }
         }))

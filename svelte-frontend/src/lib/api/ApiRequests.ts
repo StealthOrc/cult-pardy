@@ -1,6 +1,7 @@
 
 import {
     type ApiResponse,
+    type CFile,
     type DiscordUser,
     type DTOFileChunk,
     type DTOFileData, type DTOFileToken,
@@ -107,8 +108,14 @@ export async function upload_chunk(data:DTOFileChunk, token:DTOFileToken): Promi
     return await api_post_request(FILECHUNK_URL, data, token.token);
 }
 
+export async function get_file(filename: string): Promise<CFile> {
+    console.log("getting file:",GETFILE_URL + filename);
+    const response: Response | null = await api_get_request(GETFILE_URL + filename);
+    const json = await response.json();
+    return json;
+}
 
-export async function api_post_request(url: string, data:unknown,token:String ): Promise<Response> {
+export async function api_post_request(url: string, data:unknown,token:string ): Promise<Response> {
     try {
         if (!updater) {
             CookieStore.subscribe((c) => {
