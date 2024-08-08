@@ -25,4 +25,8 @@ impl ValidateHash {
         self.hash == hash.get_hash()
     }
 
+    pub fn new(hash: String) -> Self {
+        ValidateHash { hash }
+    }
+
 }

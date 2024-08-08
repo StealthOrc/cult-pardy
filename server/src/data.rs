@@ -1,4 +1,5 @@
 
+use bson::Binary;
 use bytes::Bytes;
 use cult_common::{dto::{file::DTOCFile, DTOFileChunk}, wasm_lib::{hashs::{filechunk::FileChunkHash, validate::ValidateHash}, ids::usersession::UserSessionId, FileData}};
 use serde::{Deserialize, Serialize};
