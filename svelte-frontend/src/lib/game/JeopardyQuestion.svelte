@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { WebsocketStore } from '$lib/stores/WebsocketStore';
-	import type { DtoQuestion, Vector2D, WebsocketSessionEvent } from 'cult-common';
+	import type { ApiResponse, CFile, DtoQuestion, FileChunk, Vector2D, WebsocketSessionEvent } from 'cult-common';
 	import type { WebSocketSubject } from 'rxjs/webSocket';
 	import { onMount } from 'svelte';
 	import { on } from 'svelte/events';
@@ -10,6 +10,8 @@
 	import JeopardyBoard from './JeopardyBoard.svelte';
 	import { JeopardyBoardStore } from '$lib/stores/JeopardyBoardStore';
 	import { binary_test } from '$lib/const';
+	import { get_file } from '$lib/api/ApiRequests';
+	import { buildUint8ArrayFromChunks} from '$lib/BinaryConversion';
     
     export let question: DtoQuestion;
     let open_request = false;
@@ -124,13 +126,26 @@
     let videoBlobUrl: string;
     async function loadVideoToBlob(url: string) {
         try {
-            const buf: ArrayBuffer = binaryToByteArray(binary_test);
+            const res: ApiResponse = await get_file('FlyHigh.mp4');
+            if (res.success) {
+                let data: CFile = res.data as CFile;
+                console.log("loadVideoToBlob",);
+                let dataChunks: FileChunk[] = data.file_chunks;
+                dataChunks.sort((a, b) => a.index - b.index);
+                let chunks: Uint8Array[] = [];
+                for (let i = 0; i < data.file_chunks.length; i++) {
+                    chunks.push(new Uint8Array(dataChunks[i].chunk));
+                }
+                const buf: ArrayBuffer = buildUint8ArrayFromChunks(chunks);
 
-            const videoBlob: Blob = new Blob([buf], { type: 'video/mp4' });
-            console.log('type:', videoBlob.type);
+                const videoBlob: Blob = new Blob([buf], { type: 'video/mp4' });
 
-            // Create a URL for the Blob
-            videoBlobUrl = URL.createObjectURL(videoBlob);
+                // Create a URL for the Blob
+                videoBlobUrl = URL.createObjectURL(videoBlob);
+            }
+            else{
+                return;
+            }
         } catch (error) {
             console.error('Error loading video:', error);
         }
@@ -138,8 +153,11 @@
 
     // Load the video when the component is mounted
     onMount(() => {
-        const videoUrl = '/assets/FlyHigh.mp4';
-        loadVideoToBlob(videoUrl);
+        //todo: DEBUG ONLY!! load video for all instances!
+        if (question && question.vector2d.x == 0 && question.vector2d.y == 1) {
+            const videoUrl = '/assets/FlyHigh.mp4';
+            loadVideoToBlob(videoUrl);
+        }
     });
 </script>
 

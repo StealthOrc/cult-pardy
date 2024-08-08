@@ -198,7 +198,6 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                     if let Ok(pong) = serde_json::from_slice::<DateTime<Local>>(&bytes) {
                         let time = Local::now();
 
-                        println!("rec + cur + ping {:?} {:?} {:?}",pong.timestamp_millis(), time.timestamp_millis(), time.signed_duration_since(pong).num_milliseconds());
                         let ping = time.signed_duration_since(pong).num_milliseconds();
                         self.player.ping = ping;
                         self.set_ping(ctx);
