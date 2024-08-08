@@ -110,8 +110,7 @@ export async function upload_chunk(data:ArrayBuffer, filename: string, fileindex
 }
 
 export async function get_file(filename: string): Promise<Response> {
-    const response: Response | null = await api_get_request(GETFILE_URL + filename);
-    return await response;
+    return await api_get_request(GETFILE_URL + filename);
 }
 
 export async function api_post_request(url: string, data:unknown,token:string ): Promise<Response> {
