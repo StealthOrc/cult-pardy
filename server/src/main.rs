@@ -16,7 +16,7 @@ use actix_web::web::Data;
 use actix_web::{get, post, web, App, HttpRequest, HttpResponse, HttpServer};
 use anyhow::Result;
 
-use apis::api::{ get_session_or_create_new, session_data_request, set_session_token_cookie, upload_file_data, uploadfile_chunk};
+use apis::api::{ get_session_or_create_new, session_data_request, set_session_token_cookie, upload_file_chunk, upload_file_data};
 use apis::data::extract_header_string;
 use authentication::discord::is_admin;
 use bson::binary;
@@ -82,7 +82,7 @@ async fn main() -> Result<()> {
             .service(create_game_lobby)
             .service(join_game)
             .service(download)
-            .service(uploadfile_chunk)
+            .service(upload_file_chunk)
             .service(upload_file_data)
             .service(get_file_from_name)
             .service(upload_streaming_data)
