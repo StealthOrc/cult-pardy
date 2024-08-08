@@ -1,5 +1,3 @@
-
-use bson::Binary;
 use bytes::Bytes;
 use cult_common::{dto::{file::DTOCFile, DTOFileChunk}, wasm_lib::{hashs::{filechunk::FileChunkHash, validate::ValidateHash}, ids::usersession::UserSessionId, FileData}};
 use serde::{Deserialize, Serialize};
@@ -64,6 +62,17 @@ impl CFile {
 
     pub fn get_chunk(&self, index: usize) -> Option<&FileChunk> {
         self.file_chunks.iter().find(|x| x.index == index)
+    }
+
+    pub fn get_as_bytes(&self) -> Bytes {
+        let mut data = Vec::new();
+        let sort = |a: &FileChunk, b: &FileChunk| a.index.cmp(&b.index);
+        let mut file_chunks = self.file_chunks.clone();
+        file_chunks.sort_by(sort);
+        for chunk in &file_chunks {
+            data.extend_from_slice(&chunk.chunk);
+        }
+        Bytes::from(data)
     }
 
     pub fn to_dto(&self) -> DTOCFile {

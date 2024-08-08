@@ -19,6 +19,7 @@ use anyhow::Result;
 use apis::api::{ get_session_or_create_new, session_data_request, set_session_token_cookie, upload_file_chunk, upload_file_data};
 use apis::data::extract_header_string;
 use authentication::discord::is_admin;
+use bson::binary;
 use dto::DTOFileData;
 use futures::StreamExt;
 use servers::authentication::AuthenticationServer;
@@ -152,9 +153,11 @@ async fn get_file_from_name(path: web::Path<String>, req: HttpRequest,  db: web:
 
     let mut response = match file {
         None => HttpResponse::from(HttpResponse::NotFound()),
-        Some(data) => HttpResponse::from(HttpResponse::Ok().json(data.to_dto())),
+        Some(data) => {
+            let bytes = data.get_as_bytes();
+            HttpResponse::from(HttpResponse::Ok().body(bytes))
+        }
     };
-
     set_session_token_cookie(&mut response, &user_session);
     Ok(response)
 }
