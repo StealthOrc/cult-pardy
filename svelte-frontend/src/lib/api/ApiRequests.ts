@@ -1,5 +1,5 @@
 
-import { type ApiResponse, type DiscordUser, type DTOFileChunk, type DTOFileData,type JeopardyBoard, type UserSessionId } from "cult-common";
+import { type ApiResponse, type CFile, type DiscordUser, type DTOFileChunk, type DTOFileData,type JeopardyBoard, type UserSessionId } from "cult-common";
 import { CookieStore, type SessionCookies } from "$lib/stores/cookies";
 
 /*
@@ -17,23 +17,20 @@ let cookies : SessionCookies | null = null;
 let updater : boolean = false;
 
 
-enum BackendApiRequests {
-    INFO = 'api/info',
-    SESSION_DATA = 'api/session-data',
-    AUTHORIZATION = 'api/authorization',
-    DISCORD_SESSION = 'api/discord_session',
-    //CREATE = 'api/create',
-    JOIN = 'api/join',
-    BOARD = 'api/board',
-    FILEDATA = 'api/upload/filedata',
-    FILECHUNK = 'api/upload/filechunk',
-    
-}   
+    const INFO_URL: string = 'api/info';
+    const SESSION_DATA_URL: string = 'api/session-data';
+    const AUTHORIZATION_URL: string = 'api/authorization';
+    const DISCORD_SESSION_URL: string = 'api/discord_session';
+    const JOIN_URL: string = 'api/join';
+    const BOARD_URL: string = 'api/board';
+    const FILEDATA_URL:string = 'api/upload/filedata';
+    const FILECHUNK_URL:string = 'api/upload/filechunk';
+    const GETFILE_URL:string = 'api/file/'; // add filename after the slash
 
 
 
 export async function authorization(): Promise<ApiResponse> {
-    const response : Response | null = await api_get_request(BackendApiRequests.AUTHORIZATION);
+    const response : Response | null = await api_get_request(AUTHORIZATION_URL);
     if (response == null || !response.ok) {
         return {success: false};
     }
@@ -41,7 +38,7 @@ export async function authorization(): Promise<ApiResponse> {
 }
 
 export async function discord_session(): Promise<DiscordUser | null> {
-    const response : Response | null = await api_get_request(BackendApiRequests.DISCORD_SESSION);
+    const response : Response | null = await api_get_request(DISCORD_SESSION_URL);
     if (response == null || !response.ok) {
         return null;
     }
@@ -49,7 +46,7 @@ export async function discord_session(): Promise<DiscordUser | null> {
 }
 
 export async function session_data(): Promise<SessionData | null> {
-    const response : Response | null = await api_get_request(BackendApiRequests.SESSION_DATA);
+    const response : Response | null = await api_get_request(SESSION_DATA_URL);
     if (response == null || !response.ok) {
         return null;
     }
@@ -63,7 +60,7 @@ export async function session_data(): Promise<SessionData | null> {
 
 
 export async function join(): Promise<ApiResponse> {
-    const response : Response | null = await api_get_request(BackendApiRequests.JOIN);
+    const response : Response | null = await api_get_request(JOIN_URL);
     if (response == null || !response.ok) {
         return {success: false};
     }
@@ -71,7 +68,7 @@ export async function join(): Promise<ApiResponse> {
 }
 
 export async function board(): Promise<JeopardyBoard | null> {
-    const response : Response | null = await api_get_request(BackendApiRequests.BOARD);
+    const response : Response | null = await api_get_request(BOARD_URL);
     if (response == null || !response.ok) {
         return null;
     }
@@ -80,8 +77,8 @@ export async function board(): Promise<JeopardyBoard | null> {
 
 
 export async function UserInfo() {
-    const discord = api_get_request(BackendApiRequests.DISCORD_SESSION);
-    const auth = api_get_request(BackendApiRequests.AUTHORIZATION);
+    const discord = api_get_request(DISCORD_SESSION_URL);
+    const auth = api_get_request(AUTHORIZATION_URL);
 
     const [discord_response, auth_response] = await Promise.all([discord, auth]);
 
@@ -95,8 +92,7 @@ export async function UserInfo() {
 }
 
 export async function upload_data(data:DTOFileData): Promise<ApiResponse> {
-    console.log("STARTING data");
-    const response : Response | null = await api_post_request(BackendApiRequests.FILEDATA, data);
+    const response : Response | null = await api_post_request(FILEDATA_URL, data);
     if (response == null || !response.ok) {
         return {success: false};
     }
@@ -105,15 +101,24 @@ export async function upload_data(data:DTOFileData): Promise<ApiResponse> {
 
 export async function upload_chunk(data:DTOFileChunk): Promise<ApiResponse> {
     console.log("STARTING CHUNK");
-    const response : Response | null = await api_post_request(BackendApiRequests.FILECHUNK, data);
+    const response : Response | null = await api_post_request(FILECHUNK_URL, data);
     if (response == null || !response.ok) {
         return {success: false};
     }
     return await response.json();
 }
 
+export async function get_file(filename: string): Promise<ApiResponse> {
+    console.log("getting file:",GETFILE_URL + filename);
+    const response: Response | null = await api_get_request(GETFILE_URL + filename);
+    if (response == null || !response.ok) {
+        return {success: false};
+    }
+    return {success: true, data: await response.json() as CFile};
+}
 
-export async function api_post_request(request:BackendApiRequests, data:unknown): Promise<Response | null> {
+
+export async function api_post_request(url: string, data:unknown): Promise<Response | null> {
     try {
         if (!updater) {
             CookieStore.subscribe((c) => {
@@ -124,7 +129,7 @@ export async function api_post_request(request:BackendApiRequests, data:unknown)
         if (cookies == null) {
             return null;
         }  
-        return await fetch(request + `?user-session-id=${cookies.userSessionId.id}&session-token=${cookies.sessionToken}`, {
+        return await fetch(url + `?user-session-id=${cookies.userSessionId.id}&session-token=${cookies.sessionToken}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -137,7 +142,7 @@ export async function api_post_request(request:BackendApiRequests, data:unknown)
         return null
     }
 }
-export async function api_get_request(request:BackendApiRequests): Promise<Response | null> {
+export async function api_get_request(url: string): Promise<Response | null> {
     try {
         if (!updater) {
             CookieStore.subscribe((c) => {
@@ -148,7 +153,7 @@ export async function api_get_request(request:BackendApiRequests): Promise<Respo
         if (cookies == null) {
             return null;
         }  
-        return await fetch(request + `?user-session-id=${cookies.userSessionId.id}&session-token=${cookies.sessionToken}`, {
+        return await fetch(url + `?user-session-id=${cookies.userSessionId.id}&session-token=${cookies.sessionToken}`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json'

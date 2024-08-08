@@ -27,3 +27,20 @@ export function fileToBinary(file:File, callback:(value: ArrayBuffer)=>void): vo
     }
     reader.readAsArrayBuffer(file);
 }
+/**
+ * Concatenates an array of Uint8Arrays into a single Uint8Array.
+ *
+ * @param {Uint8Array[]} chunks - The array of Uint8Arrays to concatenate.
+ * @return {Uint8Array} - The concatenated Uint8Array.
+ */
+export function buildUint8ArrayFromChunks(chunks: Uint8Array[]): Uint8Array {
+    const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+    const result = new Uint8Array(totalLength);
+    let offset = 0;
+    for (const chunk of chunks) {
+        result.set(chunk, offset);
+        offset += chunk.length;
+    }
+
+    return result;
+}
