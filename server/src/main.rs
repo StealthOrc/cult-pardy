@@ -8,7 +8,7 @@ mod data;
 
 use std::sync::Arc;
 
-use crate::apis::api::{board, create_game_lobby, discord_session, has_authorization, join_game};
+use crate::apis::api::{board, create_game_lobby, discord_session, has_authorization, join_game, uploadfile_chunk2};
 use crate::apis::api::api_session_request;
 
 use actix::Addr;
