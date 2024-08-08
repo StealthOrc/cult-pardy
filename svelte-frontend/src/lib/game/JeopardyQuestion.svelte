@@ -136,13 +136,9 @@
                 for (let i = 0; i < data.file_chunks.length; i++) {
                     chunks.push(new Uint8Array(dataChunks[i].chunk));
                 }
-
-                console.log('Chunks:', chunks);
                 const buf: ArrayBuffer = buildUint8ArrayFromChunks(chunks);
-                console.log('Buffer:', buf);
 
                 const videoBlob: Blob = new Blob([buf], { type: 'video/mp4' });
-                console.log('type:', videoBlob.type);
 
                 // Create a URL for the Blob
                 videoBlobUrl = URL.createObjectURL(videoBlob);
