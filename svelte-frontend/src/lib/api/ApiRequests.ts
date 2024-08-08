@@ -109,9 +109,9 @@ export async function upload_chunk(data:ArrayBuffer, filename: string, fileindex
     return await api_post_binrequest(FILECHUNK_URL, myblob, filename, fileindex, validate_hash, token.token);
 }
 
-export async function get_file(filename: string): Promise<ArrayBuffer> {
+export async function get_file(filename: string): Promise<Response> {
     const response: Response | null = await api_get_request(GETFILE_URL + filename);
-    return await response.arrayBuffer();
+    return await response;
 }
 
 export async function api_post_request(url: string, data:unknown,token:string ): Promise<Response> {

@@ -14,6 +14,7 @@
 	import { buildUint8ArrayFromChunks} from '$lib/BinaryConversion';
 	import { decompress } from 'fflate';
 	import { decompressData } from '$lib/create/fileUploadUtils';
+	import { XXH64 } from 'xxh3-ts';
     
     export let question: DtoQuestion;
     let open_request = false;
@@ -128,8 +129,16 @@
     let videoBlobUrl: string;
     async function loadVideoToBlob(url: string) {
         try {
-                const data: ArrayBuffer = await get_file('FlyHigh.mp4');
+                //TODO: Remove hardcoded filename and read from question!
+                const filename = 'FlyHigh.mp4';
+                const response = await get_file(filename);
+                const data: ArrayBuffer = await response.arrayBuffer();
+                const validatehash = XXH64(Buffer.from(data)).toString();
 
+                if ((filename !== response.headers.get('file-name')) && (validatehash !== response.headers.get('validate-hash'))) {
+                    console.error(`File name or validate hash did not match. filename should be: "${filename}", was: "${response.headers.get('file-name')}", validatehash should be: "${validatehash}", was: "${response.headers.get('validate-hash')}"`);
+                    return;
+                }
                 console.log("loadVideoToBlob",);
                 const decom : ArrayBuffer = await decompressData(data);
 
