@@ -8,7 +8,7 @@ mod data;
 
 use std::sync::Arc;
 
-use crate::apis::api::{board, create_game_lobby, discord_session, has_authorization, join_game, uploadfile_chunk2};
+use crate::apis::api::{board, create_game_lobby, discord_session, has_authorization, join_game};
 use crate::apis::api::api_session_request;
 
 use actix::Addr;
@@ -16,7 +16,7 @@ use actix_web::web::Data;
 use actix_web::{get, post, web, App, HttpRequest, HttpResponse, HttpServer};
 use anyhow::Result;
 
-use apis::api::{ get_session_or_create_new, session_data_request, set_session_token_cookie, upload_file_chunk, upload_file_data};
+use apis::api::{ get_session_or_create_new, session_data_request, set_session_token_cookie, upload_file_data, uploadfile_chunk};
 use apis::data::extract_header_string;
 use authentication::discord::is_admin;
 use bson::binary;
@@ -82,7 +82,7 @@ async fn main() -> Result<()> {
             .service(create_game_lobby)
             .service(join_game)
             .service(download)
-            .service(upload_file_chunk)
+            .service(uploadfile_chunk)
             .service(upload_file_data)
             .service(get_file_from_name)
             .service(upload_streaming_data)
@@ -155,7 +155,9 @@ async fn get_file_from_name(path: web::Path<String>, req: HttpRequest,  db: web:
         None => HttpResponse::from(HttpResponse::NotFound()),
         Some(data) => {
             let bytes = data.get_as_bytes();
-            HttpResponse::from(HttpResponse::Ok().body(bytes))
+            HttpResponse::Ok()
+            .content_type("application/octet-stream")
+            .body(bytes)
         }
     };
     set_session_token_cookie(&mut response, &user_session);
