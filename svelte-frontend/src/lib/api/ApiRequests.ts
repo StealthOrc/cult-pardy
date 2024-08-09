@@ -1,9 +1,7 @@
 
 import {
     type ApiResponse,
-    type DTOCFile,
     type DiscordUser,
-    type DTOFileChunk,
     type DTOFileData, type DTOFileToken,
     type FileDataReponse,
     type JeopardyBoard,
@@ -139,6 +137,7 @@ export async function api_post_request(url: string, data:unknown,token:string ):
     }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function api_post_binrequest(url: string, data:any, filename: string, fileindex: number, validatehash: string, token:string): Promise<Response> {
     try {
         if (!updater) {
@@ -150,11 +149,12 @@ export async function api_post_binrequest(url: string, data:any, filename: strin
         if (cookies == null) {
             throw new Error("No cookies");
         }
-        return await fetch(url + `?file-name=${filename}&file-index=${fileindex}&validate-hash=${validatehash}&file-token=${token}`, {
+        return await fetch(`${url}?file-name=${encodeURIComponent(filename)}&file-index=${encodeURIComponent(fileindex)}&validate-hash=${encodeURIComponent(validatehash)}&file-token=${encodeURIComponent(token)}`, {
 
             method: 'POST',
             headers: {
-                'Content-Type': 'application/octet-stream'
+                'Content-Type': 'application/octet-stream',
+                'file-token': token
             },
             body: data,
         });

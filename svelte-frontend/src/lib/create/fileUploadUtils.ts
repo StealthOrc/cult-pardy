@@ -6,7 +6,7 @@ import { upload_chunk, upload_data } from '$lib/api/ApiRequests';
 import { match, P } from 'ts-pattern';
 
 
-const CHUNK_SIZE = 400_000; // 200 KB
+const CHUNK_SIZE = 1_000_000; // 200 KB
 const MAX_PARALLEL_UPLOADS = 5; // Maximum number of parallel uploads
 const RETRY_LIMIT = 3; // Number of retry attempts for failed chunks
 

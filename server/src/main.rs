@@ -12,6 +12,7 @@ use crate::apis::api::{board, create_game_lobby, discord_session, has_authorizat
 use crate::apis::api::api_session_request;
 
 use actix::Addr;
+use actix_web::error::ErrorBadRequest;
 use actix_web::web::Data;
 use actix_web::{get, post, web, App, HttpRequest, HttpResponse, HttpServer};
 use anyhow::Result;
@@ -50,13 +51,13 @@ async fn main() -> Result<()> {
     let services = Services::init().await;
 
     std::env::set_var("RUST_LOG", "debug");
-    //env_logger::init();
+    env_logger::init();
 
 
     let input_server =  InputServer::init(services.authentication_server.clone());
     let rt = Runtime::new().expect("Somethings wrong with the Runtime");
     rt.spawn(input_server.read_input());
-
+    println!("Workers available: {}", num_cpus::get());
     println!("Starting HTTP server at {}", addr); 
     let server = 
     HttpServer::new(move || {
@@ -66,6 +67,23 @@ async fn main() -> Result<()> {
             .app_data(web::Data::new(services.login_client.clone()))
             .app_data(web::Data::new(services.game_server.clone()))
             .app_data(web::Data::new(services.authentication_server.clone()))
+            .app_data(
+                web::JsonConfig::default()
+                    .limit(104857600) // Increase JSON JsonConfig limit (100MB)
+                    .error_handler(|err, _req| {
+                        let error_message = format!("Error: {}", err);
+                        ErrorBadRequest(error_message)
+                    })
+            )
+            .app_data(
+                web::FormConfig::default()
+                    .limit(104857600) // Increase FormConfig limit (100MB)
+                    .error_handler(|err, _req| {
+                        let error_message = format!("Error: {}", err);
+                        ErrorBadRequest(error_message)
+                    })
+            )
+            .app_data(web::PayloadConfig::default() .limit(104857600)) // Increase PayloadConfig limit (100MB)
             .route("/ws", web::get().to(gamewebsocket::start_ws))
             .service(discord::discord_oauth)
             .service(discord::grant_access)
@@ -91,6 +109,7 @@ async fn main() -> Result<()> {
             )
     })
     .bind(addr)?
+    .workers(num_cpus::get()/2)
     .run();
     server.await?;
     rt.shutdown_background();

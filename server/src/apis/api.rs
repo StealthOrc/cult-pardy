@@ -111,7 +111,6 @@ async fn upload_file_data(req: HttpRequest,  db: web::Data<Arc<MongoServer>>,  j
 #[post("/api/upload/filechunk")]
 async fn upload_file_chunk(req: HttpRequest,db: web::Data<Arc<MongoServer>>, payload: Bytes) -> Result<HttpResponse, actix_web::Error> {
     let start_time: chrono::DateTime<Local> = Local::now();
-    println!("UPLOAD FILE CHUNK");
 
     let file_token = match get_file_token_from_value(&req) {
         Some(data) => data,
@@ -139,10 +138,7 @@ async fn upload_file_chunk(req: HttpRequest,db: web::Data<Arc<MongoServer>>, pay
         chunk: payload,
         validate_hash,
     };
-    let file_token = match get_file_token_from_value(&req) {
-        Some(data) => data,
-        None => return Ok(HttpResponse::from(HttpResponse::NotFound().json("File token not found"))),
-    };
+  
 
     let file_data = match db.get_file_data_from_name(&dto_filechunk.file_name).await {
         Some(data) => data,
@@ -164,15 +160,18 @@ async fn upload_file_chunk(req: HttpRequest,db: web::Data<Arc<MongoServer>>, pay
     if file_data.containts_file_chunk_hash(&file_chunk.validate_hash) == false {
         return Ok(HttpResponse::from(HttpResponse::NotFound().json("File chunk hash not found")));
     }
-
+    println!("Upload File Chunk before db: {:?} ms", Local::now().signed_duration_since(start_time));
     if !db.add_file_chunk(&file_chunk).await{
         return Ok(HttpResponse::from(HttpResponse::NotFound().json("Can´t add file chunk")));
     }
     let response = HttpResponse::from(HttpResponse::Ok().json(ApiResponse::of(true)));
-    if db.is_last_file_chunk(&file_name).await {
-        println!("LAST CHUNK");
-    }
-    println!("Upload File Chunk: {:?} ms", Local::now().signed_duration_since(start_time));
+    //do something in a new thread and ingore the result
+    tokio::task::spawn(async move{
+        if db.is_last_file_chunk(&file_name).await {
+            println!("LAST CHUNK");
+        }
+    });
+    println!("Upload File Chunk after db: {:?} ms", Local::now().signed_duration_since(start_time));
     Ok(response)
     
 }
