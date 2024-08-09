@@ -134,15 +134,25 @@
                 const response = await get_file(filename);
                 const data: ArrayBuffer = await response.arrayBuffer();
                 const validatehash = XXH64(Buffer.from(data)).toString();
+                console.log("validatehash", validatehash);
+                console.log("response.headers.get('validate-hash')", response.headers.get('validate-hash'));
+                console.log("filename", filename);
+                
+                let type = response.headers.get('file-type');
+                if (type == null) return;
+
 
                 if ((filename !== response.headers.get('file-name')) && (validatehash !== response.headers.get('validate-hash'))) {
                     console.error(`File name or validate hash did not match. filename should be: "${filename}", was: "${response.headers.get('file-name')}", validatehash should be: "${validatehash}", was: "${response.headers.get('validate-hash')}"`);
                     return;
                 }
+
+
+
                 console.log("loadVideoToBlob",);
                 const decom : ArrayBuffer = await decompressData(data);
 
-                const videoBlob: Blob = new Blob([decom], { type: 'video/mp4' });
+                const videoBlob: Blob = new Blob([decom], { type: type });
 
                 // Create a URL for the Blob
                 videoBlobUrl = URL.createObjectURL(videoBlob);

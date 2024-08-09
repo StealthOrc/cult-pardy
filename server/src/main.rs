@@ -51,7 +51,7 @@ async fn main() -> Result<()> {
     let services = Services::init().await;
 
     std::env::set_var("RUST_LOG", "debug");
-    env_logger::init();
+    //env_logger::init();
 
 
     let input_server =  InputServer::init(services.authentication_server.clone());

@@ -148,7 +148,7 @@ impl Lobby {
 
             let session_pings = act.get_sessions_pings();
             for websocket_session in act.websocket_connections.values() {
-                if websocket_session.ping > 0 || !websocket_session.addr.connected() {
+                if websocket_session.ping <= 1 || !websocket_session.addr.connected() {
                     continue;
                 }
                 let event = SessionEvent::SessionsPing(session_pings.clone());
