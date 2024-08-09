@@ -134,7 +134,7 @@ pub struct FileData {
     pub filedata_hash: FileDataHash,
     pub validate_hash: ValidateHash,
     pub upload_data: DateTime<Local>,
-    pub uploader: UserSessionId,
+    pub uploader: DiscordID,
     pub file_token: FileToken,
 }
 
@@ -142,7 +142,7 @@ pub struct FileData {
 
 impl FileData {
 
-    pub fn new(file_chunks_hashs: Vec<FileChunkHash>, file_name: String, total_chunks: usize, file_type: String, validate_hash:ValidateHash,uploader: &UserSessionId) -> Self {
+    pub fn new(file_chunks_hashs: Vec<FileChunkHash>, file_name: String, total_chunks: usize, file_type: String, validate_hash:ValidateHash,uploader: &DiscordID) -> Self {
         let filedata_hash = FileDataHash::default();
         let upload_data = Local::now();
         FileData {

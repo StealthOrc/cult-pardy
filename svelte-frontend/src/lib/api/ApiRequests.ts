@@ -31,7 +31,7 @@ let updater : boolean = false;
     const JOIN_URL: string = 'api/join';
     const BOARD_URL: string = 'api/board';
     const FILEDATA_URL:string = 'api/upload/filedata';
-    const FILECHUNK_URL:string = 'api/upload/filechunk';
+    const FILECHUNK_URL:string = 'api/upload/filechunk2';
     const GETFILE_URL:string = 'api/file/'; // add filename after the slash
 
 
@@ -107,6 +107,10 @@ export async function upload_chunk(data:ArrayBuffer, filename: string, fileindex
     return await api_post_binrequest(FILECHUNK_URL, myblob, filename, fileindex, validate_hash, token.token);
 }
 
+export async function upload_chunk2(data:ReadableStreamDefaultReader , filename: string): Promise<Response> {
+    return await api_post_binrequest(FILECHUNK_URL, data, filename, 2, "", "");
+}
+
 export async function get_file(filename: string): Promise<Response> {
     return await api_get_request(GETFILE_URL + filename);
 }
@@ -148,12 +152,16 @@ export async function api_post_binrequest(url: string, data:any, filename: strin
         if (cookies == null) {
             throw new Error("No cookies");
         }
-        return await fetch(`${url}?file-name=${encodeURIComponent(filename)}&file-index=${encodeURIComponent(fileindex)}&validate-hash=${encodeURIComponent(validatehash)}&file-token=${encodeURIComponent(token)}`, {
+        ///const uri = `${url}?file-name=${encodeURIComponent(filename)}&file-index=${encodeURIComponent(fileindex)}&validate-hash=${encodeURIComponent(validatehash)}&file-token=${encodeURIComponent(token)}`;
+        const uri = `${url}?file-name=${filename}`;
+        console.log(uri);
+        console.log(data);
+        return await fetch(uri, {
 
             method: 'POST',
             headers: {
                 'Content-Type': 'application/octet-stream',
-                'file-token': token
+                //'file-token': token
             },
             body: data,
         });

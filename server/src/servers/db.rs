@@ -1,14 +1,17 @@
 use std::collections::HashSet;
+use std::time::Duration;
 
-use chrono::TimeDelta;
+use bytes::{Bytes, BytesMut};
 use cult_common::wasm_lib::hashs::filechunk::FileChunkHash;
 use cult_common::wasm_lib::hashs::validate::ValidateHash;
 use cult_common::wasm_lib::ids::discord::DiscordID;
 use cult_common::wasm_lib::{FileData};
-use futures::StreamExt;
+use futures::{AsyncWriteExt, StreamExt};
+use mongodb::action::gridfs::OpenUploadStream;
 use mongodb::bson::{doc, to_bson};
-use mongodb::options::{ClientOptions, ServerApi, ServerApiVersion};
-use mongodb::{Client, Collection};
+use mongodb::gridfs::GridFsBucket;
+use mongodb::options::{ClientOptions, GridFsBucketOptions, ServerApi, ServerApiVersion, WriteConcern};
+use mongodb::{Client, Collection, IndexModel};
 use ritelinked::LinkedHashSet;
 use strum::{Display, EnumIter};
 use cult_common::wasm_lib::ids::usersession::UserSessionId;
@@ -35,14 +38,30 @@ pub struct UserCollection {
     pub admins: Collection<Admin>,
     pub file_data: Collection<FileData>,
     pub file_chunks: Collection<FileChunk>,
+    pub file_bucket: GridFsBucket,
+    pub file_bucket_files: Collection<FileData>,
+    pub file_bucket_chunks: Collection<FileChunk>,
+
 }
 
 
 #[derive(Clone, Debug)]
-pub struct MongoServer{
+pub struct MongoServer {	
     pub mongo_client: Client,
-    pub collections: UserCollection,
+    pub collections:  UserCollection,
 }
+
+//GridFsMetadata for fle data
+
+pub struct FileMetadata {
+    pub file_name: String,
+    pub file_type: String,
+    pub files_size: u64,
+    pub validate_hash: ValidateHash,
+    pub uploader: DiscordID,
+}
+
+
 
 
 impl MongoServer {
@@ -52,18 +71,41 @@ impl MongoServer {
         let mongo_client = Client::with_uri_str(&url).await.expect("Can´t connect to Mongodb");
         mongo_client.database("admin").run_command(doc! {"ping": 1}).await.expect("Cant ping");
         println!("Pinged your deployment. You successfully connected to MongoDB!");
+    
+
+
+        
+        let wc = WriteConcern::builder().w_timeout(Duration::new(5, 0)).build();
+        let opts = GridFsBucketOptions::builder()
+            .bucket_name("FileBucket".to_string())
+            .write_concern(wc)
+            .build();
+
 
 
         let db = mongo_client.database("CultPardy");
+        let bucket = db.gridfs_bucket(opts);
+
+
+
 
         let collections = UserCollection{
             user_sessions: db.collection("UserSessions"),
             admins: db.collection("Admins"),
             file_data: db.collection("FileData"),
             file_chunks : db.collection("FileChunks"),
+            file_bucket: bucket,
+            file_bucket_files: db.collection("FileBucket.chunks"),
+            file_bucket_chunks: db.collection("FileBucket.chunks"),
         };
 
-
+        collections.user_sessions.create_index(IndexModel::builder().keys(doc! {"user_session_id.id": 1}).build()).await.expect("Failed to create index");
+        collections.admins.create_index(IndexModel::builder().keys(doc! {"discord_id.id": 1}).build()).await.expect("Failed to create index");
+        collections.file_data.create_index(IndexModel::builder().keys(doc! {"file_name": 1}).build()).await.expect("Failed to create index");
+        collections.file_chunks.create_index(IndexModel::builder().keys(doc! {"file_name": 1}).build()).await.expect("Failed to create index");
+        collections.file_chunks.create_index(IndexModel::builder().keys(doc! {"index": 1}).build()).await.expect("Failed to create index");
+        collections.file_chunks.create_index(IndexModel::builder().keys(doc! {"filechunk_hash.hash": 1}).build()).await.expect("Failed to create index");
+        collections.file_data.create_index(IndexModel::builder().keys(doc! {"uploader.id": 1}).build()).await.expect("Failed to create index");
 
         MongoServer{
             mongo_client,
@@ -91,6 +133,34 @@ impl MongoServer {
             Some(session) => session
         };
     }
+
+    //upload file to and file bucket with metadata
+    pub async fn upload_file_to_file_bucket(&self, file_bytes:Bytes, file_metadata:FileMetadata) -> bool {
+        let file_name = file_metadata.file_name.clone();
+        let file_type = file_metadata.file_type.clone();
+        let file_size = file_metadata.files_size.clone();
+        let validate_hash = file_metadata.validate_hash.clone();
+        let uploader = file_metadata.uploader.clone();
+        let mut upload_stream = self.collections.file_bucket.open_upload_stream(file_name.clone()).await.expect("Failed to open upload stream");
+
+       let write =  match upload_stream.write_all(&file_bytes).await {
+            Err(_) => {
+                return false;
+            }
+            Ok(_) => true,
+        };
+        upload_stream.close().await.expect("Failed to close upload stream");
+
+        write
+        
+        
+    }
+
+
+
+
+
+
 
     pub async fn get_user_session_with_token_check(&self, user_session_id: &UserSessionId, session_token:&SessionToken) -> UserSession {
         let result = self.collections.user_sessions.find_one(doc! {"user_session_id.id": &user_session_id.id, "session_token.token": &session_token.token}).await;

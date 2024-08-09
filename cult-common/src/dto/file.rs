@@ -12,6 +12,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::wasm_lib::hashs::filechunk::FileChunkHash;
 use crate::wasm_lib::hashs::validate::ValidateHash;
+use crate::wasm_lib::ids::discord::DiscordID;
 use crate::wasm_lib::ids::usersession::{self, UserSessionId};
 use crate::wasm_lib::{DiscordUser, FileData, QuestionType, Vector2D};
 
@@ -34,8 +35,8 @@ pub struct DTOFileData {
 
 impl DTOFileData {
     
-    pub fn to_file_data(self, usersession:&UserSessionId) -> FileData {
-        FileData::new(self.file_chunks_hashs, self.file_name, self.total_chunks, self.file_type, self.validate_hash, usersession)
+    pub fn to_file_data(self, discord_id:&DiscordID) -> FileData {
+        FileData::new(self.file_chunks_hashs, self.file_name, self.total_chunks, self.file_type, self.validate_hash, discord_id)
     }
 
 }

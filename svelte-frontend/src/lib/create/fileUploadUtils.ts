@@ -2,11 +2,12 @@ import { inflate, deflate } from 'fflate';
 import { XXH64 } from 'xxh3-ts';
 import { Buffer } from 'buffer';
 import type { DTOFileChunk, DTOFileData, DTOFileToken, FileChunkHash, FileDataReponse } from 'cult-common';
-import { upload_chunk, upload_data } from '$lib/api/ApiRequests';
-import { match, P } from 'ts-pattern';
+import { upload_chunk, upload_chunk2, upload_data } from '$lib/api/ApiRequests';
+import { match, P } from 'ts-pattern';  
+import axios from 'axios';
 
 
-const CHUNK_SIZE = 1_000_000; // 200 KB
+const CHUNK_SIZE = 1_000_000; // 200 KB 
 const MAX_PARALLEL_UPLOADS = 5; // Maximum number of parallel uploads
 const RETRY_LIMIT = 3; // Number of retry attempts for failed chunks
 
@@ -59,13 +60,29 @@ export async function handleFileUpload(file: File, onProgress: (progress: FileUp
 
     // Upload metadata
     const data : FileDataReponse = await upload_data(uploadData);
+    console.log(data);
+
+
+    const uint8Array = new Uint8Array(deflatedData);
     
+
+
+    const CHUNK_SIZE2 = 1024
+
+
+
+
+    const strema = file.stream().getReader();
 
     match(data)
     //BoardEvents
     .with({ Successful: P.select() }, async (boardEvent) => {
         await new Promise(r => setTimeout(r, 1000));
-        await processChunksWithLimit(boardEvent, fileChunks, uploadData.total_chunks, onProgress);
+        const res = await upload_file2(strema, file.name);
+   
+
+
+        //await processChunksWithLimit(boardEvent, fileChunks, uploadData.total_chunks, onProgress);
     })
     .with({ Failed: P.select() }, (error) => console.error(error))
     .exhaustive();
@@ -141,6 +158,20 @@ async function upload_file_chunk(chunk: DTOFileChunk, token:DTOFileToken): Promi
         const res = await upload_chunk(chunk.chunk, chunk.file_name, chunk.index, chunk.validate_hash.hash, token);
         if (!res.ok) {
             throw new Error(`Failed to upload chunk ${chunk.index}`);
+        }
+        return true;
+    }
+    catch (error) {
+        console.error('Failed to upload chunk:', error);
+        return false;
+    }
+}
+
+export async function upload_file2(chunk:ReadableStreamDefaultReader, file_name:string): Promise<boolean> {
+    try {
+        const res = await upload_chunk2(chunk,file_name);
+        if (!res.ok) {
+            throw new Error(`Failed to upload chunk ${file_name}`);
         }
         return true;
     }

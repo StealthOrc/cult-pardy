@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { handleFileUpload } from './fileUploadUtils';
+    import { handleFileUpload, upload_file2  } from './fileUploadUtils';
     import type { FileUploadProgress } from './fileUploadUtils';
 
     let file: File | null = null;
@@ -28,6 +28,9 @@
                     progressBar.max = progress.total;
                     progressText.innerText = `${progress.loaded}/${progress.total}`;
                 };
+
+                
+
 
                 await handleFileUpload(file, onProgress);
 

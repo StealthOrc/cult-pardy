@@ -2,13 +2,15 @@ use std::any;
 use std::hash::Hash;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::thread::sleep;
 use crate::data::{FileChunk, SessionRequest};
 use crate::main;
-use crate::servers::db::{DBDatabase, MongoServer};
+use crate::servers::db::{DBDatabase, FileMetadata, MongoServer};
 use crate::servers::game::{CreateLobby, SessionToken};
 use crate::servers::lobby::CanJoinLobby;
 use actix::Addr;
 
+use actix_web::body::MessageBody;
 use actix_web::cookie::Cookie;
 use actix_web::{get, HttpRequest, HttpResponse, post, web};
 use attohttpc::body::File;
@@ -17,7 +19,9 @@ use chrono::Local;
 use cult_common::dto::api::{ApiResponse, DTOFileToken, FileDataReponse};
 use cult_common::dto::{DTOFileChunk, DTOFileData};
 use cult_common::wasm_lib::hashs::validate::ValidateHash;
+use cult_common::wasm_lib::ids::discord::DiscordID;
 use cult_common::wasm_lib::{JeopardyMode, FileData};
+use futures::{AsyncWriteExt, StreamExt};
 use mongodb::change_stream::session;
 use oauth2::http::header::COOKIE;
 use oauth2::http::{response, HeaderValue};
@@ -98,7 +102,14 @@ async fn upload_file_data(req: HttpRequest,  db: web::Data<Arc<MongoServer>>,  j
         return Ok(file_data_response_send(&req, &user_session, &FileDataReponse::Failed("File already exists".to_string())));
     }
 
-    let file: FileData = dto_filedata.clone().to_file_data(&user_session.user_session_id);
+    let dicord_id = match user_session.discord_auth.clone() {
+        Some(data) => data.discord_user.unwrap().discord_id,
+        None => return Ok(file_data_response_send(&req, &user_session, &FileDataReponse::Failed("No Discord User".to_string()))),
+    };
+
+
+
+    let file: FileData = dto_filedata.clone().to_file_data(&dicord_id);
     if !db.add_file_data(file.clone()).await {
         return Ok(file_data_response_send(&req, &user_session, &FileDataReponse::Failed("Can´t add file data".to_string())));
     }
@@ -106,6 +117,39 @@ async fn upload_file_data(req: HttpRequest,  db: web::Data<Arc<MongoServer>>,  j
     set_session_token_cookie(&mut response, &user_session);
     Ok(response)
 }
+
+
+#[post("/api/upload/filechunk2")]
+async fn upload_file_chunk2(req: HttpRequest,db: web::Data<Arc<MongoServer>>,mut body: web::Payload) -> Result<HttpResponse, actix_web::Error> {
+    println!("UPLOAD FILE CHUNK 2");
+    let start_time: chrono::DateTime<Local> = Local::now();
+
+    
+    let file_name = match get_file_name_from_value(&req) {
+        Some(data) => data,
+        None => return Ok(HttpResponse::from(HttpResponse::NotFound().json("File name not found"))),
+    };
+    let mut upload_stream = db.collections.file_bucket.open_upload_stream(file_name.clone()).await.expect("Can´t open upload stream");
+
+
+    while let Some(chunk) = body.next().await {
+        let data = match chunk {
+            Ok(data) => data,
+            Err(e) => {
+                println!("Error reading chunk: {}", e);
+                return Ok(HttpResponse::InternalServerError().finish());
+            }
+        };
+        upload_stream.write_all(&data).await.expect("Can´t write to upload stream");
+
+    }
+    upload_stream.close().await.expect("Can´t close upload stream");
+
+    println!("UPLOAD FILE CHUNK 2 time: {:?}", Local::now().signed_duration_since(start_time));    
+    Ok(HttpResponse::Ok().finish())
+}
+
+
 
 
 #[post("/api/upload/filechunk")]
@@ -135,7 +179,7 @@ async fn upload_file_chunk(req: HttpRequest,db: web::Data<Arc<MongoServer>>, pay
     let dto_filechunk = DTOFileChunk {
         file_name,
         index,
-        chunk: payload,
+        chunk: payload.clone(),
         validate_hash,
     };
   
@@ -160,18 +204,31 @@ async fn upload_file_chunk(req: HttpRequest,db: web::Data<Arc<MongoServer>>, pay
     if file_data.containts_file_chunk_hash(&file_chunk.validate_hash) == false {
         return Ok(HttpResponse::from(HttpResponse::NotFound().json("File chunk hash not found")));
     }
-    println!("Upload File Chunk before db: {:?} ms", Local::now().signed_duration_since(start_time));
+    println!("Upload File Chunk {:?} before db: {:?} ms", file_data.validate_hash.get_hash(), Local::now().signed_duration_since(start_time));
     if !db.add_file_chunk(&file_chunk).await{
         return Ok(HttpResponse::from(HttpResponse::NotFound().json("Can´t add file chunk")));
     }
+    let test: FileData = file_data.clone();
+    let size = file_chunk.chunk.len() as u64;
+    let file_meta = FileMetadata{ file_name: test.file_name, file_type: file_data.file_type, files_size: size, validate_hash:file_data.validate_hash.clone(), uploader: DiscordID::server()};
+
+
+    let dbc: web::Data<Arc<MongoServer>> = db.clone();
+    tokio::task::spawn(async move {
+        dbc.upload_file_to_file_bucket(payload, file_meta).await;
+    });
+
+
+
+
     let response = HttpResponse::from(HttpResponse::Ok().json(ApiResponse::of(true)));
     //do something in a new thread and ingore the result
-    tokio::task::spawn(async move{
+    tokio::task::spawn(async move {
         if db.is_last_file_chunk(&file_name).await {
             println!("LAST CHUNK");
         }
     });
-    println!("Upload File Chunk after db: {:?} ms", Local::now().signed_duration_since(start_time));
+    println!("Upload File Chunk  {:?}  after db: {:?} ms",file_data.validate_hash.get_hash(), Local::now().signed_duration_since(start_time));
     Ok(response)
     
 }
@@ -307,13 +364,6 @@ pub fn set_cookie(res: &mut HttpResponse, cookie_name: &str, value: &String){
         .permanent()
         .secure(true)
         .finish();
-    /*if let Some(cookie) = req.cookie(cookie_name) {
-        if cookie.value().eq(value) {
-                return;
-            }
-    }
-     println!("UPDATED!! {}", cookie_name.to_string() + "");
-     */
     res.add_cookie(&_cookie).expect("Can´t add cookies to the Response");
 }
 
