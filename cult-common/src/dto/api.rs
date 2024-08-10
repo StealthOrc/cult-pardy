@@ -1,7 +1,8 @@
+use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
 
-use crate::wasm_lib::token::file::FileToken;
+use crate::wasm_lib::{hashs::validate::ValidateHash, token::file::FileToken};
 
 use super::file;
 
@@ -51,3 +52,5 @@ impl FileDataReponse {
     }
 
 }
+
+

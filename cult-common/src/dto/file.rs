@@ -48,3 +48,8 @@ pub struct DTOCFile{
     pub chunks: Vec<DTOFileChunk>,
     pub validate_hash: ValidateHash,
 }
+
+#[derive(Tsify,Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct FileMultiPart {
+    pub file_data: Bytes,
+}

@@ -26,7 +26,7 @@
                 const onProgress = (progress: FileUploadProgress) => {
                     progressBar.value = progress.loaded;
                     progressBar.max = progress.total;
-                    progressText.innerText = `${progress.loaded}/${progress.total}`;
+                    progressText.innerText = `${progress.loaded}/${progress.total} Speed ${progress.speed}`;
                 };
 
                 

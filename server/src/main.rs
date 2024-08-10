@@ -17,12 +17,12 @@ use actix_web::web::Data;
 use actix_web::{get, post, web, App, HttpRequest, HttpResponse, HttpServer};
 use anyhow::Result;
 
-use apis::api::{ get_session_or_create_new, session_data_request, set_session_token_cookie, upload_file_chunk, upload_file_chunk2, upload_file_data};
+use apis::api::{ get_session_or_create_new, session_data_request, set_session_token_cookie, upload_file_chunk, upload_file_chunk2, upload_file_chunk3, upload_file_data};
 use apis::data::extract_header_string;
 use authentication::discord::is_admin;
 use bson::binary;
 use dto::DTOFileData;
-use futures::StreamExt;
+use futures::{AsyncReadExt, StreamExt};
 use servers::authentication::AuthenticationServer;
 use servers::db::{self, MongoServer};
 use servers::game::GameServer;
@@ -30,6 +30,7 @@ use tokio::runtime::Runtime;
 use cult_common::*;
 use cult_common::backend::JeopardyBoard;
 use wasm_lib::JeopardyMode;
+use ws::filewebsocket;
 use crate::authentication::discord;
 use crate::frontend::frontend::{assets, find_game, grant_admin_access, index};
 use crate::servers::input::{InputServer};
@@ -85,6 +86,7 @@ async fn main() -> Result<()> {
             )
             .app_data(web::PayloadConfig::default() .limit(104857600)) // Increase PayloadConfig limit (100MB)
             .route("/ws", web::get().to(gamewebsocket::start_ws))
+            .route("/filews", web::get().to(filewebsocket::start_ws))
             .service(discord::discord_oauth)
             .service(discord::grant_access)
             .service(discord::login_only)
@@ -103,8 +105,10 @@ async fn main() -> Result<()> {
             .service(upload_file_chunk)
             .service(upload_file_data)
             .service(get_file_from_name)
+            .service(get_file_from_name2)
             .service(upload_streaming_data)
             .service(upload_file_chunk2)
+            .service(upload_file_chunk3)
             .default_service(
                 web::route().to(not_found)
             )
@@ -171,6 +175,7 @@ async fn get_file_from_name(path: web::Path<String>, req: HttpRequest,  db: web:
     let file = db.get_cfile_from_name(&name).await;
 
 
+
     let mut response = match file {
         None => HttpResponse::from(HttpResponse::NotFound()),
         Some(data) => {
@@ -185,6 +190,40 @@ async fn get_file_from_name(path: web::Path<String>, req: HttpRequest,  db: web:
             .body(bytes)
         }
     };
+    set_session_token_cookie(&mut response, &user_session);
+    Ok(response)
+}
+
+
+
+#[get("/api/file2/{name}")]
+async fn get_file_from_name2(path: web::Path<String>, req: HttpRequest,  db: web::Data<Arc<MongoServer>> , auth: web::Data<Addr<AuthenticationServer>> ) -> Result<HttpResponse, actix_web::Error> {
+    let user_session = get_session_or_create_new(&req, &db).await;
+
+    let name = path.into_inner();
+    if name.is_empty() {
+        return Ok(HttpResponse::from(HttpResponse::BadRequest()));
+    }
+        
+    if is_admin(&user_session, &db).await == false {
+        return Ok(HttpResponse::from(HttpResponse::Unauthorized()));
+    }
+
+    //let file = db.get_cfile_from_name(&name).await;
+
+    let mut test = db.collections.file_bucket.open_download_stream_by_name(&name).await.expect("Failed to open download stream");
+    let mut buf = Vec::new();
+    let result = test.read_to_end(&mut buf).await?;
+
+    
+    
+
+    let mut response =             HttpResponse::Ok()
+    .content_type("application/octet-stream")
+    .body(buf);
+
+
+
     set_session_token_cookie(&mut response, &user_session);
     Ok(response)
 }

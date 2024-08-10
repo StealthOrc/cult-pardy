@@ -31,9 +31,11 @@ let updater : boolean = false;
     const JOIN_URL: string = 'api/join';
     const BOARD_URL: string = 'api/board';
     const FILEDATA_URL:string = 'api/upload/filedata';
-    const FILECHUNK_URL:string = 'api/upload/filechunk2';
+    const FILECHUNK_URL:string = 'api/upload/filechunk';
+    const FILECHUNK_URL2:string = 'api/upload/filechunk2';
+    const FILECHUNK_URL3:string = 'api/upload/filechunk3';
     const GETFILE_URL:string = 'api/file/'; // add filename after the slash
-
+    const GETFILE_URL2:string = 'api/file2/'; // add filename after the slash
 
 
 export async function authorization(): Promise<ApiResponse> {
@@ -107,13 +109,41 @@ export async function upload_chunk(data:ArrayBuffer, filename: string, fileindex
     return await api_post_binrequest(FILECHUNK_URL, myblob, filename, fileindex, validate_hash, token.token);
 }
 
-export async function upload_chunk2(data:ReadableStreamDefaultReader , filename: string): Promise<Response> {
-    return await api_post_binrequest(FILECHUNK_URL, data, filename, 2, "", "");
+export async function upload_chunk2(data:any , filename: string): Promise<Response> {
+    return await api_post_binrequest(FILECHUNK_URL2, data, filename, 2, "", "");
 }
 
 export async function get_file(filename: string): Promise<Response> {
     return await api_get_request(GETFILE_URL + filename);
 }
+
+export async function get_file2(filename: string): Promise<Response> {
+    return await api_get_request(GETFILE_URL2 + filename);
+}
+
+export async function upload_chunk3(file:FormData): Promise<Response> {
+    return await api_post_formrequest(FILECHUNK_URL3, file);
+}
+
+export function objectToFormData(obj: Record<string, any>, formData = new FormData(), parentKey = ''): FormData {
+    for (const [key, value] of Object.entries(obj)) {
+        const formKey = parentKey ? `${parentKey}[${key}]` : key;
+
+        if (value instanceof Blob || value instanceof File) {
+            formData.append(formKey, value);
+        } else if (value instanceof Array) {
+            value.forEach((item, index) => {
+                objectToFormData({ [index]: item }, formData, formKey);
+            });
+        } else if (typeof value === 'object' && value !== null) {
+            objectToFormData(value, formData, formKey);
+        } else {
+            formData.append(formKey, String(value));
+        }
+    }
+    return formData;
+}
+
 
 export async function api_post_request(url: string, data:unknown,token:string ): Promise<Response> {
     try {
@@ -152,8 +182,8 @@ export async function api_post_binrequest(url: string, data:any, filename: strin
         if (cookies == null) {
             throw new Error("No cookies");
         }
-        ///const uri = `${url}?file-name=${encodeURIComponent(filename)}&file-index=${encodeURIComponent(fileindex)}&validate-hash=${encodeURIComponent(validatehash)}&file-token=${encodeURIComponent(token)}`;
-        const uri = `${url}?file-name=${filename}`;
+        const uri = `${url}?file-name=${encodeURIComponent(filename)}&file-index=${encodeURIComponent(fileindex)}&validate-hash=${encodeURIComponent(validatehash)}&file-token=${encodeURIComponent(token)}`;
+        //const uri = `${url}?file-name=${filename}`;
         console.log(uri);
         console.log(data);
         return await fetch(uri, {
@@ -171,6 +201,37 @@ export async function api_post_binrequest(url: string, data:any, filename: strin
         throw new Error("Failed to fetch");
     }
 }
+export async function api_post_formrequest(url: string, form:FormData): Promise<Response> {
+    try {
+        if (!updater) {
+            CookieStore.subscribe((c) => {
+                cookies = c;
+            });
+            updater = true;
+        }
+        if (cookies == null) {
+            throw new Error("No cookies");
+        }
+       
+        // POST Rquest with form data
+        return await fetch(url + `?user-session-id=${cookies.userSessionId.id}&session-token=${cookies.sessionToken}?file-name=FlyHigh3.mp4`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            },
+            body: form,
+        });
+
+
+
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (e ) {
+        throw new Error("Failed to fetch");
+    }
+}
+
+
+
 export async function api_get_request(url: string): Promise<Response> {
     try {
         if (!updater) {
@@ -219,3 +280,4 @@ export class SessionToken {
         this.create = create;
     }
 }
+

@@ -1,3 +1,4 @@
+use actix_multipart::form::{tempfile::TempFile, MultipartForm};
 use bytes::Bytes;
 use cult_common::{dto::{file::DTOCFile, DTOFileChunk}, wasm_lib::{hashs::{filechunk::FileChunkHash, validate::ValidateHash}, ids::usersession::UserSessionId, FileData}};
 use serde::{Deserialize, Serialize};
@@ -94,3 +95,9 @@ pub struct SessionRequest {
     pub user_session_id: UserSessionId,
     pub session_token: SessionToken,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Default)]
+pub struct FileDataRequest {
+    pub file_data: Bytes
+}
+

@@ -10,6 +10,8 @@ use crate::servers::game::{CreateLobby, SessionToken};
 use crate::servers::lobby::CanJoinLobby;
 use actix::Addr;
 
+use actix_multipart::form::MultipartForm;
+use actix_multipart::Multipart;
 use actix_web::body::MessageBody;
 use actix_web::cookie::Cookie;
 use actix_web::{get, HttpRequest, HttpResponse, post, web};
@@ -21,7 +23,7 @@ use cult_common::dto::{DTOFileChunk, DTOFileData};
 use cult_common::wasm_lib::hashs::validate::ValidateHash;
 use cult_common::wasm_lib::ids::discord::DiscordID;
 use cult_common::wasm_lib::{JeopardyMode, FileData};
-use futures::{AsyncWriteExt, StreamExt};
+use futures::{AsyncWriteExt, Stream, StreamExt};
 use mongodb::change_stream::session;
 use oauth2::http::header::COOKIE;
 use oauth2::http::{response, HeaderValue};
@@ -119,6 +121,59 @@ async fn upload_file_data(req: HttpRequest,  db: web::Data<Arc<MongoServer>>,  j
 }
 
 
+
+
+
+
+
+#[post("/api/upload/filechunk3")]
+async fn upload_file_chunk3(req: HttpRequest,db: web::Data<Arc<MongoServer>>,mut payload: Multipart) -> Result<HttpResponse, actix_web::Error> {
+    println!("UPLOAD FILE CHUNK 3");
+    let start_time: chrono::DateTime<Local> = Local::now();
+    //print!("SOMETHINGS HERE!{:?}", payload.next().await);
+    return Ok(HttpResponse::Ok().finish())/* 
+    let file_name = match get_file_name_from_value(&req) {
+        Some(data) => data,
+        None => return Ok(HttpResponse::from(HttpResponse::NotFound().json("File name not found"))),
+    };
+    let form = match payload.next().await {
+        Some(data) => data,
+        None => return Ok(HttpResponse::from(HttpResponse::NotFound().json("File data not found"))),
+    };
+
+    //Convert the form to a FileDataForm
+    let mut form = match form {
+        Ok(data) => data,
+        Err(e) => return Ok(HttpResponse::from(HttpResponse::NotFound().json("File data not found"))),
+    };
+
+    while let Some(chunk) = form.next().await {
+        let data = match chunk {
+            Ok(data) => data,
+            Err(e) => {
+                println!("Error reading chunk: {}", e);
+                return Ok(HttpResponse::InternalServerError().finish());
+            }
+        };
+        println!("Chunk: {:?}", data);
+    }
+    
+   /* 
+
+
+
+
+    let mut upload_stream = db.collections.file_bucket.open_upload_stream(file_name.clone()).await.expect("Can´t open upload stream");
+    let body = form.file_data;
+    let mut body = body.data;
+    upload_stream.write_all(&body).await.expect("Can´t write to upload stream");
+    upload_stream.close().await.expect("Can´t close upload stream");
+    */
+    println!("UPLOAD FILE CHUNK 3 time: {:?}", Local::now().signed_duration_since(start_time));    
+    Ok(HttpResponse::Ok().finish())*/
+}
+
+
 #[post("/api/upload/filechunk2")]
 async fn upload_file_chunk2(req: HttpRequest,db: web::Data<Arc<MongoServer>>,mut body: web::Payload) -> Result<HttpResponse, actix_web::Error> {
     println!("UPLOAD FILE CHUNK 2");
@@ -131,6 +186,9 @@ async fn upload_file_chunk2(req: HttpRequest,db: web::Data<Arc<MongoServer>>,mut
     };
     let mut upload_stream = db.collections.file_bucket.open_upload_stream(file_name.clone()).await.expect("Can´t open upload stream");
 
+
+
+    
 
     while let Some(chunk) = body.next().await {
         let data = match chunk {

@@ -10,7 +10,7 @@
 	import JeopardyBoard from './JeopardyBoard.svelte';
 	import { JeopardyBoardStore } from '$lib/stores/JeopardyBoardStore';
 	import { binary_test } from '$lib/const';
-	import { get_file } from '$lib/api/ApiRequests';
+	import { get_file, get_file2 } from '$lib/api/ApiRequests';
 	import { buildUint8ArrayFromChunks} from '$lib/BinaryConversion';
 	import { decompress } from 'fflate';
 	import { decompressData } from '$lib/create/fileUploadUtils';
@@ -131,7 +131,17 @@
         try {
                 //TODO: Remove hardcoded filename and read from question!
                 const filename = 'FlyHigh.mp4';
-                const response = await get_file(filename);
+                let response;
+                Promise.all([get_file(filename), get_file2("FlyHigh2.mp4")]).then((values) => {
+                    console.log("values", values);
+                    response = values[1];
+                });
+                while (response == null) {
+                    await new Promise(r => setTimeout(r, 100));
+                }
+                
+                //const response = await get_file(filename);
+                //const response2 = await get_file2("FlyHigh2.mp4");
                 const data: ArrayBuffer = await response.arrayBuffer();
                 const validatehash = XXH64(Buffer.from(data)).toString();
                 console.log("validatehash", validatehash);
@@ -139,12 +149,12 @@
                 console.log("filename", filename);
                 
                 let type = response.headers.get('file-type');
-                if (type == null) return;
+                // if (type == null) return;
 
 
                 if ((filename !== response.headers.get('file-name')) && (validatehash !== response.headers.get('validate-hash'))) {
                     console.error(`File name or validate hash did not match. filename should be: "${filename}", was: "${response.headers.get('file-name')}", validatehash should be: "${validatehash}", was: "${response.headers.get('validate-hash')}"`);
-                    return;
+                   // return;
                 }
 
 
@@ -152,7 +162,7 @@
                 console.log("loadVideoToBlob",);
                 const decom : ArrayBuffer = await decompressData(data);
 
-                const videoBlob: Blob = new Blob([decom], { type: type });
+                const videoBlob: Blob = new Blob([decom], { type: "video/mp4" });
 
                 // Create a URL for the Blob
                 videoBlobUrl = URL.createObjectURL(videoBlob);
