@@ -7,7 +7,7 @@ import { match, P } from 'ts-pattern';
 import axios from 'axios';
 
 
-const CHUNK_SIZE = 16_384; // 200 KB 
+const CHUNK_SIZE = 25_000; // 200 KB 
 const MAX_PARALLEL_UPLOADS = 5; // Maximum number of parallel uploads
 const RETRY_LIMIT = 3; // Number of retry attempts for failed chunks
 
@@ -76,7 +76,7 @@ export async function handleFileUpload(file: File, onProgress: (progress: FileUp
     const startTime = performance.now();
     let totalBytesSent = 0;
     let chunkIndex = 0;
-    ws.onopen = function() {
+    /*ws.onopen = function() {
         isOpen = true;
         sendChunk();
     };
@@ -139,7 +139,7 @@ export async function handleFileUpload(file: File, onProgress: (progress: FileUp
     ws.onerror = function error() {
         isOpen = false;
         console.error('Connection error');
-    };
+    };*/
 
 
 
@@ -160,7 +160,7 @@ export async function handleFileUpload(file: File, onProgress: (progress: FileUp
 
 
     
-    /*ws.onopen = async function open() {
+    ws.onopen = async function open() {
         isOpen = true;
     
         // Start time measurement
@@ -216,7 +216,7 @@ export async function handleFileUpload(file: File, onProgress: (progress: FileUp
     ws.onerror = function error() {
         isOpen = false;
         console.error('Connection error');
-    };*/
+    };
 
     
     return;

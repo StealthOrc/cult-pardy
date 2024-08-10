@@ -14,14 +14,16 @@ use crate::apis::api::api_session_request;
 use actix::Addr;
 use actix_web::error::ErrorBadRequest;
 use actix_web::web::Data;
-use actix_web::{get, post, web, App, HttpRequest, HttpResponse, HttpServer};
+use actix_web::{get, post, web, App, HttpRequest, HttpResponse, HttpServer, Responder};
+use actix_ws::Message;
 use anyhow::Result;
 
 use apis::api::{ get_session_or_create_new, session_data_request, set_session_token_cookie, upload_file_chunk, upload_file_chunk2, upload_file_chunk3, upload_file_data};
 use apis::data::extract_header_string;
 use authentication::discord::is_admin;
 use bson::binary;
-use dto::DTOFileData;
+use bytes::BytesMut;
+use dto::{file, DTOFileData};
 use futures::{AsyncReadExt, StreamExt};
 use servers::authentication::AuthenticationServer;
 use servers::db::{self, MongoServer};
@@ -87,6 +89,7 @@ async fn main() -> Result<()> {
             .app_data(web::PayloadConfig::default() .limit(104857600)) // Increase PayloadConfig limit (100MB)
             .route("/ws", web::get().to(gamewebsocket::start_ws))
             .route("/filews", web::get().to(filewebsocket::start_ws))
+            .route("/filews2", web::get().to(ws))
             .service(discord::discord_oauth)
             .service(discord::grant_access)
             .service(discord::login_only)
@@ -229,3 +232,44 @@ async fn get_file_from_name2(path: web::Path<String>, req: HttpRequest,  db: web
 }
 
 
+
+async fn ws(req: HttpRequest, body: web::Payload) -> actix_web::Result<impl Responder> {
+    let (response, mut session, mut msg_stream) = actix_ws::handle(&req, body)?;
+    println!("Starting WS2");
+    let mut file_chunks = BytesMut::new();
+
+    actix_web::rt::spawn(async move {
+        while let Some(Ok(msg)) = msg_stream.next().await {
+            let mut session2 = session.clone();
+            match msg {
+                Message::Ping(bytes) => {
+                    session2.pong(&bytes).await.expect("Failed to send pong");
+
+
+                }
+                Message::Text(msg) => println!("Got text: {msg}"),
+                Message::Binary(data) => {
+                    file_chunks.extend_from_slice(&data);
+                    if session2.text("ack").await.is_err() {
+                        return;
+                    }
+                }
+                Message::Continuation(_) => todo!(),
+                Message::Pong(_) => {
+                    session2.ping(b"").await.expect("Failed to send ping");
+                }
+                Message::Close(_) => {
+                    println!("Recived {} bytes", file_chunks.len());
+                    session2.close(None).await.expect("Failed to close connection");
+                    return;
+                }
+                Message::Nop =>{
+                    println!("Nop");
+                    session2.close(None).await.expect("Failed to close connection");
+                }
+            }
+        }
+    });
+
+    Ok(response)
+}

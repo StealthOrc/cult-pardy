@@ -101,11 +101,11 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for FileSession {
             ws::Message::Text(_) => todo!(),
             ws::Message::Binary(data) => {
                 self.file_chunks.extend_from_slice(&data);
-                println!("Received {} bytes", self.file_chunks.len());
                 ctx.text("ack");
                 
             }
             ws::Message::Close(reason) => {
+                println!("Received {} bytes", self.file_chunks.len());
                 ctx.close(reason);
                 ctx.stop();
             }
