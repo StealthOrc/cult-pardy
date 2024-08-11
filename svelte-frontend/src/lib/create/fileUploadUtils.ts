@@ -58,11 +58,17 @@ export async function handleFileUpload(file: File, onProgress: (progress: FileUp
         file_chunks_hashs: chunkHashes, // Set chunk hashes here
         validate_hash: { hash: validateHash }
     };
+    const startTime = performance.now();
+    let totalBytesSent = 0;
+    function formatSpeed(bytes, seconds) {
+        if (seconds === 0) return '0 MB/s';
+        const megabytes = bytes / (1024 * 1024);
+        const speed = megabytes / seconds;
+        return `${speed.toFixed(2)} MB/s`;
+    }
 
 
-
-
-    const ws = new WebSocket('ws://localhost:8000/filews');
+    /*const ws = new WebSocket('ws://localhost:8000/filews');
     console.log(fileChunks.length);
 
     function formatSpeed(bytes, seconds) {
@@ -75,7 +81,44 @@ export async function handleFileUpload(file: File, onProgress: (progress: FileUp
     let isOpen = false;
     const startTime = performance.now();
     let totalBytesSent = 0;
-    let chunkIndex = 0;
+    let chunkIndex = 0;*/
+
+    const form = new FormData();
+    let blob2 = new Blob([deflatedData], { type: file.type });
+    form.append('file_data', blob2);
+
+    const xhr = new XMLHttpRequest();
+    
+    xhr.open('POST', 'api/upload/filechunk3', true);
+    xhr.setRequestHeader('Content-Type', 'multipart/form-data');
+    xhr.onload = function() {
+        if (xhr.status === 200) {
+            console.log('Chunk uploaded successfully');
+        } else {
+            console.error('Failed to upload chunk');
+        }
+    }  
+
+    xhr.upload.onprogress = function(event) {
+        if (event.lengthComputable) {
+            const currentTime = performance.now();
+            const elapsedTime = (currentTime - startTime) / 1000; // Convert ms to seconds
+            const speed = formatSpeed(event.loaded, elapsedTime);
+            onProgress({ loaded: event.loaded, total: totalChunks, speed });
+        }
+    }
+
+
+
+    xhr.onerror = function() {
+        console.error('Failed to upload chunk');
+    }
+
+    xhr.send(form);
+
+
+
+
     /*ws.onopen = function() {
         isOpen = true;
         sendChunk();
@@ -139,27 +182,15 @@ export async function handleFileUpload(file: File, onProgress: (progress: FileUp
     ws.onerror = function error() {
         isOpen = false;
         console.error('Connection error');
-    };*/
+    };
 
 
 
 
+    */
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
+    /*
     ws.onopen = async function open() {
         isOpen = true;
     
@@ -249,7 +280,7 @@ export async function handleFileUpload(file: File, onProgress: (progress: FileUp
     
         } catch (error) {
             console.error('Failed to upload chunk:', error);
-        }*/
+        }
 
 
 
@@ -265,7 +296,7 @@ export async function handleFileUpload(file: File, onProgress: (progress: FileUp
     })
     .with({ Failed: P.select() }, (error) => console.error(error))
     .exhaustive();
-
+    */
 
 }
 

@@ -187,7 +187,7 @@ impl Lobby {
     pub fn update_session_score(&mut self, user_session_id: &UserSessionId, score: i32) {
         if let Some(_) = self.connected_user_session.get(user_session_id) {
             if let Some(user_data) = self.user_data.get_mut(user_session_id) {
-                user_data.score + score;
+                user_data.score += score;
                 }
             }
     }
@@ -512,18 +512,85 @@ impl Handler<AddLobbySessionScore> for Lobby {
         Box::pin(
             async move {
                 is_editor(&user_session_id, &creator, db).await
-        }.into_actor(self).map(move |allowed, lobby, _|  {
+        }.into_actor(self).map(move |allowed, lobby,ctx|  {
             if allowed.clone() {
                 lobby.current_question_won(&msg.grant_score_user_session_id);
                 let dto_board = lobby.jeopardy_board.dto(lobby.creator.clone());
                 let event = WebsocketServerEvents::Board(BoardEvent::CurrentBoard(dto_board));
                 lobby.send_lobby_message(&event);
                 //FIXME: Send the user session id
-                lobby.send_current_sessions();
+                ctx.address().do_send(SendCurrentDTOSessions{});
             }
         }))
     }
 }
+
+
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct SendCurrentDTOSessions {
+}
+
+
+impl Handler<SendCurrentDTOSessions> for Lobby {
+    type Result = ResponseActFuture<Self, ()>;
+
+    fn handle(&mut self, _: SendCurrentDTOSessions, _: &mut Self::Context) -> Self::Result {
+        let db: Arc<MongoServer> = self.starting_services.mongo_server.clone();
+        let user_session_data = self.user_data.clone();
+        let user_session_id = self.connected_user_session.iter().map(|id| id.clone()).collect::<Vec<UserSessionId>>();
+
+
+        Box::pin(
+            async move {
+                let sessions = get_sessions(&db, &user_session_id).await;
+                let dto_sessions = get_dto_sessions(&db, sessions, user_session_data).await;
+                WebsocketServerEvents::Session(SessionEvent::CurrentSessions(dto_sessions))
+        }.into_actor(self).map(move |event, lobby, _|  {
+            lobby.send_lobby_message(&event);
+        }))
+    }
+}
+
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct SendDTOSessionJoined {
+    pub user_session_id: UserSessionId,
+}
+
+
+impl Handler<SendDTOSessionJoined> for Lobby {
+    type Result = ResponseActFuture<Self, ()>;
+
+    fn handle(&mut self, msg: SendDTOSessionJoined, _: &mut Self::Context) -> Self::Result {
+        let db: Arc<MongoServer> = self.starting_services.mongo_server.clone();
+        let user_session_data = self.get_user_session_data(&msg.user_session_id);
+        let user_session_id = msg.user_session_id.clone();
+        
+
+
+        Box::pin(
+            async move {
+                let user_session = match get_session(&db, &user_session_id).await {
+                    None => return None,
+                    Some(session) => session,
+                };
+                let dto_session = get_dto_sesion(&db, &user_session, &user_session_data).await;
+                Some(WebsocketServerEvents::Session(SessionEvent::SessionJoined(dto_session)))
+        }.into_actor(self).map(move |event, lobby, _|  {
+
+            if let Some(event) = event {
+                lobby.send_lobby_message(&event);
+            }
+        }))
+    }
+}
+
+
+
+
+
+
 
 
 #[derive(Message,Debug, Clone)]
@@ -609,74 +676,59 @@ struct WebsocketConnectFuture{
 
 
 impl Handler<WebsocketConnect> for Lobby {
-    type Result =    ResponseActFuture<Self,Option<WebsocketSessionId>>;
-    fn handle(&mut self, msg: WebsocketConnect, _: &mut Context<Self>) -> Self::Result {
+    type Result =    Option<WebsocketSessionId>;
+    fn handle(&mut self, msg: WebsocketConnect, ctx: &mut Context<Self>) -> Self::Result {
 
         let has_websockets: bool = self.has_session_websockets(&msg.user_session_id);
         let websockets = self.get_session_websockets(&msg.user_session_id);
 
         if has_websockets && websockets.len() > 1 {
             println!("2 Session {:?} has been already connected to the lobby={:?}.", msg.user_session_id.id, &self.lobby_id.id);
-            return Box::pin(fut::ready(None));
+            return None;
         } 
 
 
         let user_session_data = self.get_user_session_data(&msg.user_session_id);
-        let fut_user_session_id = msg.user_session_id.clone();
-        let fut_sessions  = self.get_get_user_session_ids();
-        let fut_sessions_data = self.user_data.clone();
-        let fut_session_data= user_session_data.clone();
-        let db = self.starting_services.mongo_server.clone();
 
-        let futrue = async move {
-            let user_session = get_session(&db, &fut_user_session_id).await;
-            let mut dto_session : Option<DTOSession> = None;
-            if let Some(user_session) = user_session.clone() {
-                dto_session = Some(get_dto_sesion(&db, &user_session, &fut_session_data).await);
-            }
-            let sessions = get_sessions(&db, &fut_sessions).await;
-            let dto_sessions = get_dto_sessions(&db, sessions, fut_sessions_data).await;
-            WebsocketConnectFuture{
-                dto_session: dto_session,
-                dto_sessions: dto_sessions,
+        let websocket_session_id = self.add_new_websocket(&msg);
+        let event = WebsocketServerEvents::Websocket(WebsocketEvent::WebsocketJoined(websocket_session_id.clone()));
+        self.send_lobby_message(&event);
 
-            }
-        };
 
-        Box::pin(futrue.into_actor(self).map(move |wcf: WebsocketConnectFuture, lobby: &mut Lobby, _: &mut Context<Lobby>| {
-                let dto_session = match wcf.dto_session {
-                    None => return None,
-                    Some(dto_session) => dto_session
-                };
-                let websocket_session_id = lobby.add_new_websocket(&msg);
-                let event = WebsocketServerEvents::Websocket(WebsocketEvent::WebsocketJoined(websocket_session_id.clone()));
-                lobby.send_lobby_message(&event);
+        let is_new_session = self.is_new_session(&msg.user_session_id);
+        if is_new_session {
+            self.add_new_session(&msg.user_session_id, &user_session_data);
+        } else {
+            self.reconnect_session(&msg.user_session_id);
+        }
 
-                let is_new_session = lobby.is_new_session(&msg.user_session_id);
-                if is_new_session {
-                    lobby.add_new_session(&msg.user_session_id, &user_session_data);
-                } else {
-                    lobby.reconnect_session(&msg.user_session_id);
-                }
-                /* 
-                let mut dto_sessions = wcf.dto_sessions;
-                dto_sessions.push(dto_session.clone());
-                */
-                let board = lobby.jeopardy_board.clone();
-                let event = WebsocketServerEvents::Board(BoardEvent::CurrentBoard(board.dto(lobby.creator.clone())));
-                lobby.send_websocket_session_message(&websocket_session_id, event);
-                
-                let event = WebsocketServerEvents::Session(SessionEvent::CurrentSessions(wcf.dto_sessions));
-                lobby.send_websocket_current_session(&websocket_session_id, &event);
-                let event = WebsocketServerEvents::Session(SessionEvent::SessionJoined(dto_session));
-                lobby.send_lobby_message(&event);
-                return  Some(websocket_session_id);
-                
-            })
-        )
+        ctx.address().do_send(SendWSCurrentDTOBoard{websocket_session_id: websocket_session_id.clone()});
+        ctx.address().do_send(SendDTOSessionJoined{user_session_id: msg.user_session_id.clone()});
+        ctx.address().do_send(SendCurrentDTOSessions{}); 
+        return  Some(websocket_session_id);
+        
 
     }
 }
+
+#[derive(Message, Debug, Clone)]
+#[rtype(result = "()")]
+pub struct SendWSCurrentDTOBoard {
+    pub websocket_session_id: WebsocketSessionId,
+}
+
+
+impl Handler<SendWSCurrentDTOBoard> for Lobby {
+    type Result =  ();
+    fn handle(&mut self, msg: SendWSCurrentDTOBoard, _: &mut Context<Self>) -> Self::Result {
+        let dto_board = self.jeopardy_board.dto(self.creator.clone());
+        let event = WebsocketServerEvents::Board(BoardEvent::CurrentBoard(dto_board));
+        self.send_websocket_session_message(&msg.websocket_session_id, event);
+            
+    }
+}
+
+
 
 
 

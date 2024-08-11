@@ -454,4 +454,23 @@ impl Handler<CreateLobby> for GameServer {
 }
 
 
+pub struct MessageLobbies {
+    pub msg: String,
+}
+
+impl Message for MessageLobbies {
+    type Result = ();
+}
+
+
+
+impl Handler<MessageLobbies> for GameServer {
+    type Result = ();
+
+    fn handle(&mut self, msg: MessageLobbies, _ctx: &mut Self::Context) -> Self::Result {
+        for lobby in self.lobbies.values() {
+           // lobby.addr.do_send(session::SendSessionMessageType(msg.msg.clone()));
+        }
+    }
+}
 
