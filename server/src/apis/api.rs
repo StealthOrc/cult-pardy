@@ -131,6 +131,19 @@ async fn upload_file_chunk3(req: HttpRequest,db: web::Data<Arc<MongoServer>>,mut
     println!("UPLOAD FILE CHUNK 3");
     let start_time: chrono::DateTime<Local> = Local::now();
     //print!("SOMETHINGS HERE!{:?}", payload.next().await);
+    // print size of multipart stream
+    let mut size = 0;
+    while let Some(chunk) = payload.next().await {
+        let data = match chunk {
+            Ok(data) => data,
+            Err(e) => {
+                println!("Error reading chunk: {}", e);
+                return Ok(HttpResponse::InternalServerError().finish());
+            }
+        };
+        size += data.len();
+    }
+    println!("Size: {:?}", size);
     return Ok(HttpResponse::Ok().finish())/* 
     let file_name = match get_file_name_from_value(&req) {
         Some(data) => data,
