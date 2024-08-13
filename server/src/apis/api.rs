@@ -145,7 +145,7 @@ async fn upload_file_chunk3(req: HttpRequest,db: web::Data<Arc<MongoServer>>,mut
             let bytes = match chunk {
                 Ok(data) => data,
                 Err(e) => {
-                    println!("Error reading chunk: {}", e);
+                    println!("Error reading chunk2: {}", e);
                     return Ok(HttpResponse::InternalServerError().finish());
                 }
             };

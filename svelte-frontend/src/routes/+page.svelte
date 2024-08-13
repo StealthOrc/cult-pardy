@@ -7,6 +7,7 @@
 	import { discord_session} from "$lib/api/ApiRequests";
 	import LoadingPage from "./DevLoading.svelte";
 	import FileUpload from "$lib/create/FileUpload.svelte";
+	import { FileUploadType } from "$lib/create/fileUploadUtils";
     let lobbyid = '';
 
     let cookies : SessionCookies; 
@@ -95,5 +96,11 @@
         {:else}
             <LoadingPage/>
         {/if}
-        <FileUpload/>
+        <div class="flex space-x-4">
+            <FileUpload fileuploadtype={FileUploadType.V1}/>
+            <FileUpload fileuploadtype={FileUploadType.V2}/>
+            <FileUpload fileuploadtype={FileUploadType.V3}/>
+            <FileUpload fileuploadtype={FileUploadType.WS1}/>
+            <FileUpload fileuploadtype={FileUploadType.WS2}/>
+        </div>
 </div>

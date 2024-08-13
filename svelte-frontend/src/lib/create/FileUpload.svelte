@@ -1,6 +1,9 @@
 <script lang="ts">
-    import { handleFileUpload, upload_file2  } from './fileUploadUtils';
+	import exp from 'constants';
+    import { FileUploadType, handleFileUpload, upload_file2  } from './fileUploadUtils';
     import type { FileUploadProgress } from './fileUploadUtils';
+
+    export let fileuploadtype:FileUploadType;
 
     let file: File | null = null;
     let progress: number = 0;
@@ -32,7 +35,7 @@
                 
 
 
-                await handleFileUpload(file, onProgress);
+                await handleFileUpload(file, fileuploadtype, onProgress);
 
                 uploadStatus = 'Upload complete!';
             } catch (error) {
@@ -46,7 +49,7 @@
 </script>
 
 <div class="flex flex-col items-center p-6 bg-gray-100 rounded-lg shadow-lg">
-    <h1 class="text-2xl font-semibold mb-4 text-gray-800">File Upload</h1>
+    <h1 class="text-2xl font-semibold mb-4 text-gray-800">File Upload - {fileuploadtype}</h1>
     <input type="file"   accept="image/*, video/*"   on:change={handleFileChange}  class="mb-4 p-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200"/>
     <button  on:click={uploadFile}   class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200" disabled={isUploading}  >
         Upload
