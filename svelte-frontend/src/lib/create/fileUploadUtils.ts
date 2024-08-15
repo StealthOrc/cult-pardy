@@ -127,7 +127,6 @@ async function v3_upload_file(deflatedData: ArrayBuffer, uploadData: DTOFileData
     const xhr = new XMLHttpRequest();
     
     xhr.open('POST', 'api/upload/filechunk3', true);
-    xhr.setRequestHeader('Content-Type', 'multipart/form-data');
     xhr.onload = function() {
         if (xhr.status === 200) {
             console.log('Chunk uploaded successfully');
@@ -139,11 +138,9 @@ async function v3_upload_file(deflatedData: ArrayBuffer, uploadData: DTOFileData
     xhr.upload.onprogress = function(event) {
         if (event.lengthComputable) {
             const progress = Math.min(Math.ceil(((event.loaded) / event.total) * 100), 100);
-            const currentTime = performance.now();
+            const speed = formatSpeed(event.loaded, (performance.now() - startTime) / 1000);
 
-            const speed = event.loaded / ((currentTime - startTime) / 1000);
-
-            onProgress({ loaded: progress, total: 100, speed: speed.toString()});
+            onProgress({ loaded: progress, total: 100, speed});
         }
     }
 
