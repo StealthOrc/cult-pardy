@@ -9,7 +9,6 @@
 	import type { YTPP_Options } from 'youtube-player-plus/types';
 	import JeopardyBoard from './JeopardyBoard.svelte';
 	import { JeopardyBoardStore } from '$lib/stores/JeopardyBoardStore';
-	import { binary_test } from '$lib/const';
 	import { get_file, get_file2 } from '$lib/api/ApiRequests';
 	import { buildUint8ArrayFromChunks} from '$lib/BinaryConversion';
 	import { decompress } from 'fflate';
