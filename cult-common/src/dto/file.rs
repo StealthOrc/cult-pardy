@@ -49,7 +49,19 @@ pub struct DTOCFile{
     pub validate_hash: ValidateHash,
 }
 
-#[derive(Tsify,Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Tsify,Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct FileMultiPart {
-    pub file_data: Bytes,
+    pub file_name: Option<String>,
+    pub file_type: Option<String>,
+    pub validate_hash: Option<ValidateHash>,
+    pub creator_id: Option<DiscordID>,
+}
+
+impl FileMultiPart {
+   
+
+   pub fn is_valid(&self) -> bool {
+       self.file_name.is_some() && self.file_type.is_some() && self.validate_hash.is_some() && self.creator_id.is_some()
+   }
+    
 }

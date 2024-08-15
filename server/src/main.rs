@@ -18,7 +18,7 @@ use actix_web::{get, post, web, App, HttpRequest, HttpResponse, HttpServer, Resp
 use actix_ws::Message;
 use anyhow::Result;
 
-use apis::api::{ get_session_or_create_new, session_data_request, set_session_token_cookie, upload_file_chunk, upload_file_chunk2, upload_file_chunk3, upload_file_data};
+use apis::api::{ get_session_or_create_new, session_data_request, set_session_token_cookie, upload_file_chunk, upload_file_chunk2, upload_file_part, upload_file_data};
 use apis::data::extract_header_string;
 use authentication::discord::is_admin;
 use bson::binary;
@@ -111,7 +111,7 @@ async fn main() -> Result<()> {
             .service(get_file_from_name2)
             .service(upload_streaming_data)
             .service(upload_file_chunk2)
-            .service(upload_file_chunk3)
+            .service(upload_file_part)
             .default_service(
                 web::route().to(not_found)
             )

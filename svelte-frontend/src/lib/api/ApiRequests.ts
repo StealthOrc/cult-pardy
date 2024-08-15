@@ -33,7 +33,7 @@ let updater : boolean = false;
     const FILEDATA_URL:string = 'api/upload/filedata';
     const FILECHUNK_URL:string = 'api/upload/filechunk';
     const FILECHUNK_URL2:string = 'api/upload/filechunk2';
-    const FILECHUNK_URL3:string = 'api/upload/filechunk3';
+    const FILEPART:string = 'api/upload/filepart';
     const GETFILE_URL:string = 'api/file/'; // add filename after the slash
     const GETFILE_URL2:string = 'api/file2/'; // add filename after the slash
 
@@ -122,7 +122,7 @@ export async function get_file2(filename: string): Promise<Response> {
 }
 
 export async function upload_chunk3(file:FormData): Promise<Response> {
-    return await api_post_formrequest(FILECHUNK_URL3, file);
+    return await api_post_formrequest(FILEPART, file);
 }
 
 export function objectToFormData(obj: Record<string, any>, formData = new FormData(), parentKey = ''): FormData {

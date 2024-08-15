@@ -16,9 +16,11 @@ use actix_web::body::MessageBody;
 use actix_web::cookie::Cookie;
 use actix_web::{get, HttpRequest, HttpResponse, post, web};
 use attohttpc::body::File;
+use bson::bson;
 use bytes::Bytes;
 use chrono::Local;
 use cult_common::dto::api::{ApiResponse, DTOFileToken, FileDataReponse};
+use cult_common::dto::file::{self, FileMultiPart};
 use cult_common::dto::{DTOFileChunk, DTOFileData};
 use cult_common::wasm_lib::hashs::validate::ValidateHash;
 use cult_common::wasm_lib::ids::discord::DiscordID;
@@ -126,74 +128,91 @@ async fn upload_file_data(req: HttpRequest,  db: web::Data<Arc<MongoServer>>,  j
 
 
 
-#[post("/api/upload/filechunk3")]
-async fn upload_file_chunk3(req: HttpRequest,db: web::Data<Arc<MongoServer>>,mut payload: Multipart) -> Result<HttpResponse, actix_web::Error> {
-    println!("UPLOAD FILE CHUNK 3");
+#[post("/api/upload/filepart")]
+async fn upload_file_part(req: HttpRequest,db: web::Data<Arc<MongoServer>>,mut payload: Multipart) -> Result<HttpResponse, actix_web::Error> {
+    println!("UPLOAD FILE Part");
     let start_time: chrono::DateTime<Local> = Local::now();
-    //print!("SOMETHINGS HERE!{:?}", payload.next().await);
-    // print size of multipart stream
-    let mut size = 0;
-    while let Some(chunk) = payload.next().await {
-        let mut data = match chunk {
-            Ok(data) => data,
-            Err(e) => {
-                println!("Error reading chunk: {}", e);
-                return Ok(HttpResponse::InternalServerError().finish());
-            }
-        };
-        while let Some(chunk) = data.next().await{
-            let bytes = match chunk {
-                Ok(data) => data,
-                Err(e) => {
-                    println!("Error reading chunk2: {}", e);
-                    return Ok(HttpResponse::InternalServerError().finish());
+    let mut file_multi = FileMultiPart::default();
+
+    let mut upload_stream = None;
+
+
+    while let Some(item) = payload.next().await {
+        match item {
+            Ok(mut field) => {
+                let name = match field.name() {
+                    Some(name) => name.to_owned(),
+                    None => return  Ok(HttpResponse::from(HttpResponse::NotFound().json("Name not found"))),
+                };
+                while let Some(chunk) = field.next().await {
+                    let data = match chunk {
+                        Ok(data) => data,
+                        Err(_) => return Ok(HttpResponse::from(HttpResponse::NotFound().json("Data not found"))),
+                    };
+
+                    match name.as_str() {
+                        "file_name" => {
+                            file_multi.file_name = Some(String::from_utf8(data.to_vec()).expect("Can´t convert to string"));
+                        },
+                        "file_data" => {
+                            if upload_stream.is_none() {
+                                let file_name = match &file_multi.file_name {
+                                    Some(data) => data,
+                                    None => return Ok(HttpResponse::from(HttpResponse::NotFound().json("File name not found"))),
+                                };
+                                let file_type = match field.content_type() {
+                                    Some(data) => data,
+                                    None => return Ok(HttpResponse::from(HttpResponse::NotFound().json("File type not found"))),
+                                };
+                                file_multi.file_type = Some(file_type.to_string()); 
+                                let mut stream = db.collections.file_bucket.open_upload_stream(file_name.to_string()).await.expect("Can´t open upload stream");   
+                                stream.write_all(&data).await.expect("Can´t write to upload stream");
+                                upload_stream = Some(stream);
+                            } else {
+                                let stream = match &mut upload_stream {
+                                    Some(data) => data,
+                                    None => return Ok(HttpResponse::from(HttpResponse::NotFound().json("Upload stream not found"))),
+                                };
+                                stream.write_all(&data).await.expect("Can´t write to upload stream");
+                            }                        
+                        },
+                        "validate_hash" => {
+                            file_multi.validate_hash = Some(ValidateHash::new(String::from_utf8(data.to_vec()).expect("Can´t convert to string")));
+                        }
+                        "creator_id" => {
+                            file_multi.creator_id = Some(DiscordID::of_str(String::from_utf8(data.to_vec()).expect("Can´t convert to string").as_str()));
+                        }
+                        _ => {
+                            println!("Field not found {:?}", name);
+
+                        }
+                    }
                 }
-            };
-            size += bytes.len();
+            }
+            Err(_) => return Ok(HttpResponse::from(HttpResponse::NotFound().json("Field not found"))),
         }
     }
 
-    println!("UPLOAD FILE CHUNK 3 size: {:?} in {:?}", size, Local::now().signed_duration_since(start_time));
-    return Ok(HttpResponse::Ok().finish())/* 
-    let file_name = match get_file_name_from_value(&req) {
-        Some(data) => data,
-        None => return Ok(HttpResponse::from(HttpResponse::NotFound().json("File name not found"))),
-    };
-    let form = match payload.next().await {
-        Some(data) => data,
-        None => return Ok(HttpResponse::from(HttpResponse::NotFound().json("File data not found"))),
-    };
+    println!("UPLOAD FILE PART size: {:?} in {:?}", file_multi.file_name, Local::now().signed_duration_since(start_time));
+    println!("{:#?}", file_multi);
+    println!("{:#?}", upload_stream.is_none());
 
-    //Convert the form to a FileDataForm
-    let mut form = match form {
-        Ok(data) => data,
-        Err(e) => return Ok(HttpResponse::from(HttpResponse::NotFound().json("File data not found"))),
-    };
-
-    while let Some(chunk) = form.next().await {
-        let data = match chunk {
-            Ok(data) => data,
-            Err(e) => {
-                println!("Error reading chunk: {}", e);
-                return Ok(HttpResponse::InternalServerError().finish());
-            }
-        };
-        println!("Chunk: {:?}", data);
+    if !file_multi.is_valid() {
+        return Ok(HttpResponse::InternalServerError().finish());
     }
-    
-   /* 
+
+    if let Some(mut stream) = upload_stream {
+        let id = stream.id().clone();
+        stream.flush().await.expect("Can´t flush upload stream");
+        stream.close().await.expect("Can´t close upload stream");
+        db.collections.file_bucket_files.update_one(bson::doc! { "_id":id}, bson::doc! {"$set": {"metadata": "Test" }}).await.expect("Can´t update file type");
+    }
 
 
 
+    return Ok(HttpResponse::Ok().finish())
 
-    let mut upload_stream = db.collections.file_bucket.open_upload_stream(file_name.clone()).await.expect("Can´t open upload stream");
-    let body = form.file_data;
-    let mut body = body.data;
-    upload_stream.write_all(&body).await.expect("Can´t write to upload stream");
-    upload_stream.close().await.expect("Can´t close upload stream");
-    */
-    println!("UPLOAD FILE CHUNK 3 time: {:?}", Local::now().signed_duration_since(start_time));    
-    Ok(HttpResponse::Ok().finish())*/
+
 }
 
 
@@ -207,6 +226,11 @@ async fn upload_file_chunk2(req: HttpRequest,db: web::Data<Arc<MongoServer>>,mut
         Some(data) => data,
         None => return Ok(HttpResponse::from(HttpResponse::NotFound().json("File name not found"))),
     };
+
+
+
+
+    
     let mut upload_stream = db.collections.file_bucket.open_upload_stream(file_name.clone()).await.expect("Can´t open upload stream");
 
 

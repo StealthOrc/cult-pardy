@@ -95,7 +95,7 @@ impl MongoServer {
             file_data: db.collection("FileData"),
             file_chunks : db.collection("FileChunks"),
             file_bucket: bucket,
-            file_bucket_files: db.collection("FileBucket.chunks"),
+            file_bucket_files: db.collection("FileBucket.files"),
             file_bucket_chunks: db.collection("FileBucket.chunks"),
         };
 

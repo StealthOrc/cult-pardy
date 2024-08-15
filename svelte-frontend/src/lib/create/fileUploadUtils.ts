@@ -2,7 +2,7 @@ import { inflate, deflate } from 'fflate';
 import { XXH64 } from 'xxh3-ts';
 import { Buffer } from 'buffer';
 import type { DTOFileChunk, DTOFileData, DTOFileToken, FileChunkHash, FileDataForm, FileDataReponse } from 'cult-common';
-import { upload_chunk, upload_chunk2, upload_chunk3, upload_data } from '$lib/api/ApiRequests';
+import { upload_chunk, upload_chunk2, upload_data } from '$lib/api/ApiRequests';
 import { match, P } from 'ts-pattern';  
 import axios from 'axios';
 
@@ -122,11 +122,14 @@ async function v2_upload_file(deflatedData: ArrayBuffer, uploadData: DTOFileData
 async function v3_upload_file(deflatedData: ArrayBuffer, uploadData: DTOFileData, onProgress: (progress: FileUploadProgress) => void){
     const form = new FormData();
     const blob2 = new Blob([deflatedData], { type: uploadData.file_type });
+    form.append('file_name', uploadData.file_name);
     form.append('file_data', blob2);
-
+    form.append('creator_id', '1');
+    form.append('validate_hash', uploadData.validate_hash.hash);
+    
     const xhr = new XMLHttpRequest();
     
-    xhr.open('POST', 'api/upload/filechunk3', true);
+    xhr.open('POST', "api/upload/filepart", true);
     xhr.onload = function() {
         if (xhr.status === 200) {
             console.log('Chunk uploaded successfully');
