@@ -11,4 +11,4 @@
 .DS_Store
 Admin.json
 *.env
-Settings.toml
+*Settings.toml
