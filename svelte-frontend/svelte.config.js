@@ -33,7 +33,11 @@ const config = {
 
 function getAssetPath()  { 
 	try {
-		let file = fs.readFileSync('../Settings.toml', 'utf-8');
+		let current = process.cwd();
+		let lastIndex = Math.max(current.lastIndexOf('/'), current.lastIndexOf('\\'));
+		let parent = current.substring(0, lastIndex);
+		let filePath = parent + '/Settings.toml';
+		let file = fs.readFileSync(filePath, 'utf-8');
 		let uri = 'http://localhost:8000/assets';
 		const settings = parseToml(file);
 		if (settings && settings.frontend_settings && settings.frontend_settings.host && settings.frontend_settings.port && settings.frontend_settings.ssl) {
@@ -43,6 +47,7 @@ function getAssetPath()  {
 		return uri;
 	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	} catch (err ) {
+		console.log('Error reading Settings.toml file, using default settings');
 		return 'http://localhost:8000/assets';
 	}
 }
