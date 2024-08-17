@@ -7,6 +7,8 @@ pub struct DiscordID {
     pub id: String,
 }
 
+
+
 impl DiscordID {
 
     pub fn id(&self) -> String {
@@ -29,5 +31,7 @@ impl DiscordID {
             id: "000000000000000".to_string(),
         }
     }
+
+
 }
 

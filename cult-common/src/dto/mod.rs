@@ -1,4 +1,3 @@
-use api::DTOFileToken;
 use bytes::Bytes;
 use chrono::{DateTime, Local};
 use serde::{Deserialize, Deserializer, Serialize};
@@ -14,7 +13,6 @@ use wasm_bindgen::prelude::*;
 use crate::wasm_lib::hashs::validate::ValidateHash;
 use crate::wasm_lib::ids::discord::DiscordID;
 use crate::wasm_lib::ids::usersession::{self, UserSessionId};
-use crate::wasm_lib::token::file::FileToken;
 use crate::wasm_lib::{DiscordUser, QuestionType, Vector2D};
 
 

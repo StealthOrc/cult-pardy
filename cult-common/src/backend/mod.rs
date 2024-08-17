@@ -34,6 +34,7 @@ pub struct JeopardyBoard {
     pub current: Option<Vector2D>,
     #[serde(skip_serializing)]
     pub create: DateTime<Local>,
+    #[serde(skip_serializing)]
     pub action_state: ActionState,
 }
 

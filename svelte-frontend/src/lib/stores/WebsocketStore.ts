@@ -36,7 +36,7 @@ if(dev) {
 
 function get_ws(lobbyId: string, userSessionId: UserSessionId, sessionToken: string) : WebSocketSubject<WebsocketSessionEvent> {
      return webSocket({
-        url: `ws://localhost:8000/ws?lobby-id=${lobbyId}&user-session-id=${userSessionId.id}&session-token=${sessionToken}`,
+        url: `ws://0.0.0.0:8000/ws?lobby-id=${lobbyId}&user-session-id=${userSessionId.id}&session-token=${sessionToken}`,
         //use binaryType: 'arraybuffer' if you are sending binary data
         binaryType: 'arraybuffer',
         deserializer: (e) => e.data,

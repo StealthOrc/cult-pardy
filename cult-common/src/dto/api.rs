@@ -2,7 +2,7 @@ use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
 
-use crate::wasm_lib::{hashs::validate::ValidateHash, token::file::FileToken};
+use crate::wasm_lib::{hashs::validate::ValidateHash};
 
 use super::file;
 
@@ -29,28 +29,5 @@ impl ApiResponse {
 
 
 
-
-
-#[derive(Tsify,Debug, Clone, Serialize, Deserialize, Eq, Hash,PartialEq, Default)]
-pub struct DTOFileToken {
-    pub token: String,
-}
-
-
-#[derive(Tsify,Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-pub enum FileDataReponse {
-    Successful(DTOFileToken),
-    Failed(String),
-}
-
-impl FileDataReponse {
-    pub fn successful(file_token: &FileToken) -> Self {
-        FileDataReponse::Successful(file_token.to_dto_file_token())
-    }
-    pub fn failed(error: String) -> Self {
-        FileDataReponse::Failed(error)
-    }
-
-}
 
 

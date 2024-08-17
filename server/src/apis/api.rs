@@ -19,7 +19,7 @@ use attohttpc::body::File;
 use bson::{bson, Bson};
 use bytes::Bytes;
 use chrono::Local;
-use cult_common::dto::api::{ApiResponse, DTOFileToken, FileDataReponse};
+use cult_common::dto::api::{ApiResponse};
 use cult_common::dto::file::{self, FileMultiPart};
 use cult_common::wasm_lib::hashs::validate::ValidateHash;
 use cult_common::wasm_lib::ids::discord::DiscordID;
@@ -465,7 +465,7 @@ async fn join_game(req: HttpRequest, srv: web::Data<Addr<game::GameServer>>, db:
 
 #[get("/api/board")]
 async fn board() -> HttpResponse {
-    let response = HttpResponse::from(HttpResponse::Ok().json(JeopardyBoard::default(JeopardyMode::SHORT)));
+    let response = HttpResponse::from(HttpResponse::Ok().json(JeopardyBoard::default(JeopardyMode::NORMAL)));
     response
 }
 
@@ -508,14 +508,6 @@ pub fn get_session_token_from_value(req: &HttpRequest) -> Option<SessionToken> {
     None
 }
 
-pub fn get_file_token_from_value(req: &HttpRequest) -> Option<DTOFileToken> {
-    if let Ok(cookie) = extract_value(&req,"file-token"){
-        return Some(DTOFileToken {
-            token:cookie,
-        })
-    };
-    None
-}
 
 pub fn get_lobby_id_from_value(req: &HttpRequest) -> Option<LobbyId> {
     if let Ok(cookie) = extract_value(&req,"lobby-id"){

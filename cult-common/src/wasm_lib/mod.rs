@@ -5,7 +5,6 @@ use hashs::validate::ValidateHash;
 use ids::discord::DiscordID;
 use ids::usersession::{self, UserSessionId};
 use serde::{Deserialize, Serialize};
-use token::file::FileToken;
 use tsify_next::Tsify;
 use twox_hash::XxHash;
 use core::hash;
@@ -15,12 +14,10 @@ use std::string::ToString;
 use wasm_bindgen::prelude::*;
 
 use crate::backend::{ActionState, MediaPlayer};
-use crate::dto::api::DTOFileToken;
 
 pub mod ids;
 pub mod websocket_events;
 pub mod hashs;
-pub mod token;
 
 
 #[derive(Tsify,Clone, Copy,Serialize,Deserialize)]
@@ -101,12 +98,23 @@ impl DiscordUser {
 
 
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Default)]
-#[tsify(into_wasm_abi, from_wasm_abi)]
 pub enum QuestionType {
     Media(String),
     #[default]
     Question,
 }
+
+#[derive(Tsify,Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Default)]
+pub enum MediaType {
+    Yotube(String),
+    #[default]
+    Video,
+    Media()
+}
+
+
+
+
 
 
 impl QuestionType {

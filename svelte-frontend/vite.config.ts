@@ -22,11 +22,11 @@ export default {
     proxy: {
       // Proxy /api requests to the backend dev server running on a different port 
       '/api': {
-        target: 'http://localhost:8000',
+        target: 'http://0.0.0.0:8000',
         changeOrigin: true,
       },
       '/game/api': {
-        target: 'http://localhost:8000',
+        target: 'http://0.0.0.0:8000',
         changeOrigin: true,
         rewrite: (path : string) => {
           return path.replace(/^\/game\/api/, '/api');
@@ -36,7 +36,7 @@ export default {
 
 
       '/discord': {
-        target: 'http://localhost:8000',
+        target: 'http://0.0.0.0:8000',
         changeOrigin: true,
       },
       
