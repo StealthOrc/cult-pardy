@@ -6,6 +6,7 @@ import {
     type UserSessionId
 } from "cult-common";
 import { CookieStore, type SessionCookies } from "$lib/stores/cookies";
+import {CONST} from "$lib/const"
 
 /*
 /api/info
@@ -23,13 +24,6 @@ let updater : boolean = false;
 
 
 //    const INFO_URL: string = 'api/info';
-    const SESSION_DATA_URL: string = 'api/session-data';
-    const AUTHORIZATION_URL: string = 'api/authorization';
-    const DISCORD_SESSION_URL: string = 'api/discord_session';
-    const JOIN_URL: string = 'api/join';
-    const BOARD_URL: string = 'api/board';
-    const FILEPART:string = 'api/upload/filepart';
-    const GETFILE_URL:string = 'api/file';
 
 
 export enum RequestContentType {
@@ -40,7 +34,7 @@ export enum RequestContentType {
 
 
 export async function authorization(): Promise<ApiResponse> {
-    const response : Response = await api_get_request(AUTHORIZATION_URL, RequestContentType.JSON);
+    const response : Response = await api_get_request(CONST.AUTHORIZATION_URL, RequestContentType.JSON);
     if (response == null || !response.ok) {
         return {success: false};
     }
@@ -48,12 +42,12 @@ export async function authorization(): Promise<ApiResponse> {
 }
 
 export async function discord_session(): Promise<DiscordUser> {
-    const response : Response = await api_get_request(DISCORD_SESSION_URL, RequestContentType.JSON);
+    const response : Response = await api_get_request(CONST.DISCORD_SESSION_URL, RequestContentType.JSON);
     return await response.json();
 }
 
 export async function session_data(): Promise<SessionData> {
-    const response : Response  = await api_get_request(SESSION_DATA_URL, RequestContentType.JSON);
+    const response : Response  = await api_get_request(CONST.SESSION_DATA_URL, RequestContentType.JSON);
     const json = await response.json();
     const user_session_id: UserSessionId = json.user_session_id;
     const session_token: SessionToken = json.session_token;
@@ -64,7 +58,7 @@ export async function session_data(): Promise<SessionData> {
 
 
 export async function join(): Promise<ApiResponse> {
-    const response : Response = await api_get_request(JOIN_URL, RequestContentType.JSON);
+    const response : Response = await api_get_request(CONST.JOIN_URL, RequestContentType.JSON);
     if (response == null || !response.ok) {
         return {success: false};
     }
@@ -72,7 +66,7 @@ export async function join(): Promise<ApiResponse> {
 }
 
 export async function board(): Promise<JeopardyBoard | null> {
-    const response : Response  = await api_get_request(BOARD_URL, RequestContentType.JSON);
+    const response : Response  = await api_get_request(CONST.BOARD_URL, RequestContentType.JSON);
     if (response == null || !response.ok) {
         return null;
     }
@@ -81,8 +75,8 @@ export async function board(): Promise<JeopardyBoard | null> {
 
 
 export async function UserInfo() {
-    const discord = api_get_request(DISCORD_SESSION_URL, RequestContentType.JSON);
-    const auth = api_get_request(AUTHORIZATION_URL, RequestContentType.JSON);
+    const discord = api_get_request(CONST.DISCORD_SESSION_URL, RequestContentType.JSON);
+    const auth = api_get_request(CONST.AUTHORIZATION_URL, RequestContentType.JSON);
 
     const [discord_response, auth_response] = await Promise.all([discord, auth]);
 
@@ -98,12 +92,12 @@ export async function UserInfo() {
 export async function get_file(filename: string): Promise<Response> {
     const headers = new Headers();
     headers.append("file-name", filename);
-    return await api_get_request(GETFILE_URL, RequestContentType.OCTET_STREAM, headers);
+    return await api_get_request(CONST.GETFILE_URL, RequestContentType.OCTET_STREAM, headers);
 }
 
 
 export async function upload_file_part(file:FormData): Promise<Response> {
-    return await api_post_formrequest(FILEPART, file, RequestContentType.FORM_DATA);
+    return await api_post_formrequest(CONST.FILEPART, file, RequestContentType.FORM_DATA);
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

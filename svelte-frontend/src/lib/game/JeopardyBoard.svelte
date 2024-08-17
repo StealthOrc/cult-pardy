@@ -13,8 +13,7 @@
 	import { JeopardyBoardStore } from '$lib/stores/JeopardyBoardStore';
 	import { inflate } from 'fflate';
 
-    export let lobbyId: string = "main";
-    
+    export let lobbyId: string = "main";	
 
     var cookies : SessionCookies;
     let wsStore: WebsocketStore
@@ -133,6 +132,7 @@
         })
         .with({ SessionDisconnected: P.select() }, (data) => {
             console.log("Disconnected Session: ", data, currentSessions);
+            CurrentSessionsStore.removeSessionById(data);
             SessionPingsStore.removeBySessionId(data);
             return true;
         })
