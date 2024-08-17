@@ -8,7 +8,7 @@ use actix::{Addr};
 use actix_web::{get, HttpResponse, web};
 use attohttpc::Method;
 use cult_common::wasm_lib::DiscordUser;
-use cult_common::{get_false, get_true, JsonPrinter, LOCATION, PROTOCOL};
+use cult_common::{get_false, get_true, JsonPrinter};
 use oauth2::basic::{BasicClient, BasicTokenResponse};
 use oauth2::{AuthorizationCode, AuthUrl, ClientId, ClientSecret, CsrfToken, RedirectUrl, Scope, TokenResponse, TokenUrl};
 use oauth2::reqwest::{async_http_client};
@@ -16,12 +16,13 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use strum::{Display};
 use cult_common::wasm_lib::ids::discord::DiscordID;
-use crate::apis::api::{get_session_or_create_new, get_session_or_create_new_session_request, get_token, remove_cookie, set_cookie, set_session_token_cookie};
-use crate::apis::data::{extract_value};
+
+use crate::apis::data::{extract_value, get_session_or_create_new_session_request, get_session_with_token_update_or_create_new, get_token, remove_cookie, set_session_token_cookie};
 use crate::authentication::discord::DiscordRedirectURL::{Grant, Login};
 use crate::services::authentication::{AddDiscordAccount, AuthenticationServer, CheckAdminAccess, DiscordAccountStatus, RedeemAdminAccessToken};
 use crate::services::db::MongoServer;
 use crate::services::game::{DiscordData, GameServer, UserSession};
+use crate::settings::{self, Settings};
 
 #[derive(Clone, Display,Debug)]
 enum DiscordRedirectURL{
@@ -40,17 +41,17 @@ pub struct GrantDiscordAuth {
 }
 
 impl LoginDiscordAuth {
-    pub fn init() -> Self {
+    pub fn init(settings:&Arc<Settings>) -> Self {
         LoginDiscordAuth{
-            client : Self::create_oauth_client(),
+            client : Self::create_oauth_client(settings),
         }
     }
 }
 
 impl GrantDiscordAuth {
-    pub fn init() -> Self {
+    pub fn init(settings:&Arc<Settings>) -> Self {
         GrantDiscordAuth{
-            client : Self::create_oauth_client(),
+            client : Self::create_oauth_client(settings),
         }
     }
 }
@@ -79,17 +80,17 @@ trait DiscordAuth{
     const AUTHORIZATION_URL: &'static str = "https://discord.com/api/oauth2/authorize";
     const TOKEN_URL: &'static str = "https://discord.com/api/oauth2/token";
 
-    fn create_oauth_client() -> BasicClient {
-
-        println!("CULT_PARDY_CLIENT_ID = {:?}", env::var("CULT_PARDY_CLIENT_ID"));
-        println!("CULT_PARDY_CLIENT_SECRET = {:?}", env::var("CULT_PARDY_CLIENT_SECRET"));
-
+    fn create_oauth_client(settings:&Arc<Settings>) -> BasicClient {
+        let location = settings.get_discord_auth_uri();
+        println!("Location: {:?}", location);
+        let url = format!("{}/{}",location,Self::REDIRECT_URL.to_string().to_lowercase());
+        println!("URL: {:?}", url);
         BasicClient::new(
-            ClientId::new(env::var("CULT_PARDY_CLIENT_ID").unwrap_or_else(|_| "NOT SET".to_string())),
-            Some(ClientSecret::new(env::var("CULT_PARDY_CLIENT_SECRET").unwrap_or_else(|_| "NOT SET".to_string()))),
+            ClientId::new(settings.discord_auth.client_id.clone()),
+            Some(ClientSecret::new(settings.discord_auth.client_secret.clone())),
             AuthUrl::new(Self::AUTHORIZATION_URL.to_owned()).expect("AuthUrl"),
             Some(TokenUrl::new(Self::TOKEN_URL.to_owned()).expect("TokenUrl"))
-        ).set_redirect_uri(RedirectUrl::new(format!("{}{}/{}",PROTOCOL,LOCATION,Self::REDIRECT_URL.to_string().to_lowercase())).expect("Invalid redirect URL"))
+        ).set_redirect_uri(RedirectUrl::new(url).expect("RedirectUrl"))
     }
 
 }
@@ -115,11 +116,12 @@ pub async fn discord_oauth(
     grant:web::Data<Arc<GrantDiscordAuth>>,
     login: web::Data<Arc<LoginDiscordAuth>>,
     db: web::Data<Arc<MongoServer>>,
+    settings: web::Data<Arc<Settings>>,
 ) -> anyhow::Result<HttpResponse, actix_web::Error> {
-    let user_session = get_session_or_create_new(&req, &db).await;
+    let user_session = get_session_with_token_update_or_create_new(&req, &db).await;
     if let Some(discord_data) = user_session.clone().discord_auth {
         if discord_data.discord_user.is_some() {
-            return to_main_page(&user_session)
+            return to_main_page(&user_session, &settings);
         }
     }
 
@@ -288,16 +290,17 @@ pub async fn login_only(
     code: web::Query<Code>,
     oauth_client: web::Data<Arc<LoginDiscordAuth>>,
     db: web::Data<Arc<MongoServer>>,
+    setings: web::Data<Arc<Settings>>,
 ) -> anyhow::Result<HttpResponse, actix_web::Error> {
 
-    let mut user_session = get_session_or_create_new(&req, &db).await;
-
+    let mut user_session = get_session_with_token_update_or_create_new(&req, &db).await;
+    let url = setings.backend_settings.get_host();
     let mut response = HttpResponse::Found()
-        .append_header(("Location", format!("{}{}",PROTOCOL,LOCATION)))
+        .append_header(("Location", format!("{}",url)))
         .finish();
     if let Some(discord_data) = user_session.clone().discord_auth {
         if discord_data.discord_user.is_some() {
-            return to_main_page(&user_session)
+            return to_main_page(&user_session, &setings);
         }
     }
     println!("Usersession_id: {:?}", &user_session.user_session_id);
@@ -324,10 +327,10 @@ fn to_response(mut response: HttpResponse,  user_session: &UserSession) -> anyho
     Ok(response)
 }
 
-pub fn to_main_page(user_session: &UserSession) -> anyhow::Result<HttpResponse, actix_web::Error> {
+pub fn to_main_page(user_session: &UserSession, setting:&Arc<Settings>) -> anyhow::Result<HttpResponse, actix_web::Error> {
     println!("TO MAIN PAGE");
     let mut response = HttpResponse::Found()
-        .append_header(("Location", format!("{}{}",PROTOCOL,LOCATION)))
+        .append_header(("Location", setting.backend_settings.get_host()))
         .finish();
     set_session_token_cookie(&mut response,  &user_session);
     Ok(response)
@@ -343,13 +346,14 @@ pub async fn grant_access(
     oauth_client: web::Data<Arc<GrantDiscordAuth>>,
     auth: web::Data<Addr<AuthenticationServer>>,
     db: web::Data<Arc<MongoServer>>,
+    settings: web::Data<Arc<Settings>>,
 ) -> anyhow::Result<HttpResponse, actix_web::Error> {
     let mut response = HttpResponse::NotFound().finish();
-    let mut user_session = get_session_or_create_new(&req, &db).await;
+    let mut user_session = get_session_with_token_update_or_create_new(&req, &db).await;
     let mut printer = JsonPrinter::new();
 
     let token = match get_token(&req){
-        None => return to_main_page(&user_session),
+        None => return to_main_page(&user_session, &settings),
         Some(token) => token
 
     };
@@ -357,7 +361,7 @@ pub async fn grant_access(
     printer.add("Has grant Token:", get_true());
 
     if is_admin(&user_session, &db).await {
-        return to_main_page(&user_session);
+        return to_main_page(&user_session, &settings);
     }
 
     if let Some(discord_data) = user_session.clone().discord_auth {

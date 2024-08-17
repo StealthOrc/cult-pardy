@@ -17,13 +17,10 @@ pub mod backend;
 pub mod wasm_lib;
 
 
-pub const WS_PROTOCOL: &'static str = "ws://";
-pub const PROTOCOL: &'static str = "http://";
-pub const LOCATION: &'static str = "0.0.0.0:8000";
-
 
 pub fn parse_addr_str(domain: &str, port: usize) -> SocketAddr {
     let addr = format!("{}:{}", domain, port);
+    println!("Parsed address: {}", addr);
     let addr = addr.parse::<SocketAddr>().expect("Failed to parse address");
     addr
 }

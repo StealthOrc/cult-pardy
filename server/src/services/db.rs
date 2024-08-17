@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::sync::Arc;
 use std::time::Duration;
 
 use bytes::{Bytes, BytesMut};
@@ -18,6 +19,7 @@ use cult_common::wasm_lib::ids::usersession::UserSessionId;
 use crate::data::FileData;
 use crate::services::db::DBDatabase::CultPardy;
 use crate::services::game::UserSession;
+use crate::settings::Settings;
 use crate::ws::session;
 
 use super::authentication::{self, Admin};
@@ -57,8 +59,9 @@ pub struct MongoServer {
 
 impl MongoServer {
 
-    pub async fn new() -> Self{
-        let url = std::env::var("MONGODB_URI").expect("Cant get MONGODB_URI");
+    pub async fn new(settings:&Arc<Settings>) -> Self{
+        let url = settings.database.get_uri();
+        println!("Connecting to MongoDB with URL: {}", url);
         let mongo_client = Client::with_uri_str(&url).await.expect("Can´t connect to Mongodb");
         mongo_client.database("admin").run_command(doc! {"ping": 1}).await.expect("Cant ping");
         println!("Pinged your deployment. You successfully connected to MongoDB!");
@@ -112,22 +115,28 @@ impl MongoServer {
 
     
 
-    pub async fn get_user_session_with_token(&self, user_session_id: &UserSessionId, session_token:&SessionToken) -> UserSession {
-        println!("Getting UserSession with token check");
-        let result = self.collections.user_sessions.find_one(doc! {"user_session_id.id": &user_session_id.id, "session_token.token": &session_token.token}).await;
-        let optional_session = match result {
+    pub async fn get_user_session_with_id(&self, user_session_id: &UserSessionId, session_token:&SessionToken) -> Option<UserSession> {
+        let result = self.collections.user_sessions.find_one(doc! {"user_session_id.id": &user_session_id.id}).await;
+        match result {
             Err(_) => {
                 println!("Something went wrong");
-                return self.new_user_session().await;
+                return None;
             }
-            Ok(data) => data,
-        };
-        return match optional_session {
-            None => {
-                self.new_user_session().await
-            }
-            Some(session) => session
-        };
+            Ok(data) => {
+                if let Some(session) = data {
+                    if session.session_token.token.eq(&session_token.token) {
+                        //TOKEN CHECK
+                        return Some(self.check_token(session, &session_token).await)
+                    } else {
+                        println!("Token is not the same");
+                        return None;
+                    }
+                } else {
+                    println!("No UserSession found");
+                    return None;
+                }
+            },
+        }
     }
 
 
@@ -138,6 +147,7 @@ impl MongoServer {
 
 
     pub async fn get_user_session_with_token_check(&self, user_session_id: &UserSessionId, session_token:&SessionToken) -> UserSession {
+        println!("Checking UserSession with Token {:?} {:?}", user_session_id, session_token);
         let result = self.collections.user_sessions.find_one(doc! {"user_session_id.id": &user_session_id.id, "session_token.token": &session_token.token}).await;
         let optional_session = match result {
             Err(_) => {
@@ -147,7 +157,10 @@ impl MongoServer {
             Ok(data) => data,
         };
         return match optional_session {
-            None => return self.new_user_session().await,
+            None =>  {
+                println!("No UserSession found");
+                return self.new_user_session().await;
+            },
             Some(session) => self.check_token(session, &session_token).await
         
         };
@@ -170,7 +183,6 @@ impl MongoServer {
                     return self.new_user_session().await;
                 }
             }
-            println!("Token is the same");
             return db_user_session.clone()
         } else{
             print!("Token is not the same");

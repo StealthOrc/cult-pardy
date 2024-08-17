@@ -2,18 +2,19 @@
 use actix::{ActorStreamExt, Addr};
 use actix_files::NamedFile;
 use actix_web::{get, web, HttpRequest, HttpResponse};
-use cult_common::{LOCATION, PROTOCOL};
 use std::env;
 use std::path::PathBuf;
 use std::sync::Arc;
 use cult_common::wasm_lib::ids::lobby::LobbyId;
-use crate::apis::api::{ get_session_or_create_new, get_session_with_token_update_or_create_new, remove_cookie, session_error, set_cookie, set_session_token_cookie};
+use crate::apis::api::session_error;
+use crate::apis::data::{get_session_with_token_update_or_create_new, remove_cookie, set_cookie, set_session_token_cookie};
 use crate::authentication::discord::{is_admin, to_main_page};
 use crate::services::authentication::{AuthenticationServer, CheckAdminAccessToken};
 use crate::services::db::MongoServer;
 use crate::services::lobby::CanJoinLobby;
 use crate::services::{game};
 use crate::services::game::{GameServer};
+use crate::settings;
 
 
 pub fn index_response(req: &HttpRequest) -> HttpResponse{
@@ -45,8 +46,9 @@ async fn find_game(
     lobby_id: web::Path<String>,
     srv: web::Data<Addr<GameServer>>,
     db : web::Data<Arc<MongoServer>>,
+    settings: web::Data<Arc<settings::Settings>>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    let user_session = get_session_or_create_new(&req, &db).await;
+    let user_session = get_session_with_token_update_or_create_new(&req, &db).await;
 
     let id = lobby_id.to_string(); 
     let lobby_id = LobbyId::of(id);
@@ -64,7 +66,7 @@ async fn find_game(
    
     println!("HasLobby?{}", can_join);
     if !can_join {
-        return to_main_page(&user_session)
+        return to_main_page(&user_session, &settings)
     }
     let mut response = index_response(&req);
     set_session_token_cookie(&mut response, &user_session);
@@ -80,29 +82,30 @@ async fn grant_admin_access(
     grand_id: web::Path<usize>,
     auth: web::Data<Addr<AuthenticationServer>>,
     db : web::Data<Arc<MongoServer>>,
+    settings: web::Data<Arc<settings::Settings>>,
 ) -> Result<HttpResponse, actix_web::Error> {
-
-    let user_session = get_session_or_create_new(&req, &db).await;
+    let url = settings.backend_settings.get_host();
+    let user_session = get_session_with_token_update_or_create_new(&req, &db).await;
     let mut response = HttpResponse::Found()
-        .append_header(("Location", format!("{}{}/discord?type=grant",  PROTOCOL,LOCATION)))
+        .append_header(("Location", format!("{}/discord?type=grant", url)))
         .finish();
 
     if is_admin(&user_session,&db).await {
-        return to_main_page(&user_session,);
+        return to_main_page(&user_session,&settings);
     }
 
     match auth.send(CheckAdminAccessToken{ token: grand_id.clone()}).await {
         Ok(valid) => {
             if !valid {
-                return to_main_page(&user_session)
+                return to_main_page(&user_session, &settings)
             }
         }
-        Err(_) =>  return to_main_page(&user_session)
+        Err(_) =>  return to_main_page(&user_session, &settings)
     }
 
     if let Some(discord_data) = user_session.clone().discord_auth {
         if discord_data.discord_user.is_some() {
-            response = HttpResponse::Found().append_header(("Location", format!("{}{}/grant", PROTOCOL, LOCATION))).finish();
+            response = HttpResponse::Found().append_header(("Location", format!("{}/grant", url))).finish();
         }
     }
 
@@ -126,7 +129,6 @@ async fn index(
 #[get("/assets/{filename:.*}")]
 async fn assets(
     req: HttpRequest,
-    srv: web::Data<Addr<GameServer>>,
 ) -> actix_web::Result<HttpResponse> {
     let path: PathBuf = req
         .match_info()

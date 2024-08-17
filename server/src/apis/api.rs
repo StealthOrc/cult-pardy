@@ -34,7 +34,7 @@ use serde_json::json;
 use cult_common::backend::JeopardyBoard;
 use cult_common::wasm_lib::ids::lobby::LobbyId;
 use cult_common::wasm_lib::ids::usersession::UserSessionId;
-use crate::apis::data::{extract_header_string, extract_value, get_internal_server_error_json, get_lobby_id_from_header};
+use crate::apis::data::{extract_header_string, extract_value, get_internal_server_error_json, get_lobby_id_from_header, get_session, get_session_with_token_update_or_create_new, set_session_token_cookie};
 use crate::authentication::discord::is_admin;
 use crate::services::authentication::AuthenticationServer;
 use crate::services::{db, game};
@@ -73,7 +73,10 @@ struct UserSessionWithAdmin{
 
 #[get("/api/session")]
 async fn api_session_request(req: HttpRequest ,db:web::Data<Arc<MongoServer>> ) -> Result<HttpResponse, actix_web::Error> {
-    let user_session = get_session_or_create_new(&req, &db).await;
+    let user_session = match get_session(&req, &db).await {
+        Some(data) => data,
+        None => return Ok(HttpResponse::InternalServerError().json("No User Session")),
+    };
     let is_admin = is_admin(&user_session, &db).await;
     let mut response = HttpResponse::from(HttpResponse::Ok().json(UserSessionWithAdmin{user_session:user_session.clone(), is_admin}));
     set_session_token_cookie(&mut response,  &user_session);
@@ -88,7 +91,10 @@ async fn api_session_request(req: HttpRequest ,db:web::Data<Arc<MongoServer>> ) 
 
 #[post("/api/upload/filepart")]
 async fn upload_file_part(req: HttpRequest,db: web::Data<Arc<MongoServer>>,mut payload: Multipart) -> Result<HttpResponse, actix_web::Error> {
-    let user_session = get_session_or_create_new(&req, &db).await;
+    let user_session = match get_session(&req, &db).await {
+        Some(data) => data,
+        None => return Ok(HttpResponse::InternalServerError().json("No User Session")),
+    };
     if is_admin(&user_session, &db).await == false {
         return Ok(file_part_error(None, "No Admin").await)
     } 
@@ -262,7 +268,7 @@ pub fn session_error(req: &HttpRequest, user_session:&UserSession, str:&str) -> 
 #[get("/api/session-data")]
 async fn session_data_request(req: HttpRequest, db: web::Data<Arc<MongoServer>>) -> Result<HttpResponse, actix_web::Error> {
     println!("SESSION DATA REQUEST");
-    let user_session = get_session_or_create_new(&req, &db).await;
+    let user_session = get_session_with_token_update_or_create_new(&req, &db).await;
     let sessionrequest : SessionRequest = SessionRequest{
      user_session_id: user_session.user_session_id.clone(), 
      session_token: user_session.session_token.clone() 
@@ -276,134 +282,15 @@ async fn session_data_request(req: HttpRequest, db: web::Data<Arc<MongoServer>>)
 
 
 
-pub async fn get_session_with_token_update_or_create_new(req: &HttpRequest, db: &web::Data<Arc<MongoServer>>) -> UserSession {
-    let user_session_id = match get_user_id_from_value(&req).or(get_user_id_from_cookie(&req)) {
-        Some(data) => data,
-        None =>  {
-            println!("User-session-id cookie not found");
-            return db.new_user_session().await
-        }
-    };
-    let session_token = match get_session_token_from_value(&req).or(get_session_token_from_cookie(&req)) {
-        Some(data) => data,
-        None =>  {
-            println!("Session-cookie not found");
-            return db.new_user_session().await
-        }
-    };
-    db.get_user_session_with_token_check(&user_session_id, &session_token).await
-}
-
-
-pub async fn get_session_or_create_new_session_request(session_request:&SessionRequest, db: &web::Data<Arc<MongoServer>>) -> UserSession {
-    db.get_user_session_with_token(&session_request.user_session_id, &session_request.session_token).await
-
-}
-
-
-
-pub async fn get_session_or_create_new(req: &HttpRequest, db: &web::Data<Arc<MongoServer>>) -> UserSession {
-    let user_session_id = match get_user_id_from_value(&req).or(get_user_id_from_cookie(&req)) {
-        Some(data) => data,
-        None => {
-            println!("User-session-id cookie not found");
-            return db.new_user_session().await
-        }
-    };
-    let session_token = match get_session_token_from_value(&req).or(get_session_token_from_cookie(&req)) {
-        Some(data) => data,
-        None => {
-            println!("Session-cookie not found");
-            return db.new_user_session().await
-        }
-    };
-    db.get_user_session_with_token(&user_session_id, &session_token).await
-
-}
-
-
-
-pub async fn find_session(req: &HttpRequest, db: &web::Data<Arc<MongoServer>>) -> Option<UserSession> {
-    let user_session_id = match get_user_id_from_value(&req).or(get_user_id_from_cookie(&req)) {
-        Some(data) => data,
-        None => {
-            println!("User-session-id cookie not found");
-            return None
-        }
-    };
-    let session_token = match get_session_token_from_value(&req).or(get_session_token_from_cookie(&req)) {
-        Some(data) => data,
-        None => {
-            println!("Session-cookie not found");
-            return None
-        }
-    };
-    
-    let user = match db.find_user_session(&user_session_id).await {
-        Some(data) => data,
-        None => {
-            println!("User-session not found");
-            return None
-        }
-    };
-    if user.session_token.token.eq(&session_token.token) {
-        return Some(user);
-    }
-    None
-
-}
-
-
-pub fn get_token(req: &HttpRequest) -> Option<usize> {
-    let cookie = match req.cookie("token") {
-        None => return None,
-        Some(cookie) => cookie,
-    };
-    match cookie.value().parse::<usize>() {
-        Err(_) => None,
-        Ok(id) => Some(id),
-    }
-}
-
-
-
-
-
-pub fn set_cookie(res: &mut HttpResponse, cookie_name: &str, value: &String){
-    let cookie = format!("{}={}", cookie_name, value);
-    res.headers_mut().append(COOKIE, HeaderValue::from_str(&cookie).unwrap());
-    let _cookie = Cookie::build(cookie_name, value)
-        .path("/")
-        .permanent()
-        .secure(true)
-        .finish();
-    res.add_cookie(&_cookie).expect("Can´t add cookies to the Response");
-}
-
-
-pub fn set_session_token_cookie(response: &mut HttpResponse, user_session: &UserSession){
-    set_cookie(response, "user-session-id", &user_session.user_session_id.id.to_string());
-    set_cookie(response, "session-token", &user_session.session_token.token);
-}
-
-
-
-
-
-
-pub fn remove_cookie(res: &mut HttpResponse, req: &HttpRequest, cookie_name: &str){
-    if let Some(cookie)= req.cookie(cookie_name) {
-        res.add_removal_cookie(&cookie).expect("Can´t add cookies to the Response")
-    }
-}
-
-
 
 
 
 #[get("/api/authorization")]
 async fn has_authorization(req: HttpRequest, db: web::Data<Arc<MongoServer>>) -> HttpResponse {
-    let user_session = get_session_or_create_new(&req, &db).await;
+    let user_session = match get_session(&req, &db).await {
+        Some(data) => data,
+        None => return HttpResponse::InternalServerError().json("No User Session"),
+    };
     let admin = is_admin(&user_session, &db).await;
     let mut response = HttpResponse::from(HttpResponse::Ok().json(ApiResponse::new(admin)));
     set_session_token_cookie(&mut response, &user_session);
@@ -412,7 +299,10 @@ async fn has_authorization(req: HttpRequest, db: web::Data<Arc<MongoServer>>) ->
 
 #[get("/api/discord_session")]
 async fn discord_session(req: HttpRequest, db: web::Data<Arc<MongoServer>>) -> HttpResponse {
-    let user_session = get_session_or_create_new(&req, &db).await;
+    let user_session = match get_session(&req, &db).await {
+        Some(data) => data,
+        None => return HttpResponse::InternalServerError().json("No User Session"),
+    };
     let discord_user = match user_session.clone().discord_auth{
         None => None,
         Some(data) => data.discord_user,
@@ -424,7 +314,10 @@ async fn discord_session(req: HttpRequest, db: web::Data<Arc<MongoServer>>) -> H
 
 #[post("/api/create")]
 async fn create_game_lobby(req: HttpRequest,json: web::Json<Option<JeopardyBoard>>, srv: web::Data<Addr<game::GameServer>>, db: web::Data<Arc<MongoServer>>) -> HttpResponse {
-    let user_session = get_session_or_create_new(&req, &db).await;
+    let user_session = match get_session(&req, &db).await {
+        Some(data) => data,
+        None => return HttpResponse::InternalServerError().json("No User Session"),
+    };
     let mut response =   HttpResponse::from(HttpResponse::NotFound());
     if is_admin(&user_session, &db).await{
         if let Some(discord_data) = user_session.clone().discord_auth {
@@ -446,9 +339,10 @@ async fn join_game(req: HttpRequest, srv: web::Data<Addr<game::GameServer>>, db:
         Some(data) => data,
         None => return Ok(get_internal_server_error_json(json!({"Error": "No Lobby ID Found"}))),
     };
-    let user_session = get_session_or_create_new(&req, &db).await;
-
-
+    let user_session = match get_session(&req, &db).await {
+        Some(data) => data,
+        None => return Ok(HttpResponse::InternalServerError().json("No User Session")),
+    };
     let lobby_adrr = match srv.send(game::LobbyAddrRequest{lobby_id:lobby_id.clone()}).await.expect("No Lobby found!") {
         Some(data) => data,
         None => return Ok(session_error(&req, &user_session, "No Lobby Found")),
@@ -467,76 +361,4 @@ async fn join_game(req: HttpRequest, srv: web::Data<Addr<game::GameServer>>, db:
 async fn board() -> HttpResponse {
     let response = HttpResponse::from(HttpResponse::Ok().json(JeopardyBoard::default(JeopardyMode::NORMAL)));
     response
-}
-
-
-pub fn get_user_id_from_cookie(req: &HttpRequest) -> Option<UserSessionId> {
-    if let Some(cookie) = req.cookie("user-session-id"){
-        if let Ok(id) =  cookie.value().parse::<usize>(){
-            return Some(UserSessionId::of(id));
-        }
-    }
-    None
-}
-
-pub fn get_session_token_from_cookie(req: &HttpRequest) -> Option<SessionToken> {
-    if let Some(cookie) = req.cookie("session-token"){
-        return Some(SessionToken {
-            token:cookie.value().to_string(),
-            expire: Local::now(),
-        })
-    };
-    None
-}
-
-pub fn get_user_id_from_value(req: &HttpRequest) -> Option<UserSessionId> {
-    if let Ok(cookie) = extract_value(&req,"user-session-id"){
-        if let Ok(id) =  cookie.parse::<usize>(){
-            return Some(UserSessionId::of(id));
-        }
-    }
-    None
-}
-
-pub fn get_session_token_from_value(req: &HttpRequest) -> Option<SessionToken> {
-    if let Ok(cookie) = extract_value(&req,"session-token"){
-        return Some(SessionToken {
-            token:cookie,
-            expire: Local::now(),
-        })
-    };
-    None
-}
-
-
-pub fn get_lobby_id_from_value(req: &HttpRequest) -> Option<LobbyId> {
-    if let Ok(cookie) = extract_value(&req,"lobby-id"){
-        return Some(LobbyId::of(cookie));
-    }
-    None
-}
-
-
-
-pub fn get_file_name_from_value(req: &HttpRequest) -> Option<String> {
-    if let Ok(cookie) = extract_value(&req,"file-name"){
-        return Some(cookie);
-    };
-    None
-}
-
-pub fn get_file_index_from_value(req: &HttpRequest) -> Option<usize> {
-    if let Ok(cookie) = extract_value(&req,"file-index"){
-        if let Ok(id) =  cookie.parse::<usize>(){
-            return Some(id);
-        }
-    }
-    None
-}
-
-pub fn get_validate_hash_from_value(req: &HttpRequest) -> Option<ValidateHash> {
-    if let Ok(cookie) = extract_value(&req,"validate-hash"){
-        return Some(ValidateHash::new(cookie));
-    }
-    None
 }

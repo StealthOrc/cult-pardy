@@ -11,6 +11,7 @@ use crate::authentication::discord::{GrantDiscordAuth, LoginDiscordAuth};
 use crate::services::authentication::AuthenticationServer;
 use crate::services::db::MongoServer;
 use crate::services::game::GameServer;
+use crate::settings::Settings;
 
 pub(crate) mod game;
 pub(crate) mod input;
@@ -38,15 +39,15 @@ pub(crate) struct Services {
 
 
 impl Services {
-    pub async fn init() -> Self {
+    pub async fn init(settings:&Arc<Settings>) -> Self {
 
-        let mongo_server = Arc::new(MongoServer::new().await);
-        let login_client = Arc::new(LoginDiscordAuth::init());
+        let mongo_server = Arc::new(MongoServer::new(settings).await);
+        let login_client = Arc::new(LoginDiscordAuth::init(settings));
         
         let auth_server = AuthenticationServer::new(mongo_server.clone()).start();
 
 
-        let discord_auth =  Arc::new(GrantDiscordAuth::init());
+        let discord_auth =  Arc::new(GrantDiscordAuth::init(settings));
 
         let services =  Arc::new(StartingServices {
             authentication_server: auth_server.clone(),

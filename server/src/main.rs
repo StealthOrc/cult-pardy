@@ -4,6 +4,7 @@ mod ws;
 mod authentication;
 mod services;
 mod data;
+mod settings;
 
 
 use std::io::{self, Read};
@@ -19,8 +20,8 @@ use actix_web::{get, post, web, App, HttpRequest, HttpResponse, HttpServer, Resp
 use actix_ws::Message;
 use anyhow::Result;
 
-use apis::api::{ get_session_or_create_new, session_data_request, set_session_token_cookie, upload_file_part};
-use apis::data::extract_header_string;
+use apis::api::{session_data_request, upload_file_part};
+use apis::data::{extract_header_string, get_session, get_session_with_token_update_or_create_new, set_session_token_cookie};
 use authentication::discord::is_admin;
 use bson::{binary, doc};
 use bytes::{Bytes, BytesMut};
@@ -30,6 +31,7 @@ use futures::{AsyncReadExt, StreamExt};
 use services::authentication::AuthenticationServer;
 use services::db::{self, MongoServer};
 use services::game::GameServer;
+use settings::Settings;
 use tokio::runtime::Runtime;
 use cult_common::*;
 use cult_common::backend::JeopardyBoard;
@@ -45,24 +47,27 @@ use crate::ws::gamewebsocket;
 
 
 
+
 #[actix_web::main]
 async fn main() -> Result<()> {
+    let settings = Arc::new(Settings::new().expect("Failed to load configuration"));
+    
 
-    let addr = "0.0.0.0";
-    let port = 8000;
+    let addr = settings.backend_settings.host.as_str();
+    let port = settings.backend_settings.port;
     let addr = parse_addr_str(addr, port);
 
-    let services = Services::init().await;
+    let services = Services::init(&settings).await;
 
-    std::env::set_var("RUST_LOG", "debug");
-    //env_logger::init();
-
+    //std::env::set_var("RUST_LOG", "debug");
 
     let input_server =  InputServer::init(services.authentication_server.clone());
     let rt = Runtime::new().expect("Somethings wrong with the Runtime");
+
     rt.spawn(input_server.read_input());
     println!("Workers available: {}", num_cpus::get());
     println!("Starting HTTP server at {}", addr); 
+
     let server = 
     HttpServer::new(move || {
         App::new()
@@ -71,6 +76,7 @@ async fn main() -> Result<()> {
             .app_data(web::Data::new(services.login_client.clone()))
             .app_data(web::Data::new(services.game_server.clone()))
             .app_data(web::Data::new(services.authentication_server.clone()))
+            .app_data(web::Data::new(settings.clone()))
             .app_data(
                 web::JsonConfig::default()
                     .limit(104857600) // Increase JSON JsonConfig limit (100MB)
@@ -112,14 +118,16 @@ async fn main() -> Result<()> {
     .bind(addr)?
     .workers(num_cpus::get()/2)
     .run();
+
     server.await?;
     rt.shutdown_background();
     Ok(())
 }
 
-async fn not_found() -> std::result::Result<HttpResponse, actix_web::Error> {
+async fn not_found(settings:web::Data<Arc<Settings>>) -> std::result::Result<HttpResponse, actix_web::Error> {
+    let url = format!("{}", settings.backend_settings.get_host());
     let response = HttpResponse::PermanentRedirect()
-        .append_header(("Location", format!("{}{}",PROTOCOL,LOCATION)))
+        .append_header(("Location", url))
         .finish();
     Ok(response)
 }
@@ -138,7 +146,10 @@ pub struct CFile {
 
 #[get("/api/file")]
 async fn get_file_from_name(req: HttpRequest,  db: web::Data<Arc<MongoServer>>) -> Result<HttpResponse, actix_web::Error> {
-    let user_session = get_session_or_create_new(&req, &db).await;
+    let user_session = match get_session(&req, &db).await {
+        Some(data) => data,
+        None => return Ok(HttpResponse::Unauthorized().json("You are not authorized to access this file")),
+    };
 
     let file_name = match extract_header_string(&req, "file-name") {
         Ok(data) => data,
