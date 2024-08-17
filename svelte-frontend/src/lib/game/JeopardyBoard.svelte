@@ -132,6 +132,7 @@
         })
         .with({ SessionDisconnected: P.select() }, (data) => {
             console.log("Disconnected Session: ", data, currentSessions);
+            CurrentSessionsStore.removeSessionById(data);
             SessionPingsStore.removeBySessionId(data);
             return true;
         })
