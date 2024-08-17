@@ -25,21 +25,26 @@ const config = {
 		
 		paths: {
 			//TODO PRODUTION IP NEED TO BE SET, Currently local Test IP set
-			assets: getAssetPath(),
+			assets:  getAssetPath(),
 		}
 	}
 };
 
 
-function getAssetPath()  {
-	let file = fs.readFileSync('../Settings.toml', 'utf-8');
-	let uri = 'http://localhost:8000/assets';
-	const settings = parseToml(file);
-	if (settings && settings.frontend_settings && settings.frontend_settings.host && settings.frontend_settings.port && settings.frontend_settings.ssl) {
-		let ssl = settings.frontend_settings.ssl ? 'https://' : 'http://';
-		uri = ssl + settings.frontend_settings.host + ':' + settings.frontend_settings.port + '/assets';
+function getAssetPath()  { 
+	try {
+		let file = fs.readFileSync('../Settings.toml', 'utf-8');
+		let uri = 'http://localhost:8000/assets';
+		const settings = parseToml(file);
+		if (settings && settings.frontend_settings && settings.frontend_settings.host && settings.frontend_settings.port && settings.frontend_settings.ssl) {
+			let ssl = settings.frontend_settings.ssl ? 'https://' : 'http://';
+			uri = ssl + settings.frontend_settings.host + ':' + settings.frontend_settings.port + '/assets';
+		}
+		return uri;
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
+	} catch (err ) {
+		return 'http://localhost:8000/assets';
 	}
-	return uri;
 }
 
 export default config;

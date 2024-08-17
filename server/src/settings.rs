@@ -84,7 +84,12 @@ pub struct Settings {
 
 impl Settings {
     pub  fn new() -> Result<Self, ConfigError> {
-        let source_file = File::with_name("../Settings");
+        //Use root directory as the base path that works in linux and windows
+        let root = std::env::current_dir().expect("Failed to get current directory");
+        let root = root.to_str().expect("Failed to convert path to string");
+        let root = root.split("\\").collect::<Vec<&str>>().join("/");
+        let root = format!("{}/", root);
+        let source_file = File::with_name(&format!("{}Settings", root));
         let s = Config::builder().add_source(source_file).build() .expect("Failed to load configuration");
         s.try_deserialize()
     }
