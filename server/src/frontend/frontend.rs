@@ -58,7 +58,7 @@ async fn find_game(
 
     let lobby_addr = match srv.send(game::LobbyAddrRequest{lobby_id:lobby_id.clone()}).await.expect("No Lobby found!") {
         Some(data) => data,
-        None => return Ok(session_error(&req, &user_session, "No Lobby Found")),
+        None => return Ok(session_error(&user_session, "No Lobby Found")),
     };
 
     let can_join = lobby_addr.send(CanJoinLobby { user_session_id: user_session.user_session_id.clone()}).await.expect("No Lobby found!");

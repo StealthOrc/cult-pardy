@@ -1,7 +1,6 @@
 #![feature(const_trait_impl)]
 #![feature(const_trait_impl)]
 use std::borrow::ToOwned;
-use std::env;
 use std::str::FromStr;
 use std::sync::Arc;
 use actix::{Addr};
@@ -19,10 +18,10 @@ use cult_common::wasm_lib::ids::discord::DiscordID;
 
 use crate::apis::data::{extract_value, get_session_or_create_new_session_request, get_session_with_token_update_or_create_new, get_token, remove_cookie, set_session_token_cookie};
 use crate::authentication::discord::DiscordRedirectURL::{Grant, Login};
-use crate::services::authentication::{AddDiscordAccount, AuthenticationServer, CheckAdminAccess, DiscordAccountStatus, RedeemAdminAccessToken};
+use crate::services::authentication::{AddDiscordAccount, AuthenticationServer, DiscordAccountStatus, RedeemAdminAccessToken};
 use crate::services::db::MongoServer;
-use crate::services::game::{DiscordData, GameServer, UserSession};
-use crate::settings::{self, Settings};
+use crate::services::game::{DiscordData, UserSession};
+use crate::settings::{Settings};
 
 #[derive(Clone, Display,Debug)]
 enum DiscordRedirectURL{

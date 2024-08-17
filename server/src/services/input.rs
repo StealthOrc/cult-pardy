@@ -2,7 +2,6 @@
 
 use std::process;
 use std::str::{FromStr};
-use std::sync::Arc;
 use actix::{Actor, Addr};
 use tokio::{io};
 use tokio::io::{AsyncBufReadExt};

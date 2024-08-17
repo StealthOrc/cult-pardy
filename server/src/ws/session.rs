@@ -1,21 +1,18 @@
-use std::sync::Arc;
 use std::time::{Duration, Instant};
-use std::vec;
 
 use actix::prelude::*;
 use cult_common::{compress, decompress};
 use serde::{Deserialize, Serialize};
 
-use crate::services::game::{self, GameServer};
-use crate::services::lobby::{AddLobbySessionScore, ClientMessage, Lobby, LobbyBackClick, LobbyClick, ReciveVideoEvent, UpdateWebsocketPing, WebsocketConnect, WebsocketDisconnect};
+use crate::services::game::{self};
+use crate::services::lobby::{AddLobbySessionScore, Lobby, LobbyBackClick, LobbyClick, ReciveVideoEvent, UpdateWebsocketPing, WebsocketConnect, WebsocketDisconnect};
 use actix_web::web;
 use actix_web_actors::ws;
-use actix_web_actors::ws::WebsocketContext;
-use chrono::{DateTime, Local, TimeDelta};
+use chrono::{DateTime, Local};
 use cult_common::wasm_lib::ids::lobby::LobbyId;
 use cult_common::wasm_lib::ids::usersession::UserSessionId;
 use cult_common::wasm_lib::ids::websocketsession::WebsocketSessionId;
-use cult_common::wasm_lib::websocket_events::{SessionEvent, WebsocketServerEvents, WebsocketSessionEvent};
+use cult_common::wasm_lib::websocket_events::{WebsocketServerEvents, WebsocketSessionEvent};
 
 /// How often heartbeat pings are sent
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
@@ -187,7 +184,6 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
             Ok(msg) => msg,
         };
 
-        log::debug!("WEBSOCKET MESSAGE: {msg:?}");
         match msg {
             ws::Message::Ping(msg) => {
                 self.hb = Instant::now();
@@ -206,7 +202,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                 self.hb = Instant::now();
             }
             ws::Message::Text(text) => {
-                let text = text.trim();
+                let _ = text.trim();
                 //send_chat_message(self, text)
             }
             ws::Message::Binary(data) => {

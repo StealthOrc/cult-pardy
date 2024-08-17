@@ -2,35 +2,20 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
 
-use bytes::{Bytes, BytesMut};
 use cult_common::dto::file::FileChunk;
-use cult_common::wasm_lib::hashs::validate::ValidateHash;
 use cult_common::wasm_lib::ids::discord::DiscordID;
-use futures::{AsyncWriteExt, StreamExt};
-use mongodb::action::gridfs::OpenUploadStream;
-use mongodb::bson::{doc, to_bson};
+use futures::StreamExt;
+use mongodb::bson::doc;
 use mongodb::gridfs::GridFsBucket;
-use mongodb::options::{ClientOptions, GridFsBucketOptions, ServerApi, ServerApiVersion, WriteConcern};
+use mongodb::options::{GridFsBucketOptions, WriteConcern};
 use mongodb::{Client, Collection, IndexModel};
-use ritelinked::LinkedHashSet;
-use serde::{Deserialize, Serialize};
-use strum::{Display, EnumIter};
 use cult_common::wasm_lib::ids::usersession::UserSessionId;
 use crate::data::FileData;
-use crate::services::db::DBDatabase::CultPardy;
 use crate::services::game::UserSession;
 use crate::settings::Settings;
-use crate::ws::session;
 
-use super::authentication::{self, Admin};
+use super::authentication::Admin;
 use super::game::{DiscordData, SessionToken};
-
-#[derive(Clone,Display, Debug, Default)]
-pub enum DBDatabase{
-    CultPardy(UserCollection),
-    #[default]
-    None,
-}
 
 
 #[derive(Clone, Debug)]

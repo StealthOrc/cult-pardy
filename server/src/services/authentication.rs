@@ -3,7 +3,6 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
 use actix::{Actor, Addr, Context, Handler, Message, MessageResult, ResponseActFuture, WrapFuture};
-use anyhow::Ok;
 use cult_common::wasm_lib::ids::usersession::UserSessionId;
 use mongodb::bson::doc;
 use rand::random;
@@ -14,7 +13,6 @@ use strum::{Display, EnumIter};
 use crate::data::SessionRequest;
 
 use super::{db::MongoServer, game::DiscordData};
-use anyhow::Result;
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Hash, Clone)]
 pub struct Admin{
@@ -307,45 +305,3 @@ impl Handler<AddDiscordAccount> for AuthenticationServer {
 
 
 
-
-#[derive(Message)]
-#[rtype(result = "Result<DiscordAccountStatus, anyhow::Error>")]
-struct Msg{
-    pub u :usize
-}
-
-struct MyActor{
-    pub u:usize
-}
-
-impl MyActor {
-    pub fn new(u:usize) -> Self {
-        MyActor {
-            u
-        }
-    }
-    
-}
-
-impl Actor for MyActor {
-    type Context = Context<Self>;
-}
-
-impl Handler<Msg> for MyActor {
-    type Result = ResponseActFuture<Self, Result<DiscordAccountStatus, anyhow::Error>>;
-
-    fn handle(&mut self, _: Msg, _: &mut Context<Self>) -> Self::Result {
-        let u = self.u;
-        Box::pin(
-            async move {
-                let status : DiscordAccountStatus = DiscordAccountStatus::Added;
-
-                println!("Hello World {}", u);
-                // Some async computation
-                Ok(status)
-            }
-            .into_actor(self) // converts future to ActorFuture
-        )
-        
-    }
-}

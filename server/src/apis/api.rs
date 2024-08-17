@@ -1,46 +1,29 @@
-use std::any;
-use std::hash::Hash;
-use std::str::FromStr;
 use std::sync::Arc;
-use std::thread::sleep;
 use crate::data::{SessionRequest};
-use crate::main;
-use crate::services::db::{DBDatabase, MongoServer};
-use crate::services::game::{CreateLobby, FileMetadata, SessionToken};
+use crate::services::db::MongoServer;
+use crate::services::game::{CreateLobby, FileMetadata};
 use crate::services::lobby::CanJoinLobby;
 use actix::Addr;
 
-use actix_multipart::form::MultipartForm;
 use actix_multipart::Multipart;
-use actix_web::body::MessageBody;
-use actix_web::cookie::Cookie;
 use actix_web::{get, HttpRequest, HttpResponse, post, web};
-use attohttpc::body::File;
-use bson::{bson, Bson};
-use bytes::Bytes;
+use bson::Bson;
 use chrono::Local;
 use cult_common::dto::api::{ApiResponse};
-use cult_common::dto::file::{self, FileMultiPart};
+use cult_common::dto::file::{FileMultiPart};
 use cult_common::wasm_lib::hashs::validate::ValidateHash;
-use cult_common::wasm_lib::ids::discord::DiscordID;
 use cult_common::wasm_lib::JeopardyMode;
-use futures::{AsyncWriteExt, Stream, StreamExt};
-use mongodb::change_stream::session;
+use futures::{AsyncWriteExt, StreamExt};
 use mongodb::gridfs::GridFsUploadStream;
-use oauth2::http::header::COOKIE;
-use oauth2::http::{response, HeaderValue};
 use serde::Serialize;
 use serde_json::json;
 use cult_common::backend::JeopardyBoard;
 use cult_common::wasm_lib::ids::lobby::LobbyId;
-use cult_common::wasm_lib::ids::usersession::UserSessionId;
 use crate::apis::data::{extract_header_string, extract_value, get_internal_server_error_json, get_lobby_id_from_header, get_session, get_session_with_token_update_or_create_new, set_session_token_cookie};
 use crate::authentication::discord::is_admin;
-use crate::services::authentication::AuthenticationServer;
-use crate::services::{db, game};
+use crate::services::game;
 use crate::services::game::UserSession;
 
-use super::data;
 
 
 #[get("/api/info")]
@@ -255,7 +238,7 @@ pub async fn file_part_error(stream: Option<GridFsUploadStream>,error:&str) -> H
 }
 
 
-pub fn session_error(req: &HttpRequest, user_session:&UserSession, str:&str) -> HttpResponse {
+pub fn session_error(user_session:&UserSession, str:&str) -> HttpResponse {
     let mut response = HttpResponse::InternalServerError().json(json!({
         "Error": str
     }));
@@ -345,7 +328,7 @@ async fn join_game(req: HttpRequest, srv: web::Data<Addr<game::GameServer>>, db:
     };
     let lobby_adrr = match srv.send(game::LobbyAddrRequest{lobby_id:lobby_id.clone()}).await.expect("No Lobby found!") {
         Some(data) => data,
-        None => return Ok(session_error(&req, &user_session, "No Lobby Found")),
+        None => return Ok(session_error(&user_session, "No Lobby Found")),
     };
 
 

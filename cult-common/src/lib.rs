@@ -1,11 +1,8 @@
 use flate2::read::DeflateDecoder;
 use flate2::write::DeflateEncoder;
 use serde::{Deserialize, Serialize};
-use wasm_bindgen::prelude::wasm_bindgen;
-use wasm_lib::ids::discord;
 use wasm_lib::DiscordUser;
 use std::collections::HashMap;
-use std::hash::Hasher;
 use std::io;
 use std::io::{Read, Write};
 use std::net::SocketAddr;

@@ -1,42 +1,19 @@
-use std::any;
-use std::hash::Hash;
-use std::str::FromStr;
-use std::sync::Arc;
-use std::thread::sleep;
-use crate::data::{SessionRequest};
-use crate::main;
-use crate::services::db::{DBDatabase, MongoServer};
-use crate::services::game::{CreateLobby, FileMetadata, SessionToken};
-use crate::services::lobby::CanJoinLobby;
-use actix::Addr;
 
-use actix_multipart::form::MultipartForm;
-use actix_multipart::Multipart;
-use actix_web::body::MessageBody;
+use std::sync::Arc;
+use crate::data::SessionRequest;
+use crate::services::db::MongoServer;
+use crate::services::game::SessionToken;
+
 use actix_web::cookie::Cookie;
-use actix_web::{get, HttpRequest, HttpResponse, post, web};
-use attohttpc::body::File;
-use bson::{bson, Bson};
-use bytes::Bytes;
+use actix_web::{HttpRequest, HttpResponse, web};
 use chrono::Local;
-use cult_common::dto::api::{ApiResponse};
-use cult_common::dto::file::{self, FileMultiPart};
 use cult_common::wasm_lib::hashs::validate::ValidateHash;
-use cult_common::wasm_lib::ids::discord::DiscordID;
-use cult_common::wasm_lib::JeopardyMode;
-use futures::{AsyncWriteExt, Stream, StreamExt};
-use mongodb::change_stream::session;
-use mongodb::gridfs::GridFsUploadStream;
 use oauth2::http::header::COOKIE;
-use oauth2::http::{response, HeaderValue};
+use oauth2::http::HeaderValue;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
-use cult_common::backend::JeopardyBoard;
+use serde_json::Value;
 use cult_common::wasm_lib::ids::lobby::LobbyId;
 use cult_common::wasm_lib::ids::usersession::UserSessionId;
-use crate::authentication::discord::is_admin;
-use crate::services::authentication::AuthenticationServer;
-use crate::services::{db, game};
 use crate::services::game::UserSession;
 
 #[derive(Deserialize, Serialize)]

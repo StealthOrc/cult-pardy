@@ -1,4 +1,3 @@
-use actix_multipart::form;
 use config::{Config, ConfigError, File};
 use serde::Deserialize;
 
@@ -85,9 +84,15 @@ pub struct Settings {
 impl Settings {
     pub  fn new() -> Result<Self, ConfigError> {
         //Use root directory as the base path that works in linux and windows
+
+        // if the file is not in the current directory, the go the parent directory
         let root = std::env::current_dir().expect("Failed to get current directory");
         let root = root.to_str().expect("Failed to convert path to string");
-        let root = root.split("\\").collect::<Vec<&str>>().join("/");
+        if let Ok(s) = Config::builder().add_source(File::with_name("Settings")).build() {
+            return s.try_deserialize();
+        };
+        let root = std::path::Path::new(root).parent().expect("Failed to get parent directory");    
+        let root = root.to_str().expect("Failed to convert path to string");
         let root = format!("{}/", root);
         let source_file = File::with_name(&format!("{}Settings", root));
         let s = Config::builder().add_source(source_file).build() .expect("Failed to load configuration");

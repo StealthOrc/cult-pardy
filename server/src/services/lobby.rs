@@ -1,52 +1,27 @@
 
-use core::fmt;
-use std::any::{self, Any};
-use std::cell::Ref;
 use std::collections::{HashMap, HashSet};
-use std::future::Future;
 use std::hash::Hash;
-use std::pin;
-use std::rc::Rc;
-use std::str::FromStr;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
-use actix::fut::future;
-use actix::{fut, run, Actor, ActorFutureExt, Addr, AsyncContext, Context, ContextFutureSpawner, Handler, MailboxError, Message, MessageResult, Recipient, ResponseActFuture, WrapFuture};
-use actix_web::rt::{self, task};
-use actix_web::web::{self, put};
-use attohttpc::Session;
-use chrono::{DateTime, Local, TimeDelta};
+use actix::{Actor, ActorFutureExt, Addr, AsyncContext, Context, Handler, Message, Recipient, ResponseActFuture, WrapFuture};
 
-use cult_common::backend::{JeopardyBoard, ActionState, LobbyCreateResponse, MediaPlayer, Question};
-use cult_common::dto;
+use cult_common::backend::{JeopardyBoard, Question};
 use cult_common::dto::board::DTOSession;
-use cult_common::wasm_lib::ids::discord::{self, DiscordID};
-use cult_common::wasm_lib::ids::lobby::{self, LobbyId};
-use cult_common::wasm_lib::ids::usersession::{self, UserSessionId};
+use cult_common::wasm_lib::ids::discord::DiscordID;
+use cult_common::wasm_lib::ids::lobby::LobbyId;
+use cult_common::wasm_lib::ids::usersession::UserSessionId;
 use cult_common::wasm_lib::ids::websocketsession::WebsocketSessionId;
-use cult_common::wasm_lib::websocket_events::{ActionMediaEvent, ActionStateEvent, BoardEvent, SessionEvent, VideoEvent, WebsocketError, WebsocketEvent, WebsocketPing, WebsocketServerEvents};
-use cult_common::wasm_lib::{DiscordUser, JeopardyMode, Vector2D};
-use futures::StreamExt;
-use mongodb::bson::{Bson, doc, Document};
-use oauth2::basic::{BasicClient, BasicTokenResponse};
-use oauth2::reqwest::async_http_client;
-use oauth2::TokenResponse;
-use rand::distributions::Alphanumeric;
-use rand::Rng;
+use cult_common::wasm_lib::websocket_events::{ActionMediaEvent, ActionStateEvent, BoardEvent, SessionEvent, VideoEvent, WebsocketEvent, WebsocketPing, WebsocketServerEvents};
+use cult_common::wasm_lib::Vector2D;
+use mongodb::bson::doc;
 use ritelinked::{LinkedHashMap, LinkedHashSet};
 use serde::{Deserialize, Serialize};
-use serde_json::{Map, Value};
 use strum::{Display, EnumIter};
-use tokio::runtime;
-use crate::authentication::discord::DiscordME;
-use crate::data::SessionRequest;
-use crate::services::authentication::{CheckAdminAccess, GetAdminAccess, RedeemAdminAccessToken};
 use crate::services::StartingServices;
-use crate::services::db::DBDatabase::CultPardy;
 use crate::services::db::MongoServer;
-use crate::ws::session::{self, SendSessionMessageType, UserData, WsSession};
+use crate::ws::session::{SendSessionMessageType, UserData};
 use super::authentication::Admin;
-use super::game::{SessionToken, UserSession};
+use super::game::UserSession;
 
 /// Send message to specific room
 #[derive(Message)]

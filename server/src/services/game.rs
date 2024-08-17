@@ -1,47 +1,30 @@
-use core::{fmt, hash};
-use std::any::{self, Any};
-use std::cell::Ref;
 use std::collections::{HashMap, HashSet};
-use std::rc::Rc;
-use std::str::FromStr;
-use std::sync::{Arc, Mutex};
-use actix::{fut, run, Actor, ActorFutureExt, Addr, AsyncContext, Context, ContextFutureSpawner, Handler, MailboxError, Message, MessageResult, Recipient, WrapFuture};
-use actix_web::cookie::time::Date;
-use actix_web::rt::{self, task};
-use actix_web::web;
-use attohttpc::Session;
-use chrono::{DateTime, Duration, Local, TimeDelta};
 
-use cult_common::backend::{JeopardyBoard, ActionState, LobbyCreateResponse, MediaPlayer, Question};
+use std::sync::Arc;
+use actix::{Actor, Addr, Context, Handler, Message, MessageResult};
+use chrono::{DateTime, Duration, Local};
+
+use cult_common::backend::{JeopardyBoard, LobbyCreateResponse};
 use cult_common::dto::board::DTOSession;
 use cult_common::wasm_lib::hashs::validate::ValidateHash;
 use cult_common::wasm_lib::ids::discord::DiscordID;
-use cult_common::wasm_lib::ids::lobby::{self, LobbyId};
+use cult_common::wasm_lib::ids::lobby::LobbyId;
 use cult_common::wasm_lib::ids::usersession::UserSessionId;
 use cult_common::wasm_lib::ids::websocketsession::WebsocketSessionId;
-use cult_common::wasm_lib::websocket_events::{ActionMediaEvent, ActionStateEvent, BoardEvent, SessionEvent, VideoEvent, WebsocketError, WebsocketEvent, WebsocketPing, WebsocketServerEvents};
-use cult_common::wasm_lib::{DiscordUser, JeopardyMode, Vector2D};
-use futures::StreamExt;
-use mongodb::bson::{self, doc, Bson, Document};
+use cult_common::wasm_lib::{DiscordUser, JeopardyMode};
+use mongodb::bson::{doc, Bson, Document};
 use oauth2::basic::{BasicClient, BasicTokenResponse};
 use oauth2::reqwest::async_http_client;
 use oauth2::TokenResponse;
 use rand::distributions::Alphanumeric;
 use rand::Rng;
-use ritelinked::{LinkedHashMap, LinkedHashSet};
 use serde::{Deserialize, Serialize};
-use serde_json::{value, Map, Value};
-use strum::{Display, EnumIter};
+use serde_json::{Map, Value};
 use crate::authentication::discord::DiscordME;
-use crate::data::SessionRequest;
 use crate::services::authentication::RedeemAdminAccessToken;
 use crate::services::StartingServices;
-use crate::services::db::DBDatabase::CultPardy;
 use crate::services::db::MongoServer;
-use crate::ws::session::{self, SendSessionMessageType, UserData};
 
-use super::authentication;
-use super::db::UserCollection;
 use super::lobby::Lobby;
 
 
@@ -479,7 +462,7 @@ impl Message for MessageLobbies {
 impl Handler<MessageLobbies> for GameServer {
     type Result = ();
 
-    fn handle(&mut self, msg: MessageLobbies, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, _: MessageLobbies, _ctx: &mut Self::Context) -> Self::Result {
         for lobby in self.lobbies.values() {
            // lobby.addr.do_send(session::SendSessionMessageType(msg.msg.clone()));
         }
