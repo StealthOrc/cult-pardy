@@ -37,6 +37,7 @@ function getAssetPath()  {
 		let lastIndex = Math.max(current.lastIndexOf('/'), current.lastIndexOf('\\'));
 		let parent = current.substring(0, lastIndex);
 		let filePath = parent + '/Settings.toml';
+		console.log('Settings Path:', filePath);
 		let file = fs.readFileSync(filePath, 'utf-8');
 		let uri = 'http://localhost:8000/assets';
 		const settings = parseToml(file);
@@ -44,6 +45,7 @@ function getAssetPath()  {
 			let ssl = settings.frontend_settings.ssl ? 'https://' : 'http://';
 			uri = ssl + settings.frontend_settings.host + ':' + settings.frontend_settings.port + '/assets';
 		}
+		console.log('Asset Path:', uri);
 		return uri;
 	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	} catch (err ) {

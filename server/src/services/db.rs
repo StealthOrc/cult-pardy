@@ -116,6 +116,7 @@ impl MongoServer {
     
 
     pub async fn get_user_session_with_id(&self, user_session_id: &UserSessionId, session_token:&SessionToken) -> Option<UserSession> {
+        println!("get_user_session_with_id {:?}", user_session_id);
         let result = self.collections.user_sessions.find_one(doc! {"user_session_id.id": &user_session_id.id}).await;
         match result {
             Err(_) => {
