@@ -99,7 +99,8 @@ impl DiscordUser {
 
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Default)]
 pub enum QuestionType {
-    Media(String),
+    Video(String),
+    Youtube(String),
     #[default]
     Question,
 }
@@ -120,7 +121,7 @@ pub enum MediaType {
 impl QuestionType {
     pub fn get_action_state(self: &QuestionType) -> ActionState {
         match self {
-            QuestionType::Media(_) =>  ActionState::MediaPlayer(MediaPlayer::default()),
+            QuestionType::Video(_) =>  ActionState::MediaPlayer(MediaPlayer::default()),
             _ => ActionState::None,
         }
     }
