@@ -1,3 +1,4 @@
+
 import adapter from '@sveltejs/adapter-static';
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 
@@ -22,8 +23,8 @@ const config = {
 		}),
 		
 		paths: {
-			//TODO: this has to become somehow relative so we remove localhost and the port!!
-			assets: 'http://0.0.0.0:8000/assets',
+			//TODO PRODUTION IP NEED TO BE SET, Currently local Test IP set
+			assets: 'http://cultparty-assets.shirocloud.de/assets',
 		}
 	}
 };
