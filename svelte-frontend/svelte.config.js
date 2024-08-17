@@ -41,6 +41,11 @@ function getAssetPath()  {
 		let file = fs.readFileSync(filePath, 'utf-8');
 		let uri = 'http://localhost:8000/assets';
 		const settings = parseToml(file);
+		console.log("Settings:", settings.frontend_settings);
+		console.log("host:", settings.frontend_settings.host);
+		console.log("port:", settings.frontend_settings.port);
+		console.log("ssl:", settings.frontend_settings.ssl);
+
 		if (settings && settings.frontend_settings && settings.frontend_settings.host && settings.frontend_settings.port && settings.frontend_settings.ssl) {
 			let ssl = settings.frontend_settings.ssl ? 'https://' : 'http://';
 			uri = ssl + settings.frontend_settings.host + ':' + settings.frontend_settings.port + '/assets';
