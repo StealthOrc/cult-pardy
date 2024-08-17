@@ -7,6 +7,7 @@
 	import { discord_session} from "$lib/api/ApiRequests";
 	import LoadingPage from "./DevLoading.svelte";
 	import FileUpload from "$lib/create/FileUpload.svelte";
+	import { FileUploadType } from "$lib/types";
     let lobbyid = '';
 
     let cookies : SessionCookies; 
@@ -96,6 +97,7 @@
             <LoadingPage/>
         {/if}
         <div class="flex space-x-4">
-            <FileUpload/>
+            <FileUpload title="Upload Question File"/>
+            <FileUpload title="Upload Board Json" uploadType={FileUploadType.BOARDJSON}/>
         </div>
 </div>

@@ -13,8 +13,7 @@
 	import { JeopardyBoardStore } from '$lib/stores/JeopardyBoardStore';
 	import { inflate } from 'fflate';
 
-    export let lobbyId: string = "main";
-    
+    export let lobbyId: string = "main";	
 
     var cookies : SessionCookies;
     let wsStore: WebsocketStore

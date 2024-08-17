@@ -1,9 +1,10 @@
 <script lang="ts">
-	import exp from 'constants';
-    import { handleFileUpload  } from './fileUploadUtils';
+    import { handleBoardFileUpload, handleMediaFileUpload  } from './fileUploadUtils';
     import type { FileUploadProgress } from './fileUploadUtils';
-	import { on } from 'events';
+    import { FileUploadType } from '$lib/types';
 
+    export let title: string = 'Upload File';
+    export let uploadType: FileUploadType = FileUploadType.MEDIA;
 
     let file: File | null = null;
     let progress: number = 0;
@@ -11,6 +12,15 @@
     let progressBar: HTMLProgressElement;
     let progressText: HTMLSpanElement;
     let isUploading: boolean = false;
+    let acceptTypes: string = "";
+    switch (uploadType) {
+        case FileUploadType.MEDIA:
+            acceptTypes = "image/*,video/*";
+            break;
+        case FileUploadType.BOARDJSON:
+            acceptTypes = ".json";
+            break;
+    }
 
     function handleFileChange(event: Event) {
         const input = event.target as HTMLInputElement;
@@ -32,9 +42,15 @@
                     progressBar.max = max;
                     progressText.innerText = `${progress.current} % / ${max} % Speed ${progress.speed}`;
                 };
-                onProgress({ current: 0, speed: "Na" });
-                await handleFileUpload(file, onProgress);
-
+                onProgress({ current: 0, speed: "N/A" });
+                switch (uploadType) {
+                    case FileUploadType.MEDIA:
+                        await handleMediaFileUpload(file, onProgress);
+                        break;
+                    case FileUploadType.BOARDJSON:
+                        await handleBoardFileUpload(file, onProgress);
+                        break;
+                }
                 uploadStatus = 'Upload complete!';
             } catch (error) {
                 uploadStatus = 'Upload failed!';
@@ -47,8 +63,8 @@
 </script>
 
 <div class="flex flex-col items-center p-6 bg-gray-100 rounded-lg shadow-lg">
-    <h1 class="text-2xl font-semibold mb-4 text-gray-800">File Upload </h1>
-    <input type="file"   accept="image/*, video/*"   on:change={handleFileChange}  class="mb-4 p-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200"/>
+    <h1 class="text-2xl font-semibold mb-4 text-gray-800">{title}</h1>
+    <input type="file" accept={acceptTypes} on:change={handleFileChange}  class="mb-4 p-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200"/>
     <button  on:click={uploadFile}   class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200" disabled={isUploading}  >
         Upload
     </button>
