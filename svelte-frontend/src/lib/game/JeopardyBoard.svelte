@@ -2,46 +2,40 @@
     export const prerender = false;
     import JeopardyCategory from './JeopardyCategory.svelte';
     import { onMount } from 'svelte';
-    import {webSocket, WebSocketSubject} from "rxjs/webSocket";
+    import {WebSocketSubject} from "rxjs/webSocket";
     import { CookieStore, type SessionCookies} from "$lib/stores/cookies.js";
     import { match, P } from 'ts-pattern';
 	import type { BoardEvent, DtoJeopardyBoard, DTOSession, SessionEvent, WebsocketEvent, WebsocketServerEvents, WebsocketSessionEvent } from 'cult-common';
 	import Players from './Players.svelte';
 	import {CurrentSessionsStore } from '$lib/stores/SessionStore';
-	import type { Observable, Observer } from 'rxjs';
 	import { SessionPingsStore } from '$lib/stores/SessionPings';
-	import { newWebSocketStore} from '$lib/stores/WebsocketStore';
+	import { newWebSocketStore, WebsocketStore} from '$lib/stores/WebsocketStore';
 	import { JeopardyBoardStore } from '$lib/stores/JeopardyBoardStore';
-	import { deflate, inflate } from 'fflate';
+	import { inflate } from 'fflate';
 
     export let lobbyId: string = "main";	
 
-    var cookies : SessionCookies | null = null;
+    var cookies : SessionCookies;
+    let wsStore: WebsocketStore
+    let ws : WebSocketSubject<WebsocketSessionEvent> | null = null;
     CookieStore.subscribe(value => {
         cookies = value;
+        wsStore = newWebSocketStore(lobbyId, cookies);
+        wsStore.subscribe(value => {
+            ws = value;
+        })
     })
-    if (cookies == undefined) {
-        throw new Error("Cookies are null");
-    }
 
-    let wsStore = newWebSocketStore(lobbyId, cookies);
-    let ws : WebSocketSubject<WebsocketSessionEvent> | null = null;
-    wsStore.subscribe(value => {
-        ws = value;
-    })
 
     let gameData: DtoJeopardyBoard | null = null;
-
     JeopardyBoardStore.subscribe(value => {
         gameData = value;
     })
 
     let currentSessions: DTOSession[] = [];
-
     CurrentSessionsStore.subscribe(value => {
         currentSessions = value;
     })
-    
 
     function updateGridColumns() {
         if (gameData == null || gameData.categories == null) {
@@ -53,7 +47,6 @@
     }
 
     onMount(() => {
-
         if (ws != null) {
             ws.subscribe({
                 next: (message) => {
@@ -78,9 +71,6 @@
                 error: (error) => {
                     console.log(error);
                     wsStore.stop();
-
-                    //wsStore.new_ws();
-                    //console.error('WebSocket error:', error);
                 }
             });
         }
@@ -136,14 +126,12 @@
         })
         .with({ SessionJoined: P.select() }, (data) => {
             console.log("Joined Session: ", data, currentSessions);
-            // search inside currentSessions for a object with the same user_session_id as data, if not: add data
+            // search inside currentSessions for an object with the same user_session_id as data, if not: add data
             CurrentSessionsStore.addSession(data); 
-            console.log("Joined Session 2: ", data, currentSessions);
             return true;
         })
         .with({ SessionDisconnected: P.select() }, (data) => {
             console.log("Disconnected Session: ", data, currentSessions);
-            CurrentSessionsStore.removeSessionById(data);
             SessionPingsStore.removeBySessionId(data);
             return true;
         })
@@ -176,7 +164,7 @@
     <div class="jeopardy-container">
         <div class="jeopardy-board">
                 {#each gameData.categories as category}
-                    <JeopardyCategory {category} />
+                    <JeopardyCategory {category}/>
                 {/each}
         </div>
     </div>

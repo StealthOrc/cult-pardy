@@ -2,7 +2,7 @@
 import { dev } from "$app/environment";
 import type { UserSessionId, WebsocketSessionEvent } from "cult-common";
 import { webSocket, WebSocketSubject } from "rxjs/webSocket";
-import { writable, type Subscriber, type Unsubscriber} from "svelte/store"; 
+import { writable, type Subscriber, type Unsubscriber, type Writable} from "svelte/store"; 
 import type { SessionCookies } from "./cookies";
 import { deflateSync } from "fflate";
 
@@ -56,7 +56,14 @@ function get_ws(lobbyId: string, userSessionId: UserSessionId, sessionToken: str
 
 
 
-function createWebsocketStore(lobbyId: string, userSessionId: UserSessionId, sessionToken: string) {
+export type WebsocketStore = {
+    store: Writable<WebSocketSubject<WebsocketSessionEvent>>;
+    stop: () => void;
+    new_ws: () => void;
+    subscribe: (this: void, run: Subscriber<WebSocketSubject<WebsocketSessionEvent>>) => Unsubscriber;
+}
+
+function createWebsocketStore(lobbyId: string, userSessionId: UserSessionId, sessionToken: string): WebsocketStore {
     const lobby_id = lobbyId;
     const user_session_id = userSessionId;
     const session_token = sessionToken;

@@ -1,17 +1,13 @@
 <script lang="ts">
 	import { WebsocketStore } from '$lib/stores/WebsocketStore';
-	import type { ApiResponse, DTOCFile, DTOFileChunk, DtoQuestion, Vector2D, WebsocketSessionEvent } from 'cult-common';
+	import type { ApiResponse, DTOCFile, DTOFileChunk, DtoQuestion, DTOSession, Vector2D, WebsocketSessionEvent } from 'cult-common';
 	import type { WebSocketSubject } from 'rxjs/webSocket';
 	import { onMount } from 'svelte';
-	import { on } from 'svelte/events';
 	import { match, P } from 'ts-pattern';
     import YouTubePlayerPlus from 'youtube-player-plus';
 	import type { YTPP_Options } from 'youtube-player-plus/types';
-	import JeopardyBoard from './JeopardyBoard.svelte';
 	import { JeopardyBoardStore } from '$lib/stores/JeopardyBoardStore';
 	import { get_file } from '$lib/api/ApiRequests';
-	import { buildUint8ArrayFromChunks} from '$lib/BinaryConversion';
-	import { decompress } from 'fflate';
 	import { decompressData, formatSpeed } from '$lib/create/fileUploadUtils';
 	import { XXH64 } from 'xxh3-ts';
 	import { BlobType, downloadBlob, getBlobType, type FileDownloadProgress } from './blobdisplay/blodUtils';
@@ -19,10 +15,17 @@
 	import AudioBlob from './blobdisplay/AudioBlob.svelte';
 	import TextBlob from './blobdisplay/TextBlob.svelte';
 	import VideoBlob from './blobdisplay/VideoBlob.svelte';
+	import { CurrentSessionsStore } from '$lib/stores/SessionStore';
+	import { CookieStore, type SessionCookies } from '$lib/stores/cookies';
     
     export let question: DtoQuestion;
-    let open_request = false;
 
+    let session: DTOSession;
+    let cookies: SessionCookies;
+    CookieStore.subscribe(value => {
+       cookies = value; 
+    })
+    let open_request = false;
     let ws : WebSocketSubject<WebsocketSessionEvent> | null = null;
     if (WebsocketStore != null) {
         WebsocketStore.subscribe(value => {
@@ -36,6 +39,12 @@
 
     let file_download_progress: FileDownloadProgress | null = null;
 
+    function isAdmin(): boolean {
+        return CurrentSessionsStore
+            .getSessionById({ id: cookies.userSessionId.id })
+            .is_admin;
+    }
+
     const onProgress = (progress: FileDownloadProgress) => {
         console.log('Progress:', progress);
         if (progress.blob != null) {
@@ -45,13 +54,16 @@
         }
     };
 
-
-
     async function loadVideoToBlob() {
         try {
-            if (current != null && current.vector2d.x === question.vector2d.x && current.vector2d.y === question.vector2d.y && current.question_text != null && !download_request && blob == null) {
+            if (current != null && 
+            current.vector2d.x === question.vector2d.x && current.vector2d.y === question.vector2d.y && 
+            current.question_type != "Question" && current.question_type.Media && 
+            !download_request && blob == null) {
                 download_request = true;
-                await downloadBlob(current.question_text, onProgress)
+                console.log("loadVideoToBlob: ", current);
+                //TODO eval if type is yt or custom and if custom use custom provided as filename
+                await downloadBlob(current.question_type.Media, onProgress)
                 download_request = false;
             } 
         } catch (error) {
@@ -60,8 +72,6 @@
         }
         
     }
-
-
 
     JeopardyBoardStore.subscribe(value => {
         if (value != null) {
@@ -205,7 +215,7 @@
                     {#if get_Blob_Type() == BlobType.IMAGE}
                         <ImageBlob image={get_blob()}/>
                     {:else if get_Blob_Type() == BlobType.VIDEO}
-                        <VideoBlob video={get_blob()}/>
+                        <VideoBlob video={get_blob()} currUserIsAdmin={isAdmin()}/>
                     {:else if get_Blob_Type() == BlobType.AUDIO}
                         <AudioBlob audio={get_blob()}/>
                     {:else if get_Blob_Type() == BlobType.TEXT}
