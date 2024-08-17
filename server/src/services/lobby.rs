@@ -479,6 +479,7 @@ impl Handler<LobbyBackClick> for Lobby {
         let user_session_id = msg.user_data.user_session_id.clone();
         let creator = self.creator.clone();
         let db = self.starting_services.mongo_server.clone();
+
         Box::pin(
             async move {
                 is_editor(&user_session_id, &creator, db).await

@@ -14,6 +14,7 @@ use chrono::{DateTime, Duration, Local, TimeDelta};
 
 use cult_common::backend::{JeopardyBoard, ActionState, LobbyCreateResponse, MediaPlayer, Question};
 use cult_common::dto::board::DTOSession;
+use cult_common::wasm_lib::hashs::validate::ValidateHash;
 use cult_common::wasm_lib::ids::discord::DiscordID;
 use cult_common::wasm_lib::ids::lobby::{self, LobbyId};
 use cult_common::wasm_lib::ids::usersession::UserSessionId;
@@ -39,6 +40,7 @@ use crate::servers::db::DBDatabase::CultPardy;
 use crate::servers::db::MongoServer;
 use crate::ws::session::{self, SendSessionMessageType, UserData};
 
+use super::authentication;
 use super::db::UserCollection;
 use super::lobby::Lobby;
 
@@ -181,6 +183,13 @@ impl SessionToken {
 
 
 
+
+#[derive(Clone, Debug, Serialize, Deserialize, Hash, Eq, PartialEq)]
+pub struct FileMetadata {
+    pub file_type: String,
+    pub validate_hash: ValidateHash,
+    pub uploader: DiscordID,
+}
 
 
 #[derive(Debug, Clone,Serialize, Deserialize)]
@@ -387,6 +396,7 @@ impl GameServer {
 impl Actor for GameServer {
     type Context = Context<Self>;
 
+
     fn start(self) -> Addr<Self> where Self: Actor<Context = Context<Self>> {
         Context::new().run(self)
     }
@@ -448,6 +458,8 @@ impl Handler<CreateLobby> for GameServer {
         if board.categories.len() <1 {
             return MessageResult(LobbyCreateResponse::Error("No categories".to_string()))
         }
+
+
         let board = self.new_lobby(&msg.user_session_id,&board);
         MessageResult(LobbyCreateResponse::Created(board.lobby_id.clone()))
     }
