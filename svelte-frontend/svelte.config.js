@@ -46,7 +46,7 @@ function getAssetPath()  {
 		console.log("port:", settings.frontend_settings.port);
 		console.log("ssl:", settings.frontend_settings.ssl);
 
-		if (settings && settings.frontend_settings && settings.frontend_settings.host && settings.frontend_settings.port && settings.frontend_settings.ssl) {
+		if (settings && settings.frontend_settings && settings.frontend_settings.host && settings.frontend_settings.port) {
 			let ssl = settings.frontend_settings.ssl ? 'https://' : 'http://';
 			uri = ssl + settings.frontend_settings.host + ':' + settings.frontend_settings.port + '/assets';
 		}
