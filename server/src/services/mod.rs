@@ -8,14 +8,13 @@ use actix::{Actor, Addr};
 
 
 use crate::authentication::discord::{GrantDiscordAuth, LoginDiscordAuth};
-use crate::servers::authentication::AuthenticationServer;
-use crate::servers::db::MongoServer;
-use crate::servers::game::GameServer;
+use crate::services::authentication::AuthenticationServer;
+use crate::services::db::MongoServer;
+use crate::services::game::GameServer;
 
 pub(crate) mod game;
 pub(crate) mod input;
 pub(crate) mod authentication;
-pub(crate) mod gamestructure;
 pub(crate) mod db;
 pub(crate) mod lobby;
 

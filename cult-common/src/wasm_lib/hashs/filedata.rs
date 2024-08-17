@@ -1,5 +1,3 @@
-use std::default;
-
 use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
 
@@ -8,7 +6,7 @@ use tsify_next::Tsify;
 
 #[derive(Tsify,Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize, Default)]
 pub struct FileDataHash {
-    hash: String,
+    pub hash: String,
 }
 
 impl FileDataHash {

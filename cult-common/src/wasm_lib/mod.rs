@@ -1,6 +1,5 @@
 use bytes::Bytes;
 use chrono::{DateTime, Local};
-use hashs::filechunk::FileChunkHash;
 use hashs::filedata::FileDataHash;
 use hashs::validate::ValidateHash;
 use ids::discord::DiscordID;
@@ -120,58 +119,4 @@ impl QuestionType {
     
 }
 
-
-
-
-
-
-#[derive(Tsify, Debug,Serialize,Deserialize ,Clone ,Hash,Eq, PartialEq, Default)]
-pub struct FileData {
-    file_chunks_hashs: Vec<FileChunkHash>,
-    pub file_name: String,
-    pub total_chunks: usize,
-    pub file_type: String,
-    pub filedata_hash: FileDataHash,
-    pub validate_hash: ValidateHash,
-    pub upload_data: DateTime<Local>,
-    pub uploader: DiscordID,
-    pub file_token: FileToken,
-}
-
-
-
-impl FileData {
-
-    pub fn new(file_chunks_hashs: Vec<FileChunkHash>, file_name: String, total_chunks: usize, file_type: String, validate_hash:ValidateHash,uploader: &DiscordID) -> Self {
-        let filedata_hash = FileDataHash::default();
-        let upload_data = Local::now();
-        FileData {
-            file_chunks_hashs,
-            file_name,
-            total_chunks,
-            file_type,
-            filedata_hash,
-            validate_hash,
-            upload_data,
-            uploader: uploader.clone(),
-            file_token: FileToken::new(),
-        }
-    }
-
-    pub fn containts_file_chunk_hash(&self, hash: &ValidateHash) -> bool {
-        self.file_chunks_hashs.iter().any(|x| x.hash == hash.get_hash())
-    }
-
-    pub fn get_hashs(&self) -> Vec<FileChunkHash> {
-        self.file_chunks_hashs.clone()
-    }
-
-    pub fn validate_file_token(&self, token: &DTOFileToken) -> bool {
-        self.file_token.token.eq(&token.token) && !self.file_token.is_expired()
-    }
-
-
-
-
-}
 

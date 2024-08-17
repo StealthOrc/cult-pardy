@@ -3,11 +3,11 @@ use std::hash::Hash;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::thread::sleep;
-use crate::data::{FileChunk, SessionRequest};
+use crate::data::{SessionRequest};
 use crate::main;
-use crate::servers::db::{DBDatabase, FileMetadata, MongoServer};
-use crate::servers::game::{CreateLobby, SessionToken};
-use crate::servers::lobby::CanJoinLobby;
+use crate::services::db::{DBDatabase, MongoServer};
+use crate::services::game::{CreateLobby, FileMetadata, SessionToken};
+use crate::services::lobby::CanJoinLobby;
 use actix::Addr;
 
 use actix_multipart::form::MultipartForm;
@@ -16,17 +16,17 @@ use actix_web::body::MessageBody;
 use actix_web::cookie::Cookie;
 use actix_web::{get, HttpRequest, HttpResponse, post, web};
 use attohttpc::body::File;
-use bson::bson;
+use bson::{bson, Bson};
 use bytes::Bytes;
 use chrono::Local;
 use cult_common::dto::api::{ApiResponse, DTOFileToken, FileDataReponse};
 use cult_common::dto::file::{self, FileMultiPart};
-use cult_common::dto::{DTOFileChunk, DTOFileData};
 use cult_common::wasm_lib::hashs::validate::ValidateHash;
 use cult_common::wasm_lib::ids::discord::DiscordID;
-use cult_common::wasm_lib::{JeopardyMode, FileData};
+use cult_common::wasm_lib::JeopardyMode;
 use futures::{AsyncWriteExt, Stream, StreamExt};
 use mongodb::change_stream::session;
+use mongodb::gridfs::GridFsUploadStream;
 use oauth2::http::header::COOKIE;
 use oauth2::http::{response, HeaderValue};
 use serde::Serialize;
@@ -36,9 +36,9 @@ use cult_common::wasm_lib::ids::lobby::LobbyId;
 use cult_common::wasm_lib::ids::usersession::UserSessionId;
 use crate::apis::data::{extract_header_string, extract_value, get_internal_server_error_json, get_lobby_id_from_header};
 use crate::authentication::discord::is_admin;
-use crate::servers::authentication::AuthenticationServer;
-use crate::servers::{db, game};
-use crate::servers::game::UserSession;
+use crate::services::authentication::AuthenticationServer;
+use crate::services::{db, game};
+use crate::services::game::UserSession;
 
 use super::data;
 
@@ -81,48 +81,6 @@ async fn api_session_request(req: HttpRequest ,db:web::Data<Arc<MongoServer>> ) 
 }
 
 
-fn file_data_response_send(req: &HttpRequest, user_session:&UserSession, file_upload_response:&FileDataReponse) -> HttpResponse {
-    let mut response = match file_upload_response {
-        FileDataReponse::Successful(_) => HttpResponse::from(HttpResponse::Ok().json(file_upload_response)),
-        FileDataReponse::Failed(_) =>  HttpResponse::InternalServerError().json(file_upload_response)
-    };
-    set_session_token_cookie(&mut response,  &user_session);
-    response
-}
-
-
-#[post("/api/upload/filedata")]
-async fn upload_file_data(req: HttpRequest,  db: web::Data<Arc<MongoServer>>,  json: web::Json<DTOFileData>) -> Result<HttpResponse, actix_web::Error> {
-    println!("UPLOAD FILE DATA");
-    let user_session = get_session_or_create_new(&req, &db).await;
-    if is_admin(&user_session, &db).await == false {
-        return Ok(file_data_response_send(&req, &user_session, &FileDataReponse::Failed("No Admin".to_string())));
-    } 
-
-    let dto_filedata = json.into_inner();
-    println!("DATA HASH {:?} ", dto_filedata.validate_hash);
-
-    if db.is_file_data(&dto_filedata.file_name).await {
-        return Ok(file_data_response_send(&req, &user_session, &FileDataReponse::Failed("File already exists".to_string())));
-    }
-
-    let dicord_id = match user_session.discord_auth.clone() {
-        Some(data) => data.discord_user.unwrap().discord_id,
-        None => return Ok(file_data_response_send(&req, &user_session, &FileDataReponse::Failed("No Discord User".to_string()))),
-    };
-
-
-
-    let file: FileData = dto_filedata.clone().to_file_data(&dicord_id);
-    if !db.add_file_data(file.clone()).await {
-        return Ok(file_data_response_send(&req, &user_session, &FileDataReponse::Failed("Can´t add file data".to_string())));
-    }
-    let mut response = file_data_response_send(&req, &user_session, &FileDataReponse::Successful(file.file_token.to_dto_file_token()));
-    set_session_token_cookie(&mut response, &user_session);
-    Ok(response)
-}
-
-
 
 
 
@@ -130,11 +88,40 @@ async fn upload_file_data(req: HttpRequest,  db: web::Data<Arc<MongoServer>>,  j
 
 #[post("/api/upload/filepart")]
 async fn upload_file_part(req: HttpRequest,db: web::Data<Arc<MongoServer>>,mut payload: Multipart) -> Result<HttpResponse, actix_web::Error> {
+    let user_session = get_session_or_create_new(&req, &db).await;
+    if is_admin(&user_session, &db).await == false {
+        return Ok(file_part_error(None, "No Admin").await)
+    } 
+    let discord_id = match user_session.discord_auth.clone() {
+        Some(data) => data.discord_user.unwrap().discord_id,
+        None => return Ok(file_part_error(None, "No Discord ID").await)};
+
+    let file_name = match extract_header_string(&req, "file-name") {
+        Ok(data) => data,
+        Err(_) => return Ok(HttpResponse::BadRequest().json("No file name provided")),
+    };
+
     println!("UPLOAD FILE Part");
     let start_time: chrono::DateTime<Local> = Local::now();
     let mut file_multi = FileMultiPart::default();
 
     let mut upload_stream = None;
+
+    file_multi.file_name = Some(file_name.clone());
+
+    if let Ok(data) = db.collections.file_bucket_files.find_one(bson::doc!{"filename":Some(file_name.clone())}).await {
+        if let Some(_) = data {
+            return Ok(file_part_error(upload_stream, "Pre File already exists").await);
+        }
+    }
+
+
+
+
+
+
+
+    file_multi.uploader_id = Some(discord_id);
 
 
     while let Some(item) = payload.next().await {
@@ -142,27 +129,24 @@ async fn upload_file_part(req: HttpRequest,db: web::Data<Arc<MongoServer>>,mut p
             Ok(mut field) => {
                 let name = match field.name() {
                     Some(name) => name.to_owned(),
-                    None => return  Ok(HttpResponse::from(HttpResponse::NotFound().json("Name not found"))),
+                    None => return Ok(file_part_error(upload_stream, "Can´t get name").await),
                 };
                 while let Some(chunk) = field.next().await {
                     let data = match chunk {
                         Ok(data) => data,
-                        Err(_) => return Ok(HttpResponse::from(HttpResponse::NotFound().json("Data not found"))),
+                        Err(_) => return Ok(file_part_error(upload_stream, "Can´t get chunk").await),
                     };
 
                     match name.as_str() {
-                        "file_name" => {
-                            file_multi.file_name = Some(String::from_utf8(data.to_vec()).expect("Can´t convert to string"));
-                        },
                         "file_data" => {
                             if upload_stream.is_none() {
                                 let file_name = match &file_multi.file_name {
                                     Some(data) => data,
-                                    None => return Ok(HttpResponse::from(HttpResponse::NotFound().json("File name not found"))),
+                                    None => return Ok(file_part_error(None, "Can´t get file name").await),
                                 };
                                 let file_type = match field.content_type() {
                                     Some(data) => data,
-                                    None => return Ok(HttpResponse::from(HttpResponse::NotFound().json("File type not found"))),
+                                    None => return Ok(file_part_error(None, "Can´t get content type").await),
                                 };
                                 file_multi.file_type = Some(file_type.to_string()); 
                                 let mut stream = db.collections.file_bucket.open_upload_stream(file_name.to_string()).await.expect("Can´t open upload stream");   
@@ -171,16 +155,13 @@ async fn upload_file_part(req: HttpRequest,db: web::Data<Arc<MongoServer>>,mut p
                             } else {
                                 let stream = match &mut upload_stream {
                                     Some(data) => data,
-                                    None => return Ok(HttpResponse::from(HttpResponse::NotFound().json("Upload stream not found"))),
-                                };
+                                    None => return Ok(file_part_error(None, "Can´t get upload stream").await),                         
+                                 };
                                 stream.write_all(&data).await.expect("Can´t write to upload stream");
                             }                        
                         },
                         "validate_hash" => {
                             file_multi.validate_hash = Some(ValidateHash::new(String::from_utf8(data.to_vec()).expect("Can´t convert to string")));
-                        }
-                        "creator_id" => {
-                            file_multi.creator_id = Some(DiscordID::of_str(String::from_utf8(data.to_vec()).expect("Can´t convert to string").as_str()));
                         }
                         _ => {
                             println!("Field not found {:?}", name);
@@ -189,7 +170,7 @@ async fn upload_file_part(req: HttpRequest,db: web::Data<Arc<MongoServer>>,mut p
                     }
                 }
             }
-            Err(_) => return Ok(HttpResponse::from(HttpResponse::NotFound().json("Field not found"))),
+            Err(_) => return Ok(file_part_error(upload_stream, "Can´t get file part").await),
         }
     }
 
@@ -198,17 +179,35 @@ async fn upload_file_part(req: HttpRequest,db: web::Data<Arc<MongoServer>>,mut p
     println!("{:#?}", upload_stream.is_none());
 
     if !file_multi.is_valid() {
-        return Ok(HttpResponse::InternalServerError().finish());
+        return Ok(file_part_error(upload_stream, "File Multi Part is not valid").await);
     }
 
     if let Some(mut stream) = upload_stream {
         let id = stream.id().clone();
-        stream.flush().await.expect("Can´t flush upload stream");
-        stream.close().await.expect("Can´t close upload stream");
-        db.collections.file_bucket_files.update_one(bson::doc! { "_id":id}, bson::doc! {"$set": {"metadata": "Test" }}).await.expect("Can´t update file type");
+
+        if let Ok(data) = db.collections.file_bucket_files.find_one(bson::doc!{"filename":Some(file_name.clone())}).await {
+            if let Some(_) = data {
+                return Ok(file_part_error(Some(stream), "After File already exists").await);
+            }
+        }
+        if let Err(_) = stream.flush().await {
+            return Ok(file_part_error(Some(stream), "Can´t flush upload stream").await);
+        }
+        if let Err(_) = stream.close().await {
+            return Ok(file_part_error(Some(stream), "Can´t close upload stream").await);
+        }
+
+        let file_meta = FileMetadata{
+            file_type: file_multi.file_type.unwrap(),
+            validate_hash: file_multi.validate_hash.unwrap(),
+            uploader: file_multi.uploader_id.unwrap(),
+        };
+        println!("{:#?}", file_meta);
+
+        if let Err(_) = db.collections.file_bucket_files.update_one(bson::doc! { "_id":id}, bson::doc! {"$set": {"metadata": file_meta}}).await {
+            return Ok(file_part_error(Some(stream), "Can´t update file type").await);
+        }
     }
-
-
 
     return Ok(HttpResponse::Ok().finish())
 
@@ -216,129 +215,38 @@ async fn upload_file_part(req: HttpRequest,db: web::Data<Arc<MongoServer>>,mut p
 }
 
 
-#[post("/api/upload/filechunk2")]
-async fn upload_file_chunk2(req: HttpRequest,db: web::Data<Arc<MongoServer>>,mut body: web::Payload) -> Result<HttpResponse, actix_web::Error> {
-    println!("UPLOAD FILE CHUNK 2");
-    let start_time: chrono::DateTime<Local> = Local::now();
-
-    
-    let file_name = match get_file_name_from_value(&req) {
-        Some(data) => data,
-        None => return Ok(HttpResponse::from(HttpResponse::NotFound().json("File name not found"))),
-    };
-
-
-
-
-    
-    let mut upload_stream = db.collections.file_bucket.open_upload_stream(file_name.clone()).await.expect("Can´t open upload stream");
-
-
-
-    
-
-    while let Some(chunk) = body.next().await {
-        let data = match chunk {
-            Ok(data) => data,
-            Err(e) => {
-                println!("Error reading chunk: {}", e);
-                return Ok(HttpResponse::InternalServerError().finish());
-            }
+impl From<FileMetadata> for Bson {
+    fn from(data: FileMetadata) -> Self {
+        let doc = bson::doc! {
+            "file_type": data.file_type,
+            "validate_hash": {
+                "hash": data.validate_hash.get_hash(),
+            },
+            "uploader": {
+                "id": data.uploader.id,
+            },
         };
-        upload_stream.write_all(&data).await.expect("Can´t write to upload stream");
-
+        Bson::Document(doc)
     }
-    upload_stream.close().await.expect("Can´t close upload stream");
-
-    println!("UPLOAD FILE CHUNK 2 time: {:?}", Local::now().signed_duration_since(start_time));    
-    Ok(HttpResponse::Ok().finish())
 }
 
 
 
 
-#[post("/api/upload/filechunk")]
-async fn upload_file_chunk(req: HttpRequest,db: web::Data<Arc<MongoServer>>, payload: Bytes) -> Result<HttpResponse, actix_web::Error> {
-    let start_time: chrono::DateTime<Local> = Local::now();
 
-    let file_token = match get_file_token_from_value(&req) {
-        Some(data) => data,
-        None => return Ok(HttpResponse::from(HttpResponse::NotFound().json("File token not found"))),
-    };
 
-    let file_name = match get_file_name_from_value(&req) {
-        Some(data) => data,
-        None => return Ok(HttpResponse::from(HttpResponse::NotFound().json("File name not found"))),
-    };
-
-    let index = match get_file_index_from_value(&req) {
-        Some(data) => data,
-        None => return Ok(HttpResponse::from(HttpResponse::NotFound().json("File index not found"))),
-    };
-
-    let validate_hash = match get_validate_hash_from_value(&req) {
-        Some(data) => data,
-        None => return Ok(HttpResponse::from(HttpResponse::NotFound().json("File validate hash not found"))),
-    };
-
-    let dto_filechunk = DTOFileChunk {
-        file_name,
-        index,
-        chunk: payload.clone(),
-        validate_hash,
-    };
-  
-
-    let file_data = match db.get_file_data_from_name(&dto_filechunk.file_name).await {
-        Some(data) => data,
-        None => return Ok(HttpResponse::from(HttpResponse::NotFound().json("File not found"))),
-    };
-
-    if file_data.validate_file_token(&file_token) == false {
-        return Ok(HttpResponse::from(HttpResponse::NotFound().json("File token not found")))
+pub async fn file_part_error(stream: Option<GridFsUploadStream>,error:&str) -> HttpResponse {
+    if let Some(mut stream) = stream {
+        match stream.close().await {
+            Ok(data) => data,
+            Err(_) => return HttpResponse::InternalServerError().json("Stream was not closing"),
+        };
     }
-
-    let file_chunk = match FileChunk::to_file_chunk(dto_filechunk) {
-        Some(data) => data,
-        None => return Ok(HttpResponse::from(HttpResponse::NotFound().json("File chunk not found"))),
-    };
-    let file_name = file_chunk.file_name.clone();
-    if db.get_file_chunks_by_index(&file_name, &file_chunk.index).await.is_some(){
-        return Ok(HttpResponse::from(HttpResponse::NotFound().json("File chunk already exists")));
-    }
-    if file_data.containts_file_chunk_hash(&file_chunk.validate_hash) == false {
-        return Ok(HttpResponse::from(HttpResponse::NotFound().json("File chunk hash not found")));
-    }
-    println!("Upload File Chunk {:?} before db: {:?} ms", file_data.validate_hash.get_hash(), Local::now().signed_duration_since(start_time));
-    if !db.add_file_chunk(&file_chunk).await{
-        return Ok(HttpResponse::from(HttpResponse::NotFound().json("Can´t add file chunk")));
-    }
-    let test: FileData = file_data.clone();
-    let size = file_chunk.chunk.len() as u64;
-    let file_meta = FileMetadata{ file_name: test.file_name, file_type: file_data.file_type, files_size: size, validate_hash:file_data.validate_hash.clone(), uploader: DiscordID::server()};
-
-
-    let dbc: web::Data<Arc<MongoServer>> = db.clone();
-    tokio::task::spawn(async move {
-        dbc.upload_file_to_file_bucket(payload, file_meta).await;
-    });
-
-
-
-
-    let response = HttpResponse::from(HttpResponse::Ok().json(ApiResponse::of(true)));
-    //do something in a new thread and ingore the result
-    tokio::task::spawn(async move {
-        if db.is_last_file_chunk(&file_name).await {
-            println!("LAST CHUNK");
-        }
-    });
-    println!("Upload File Chunk  {:?}  after db: {:?} ms",file_data.validate_hash.get_hash(), Local::now().signed_duration_since(start_time));
-    Ok(response)
-    
+    let response = HttpResponse::InternalServerError().json(json!({
+        "Error": error
+    }));
+    response
 }
-
-
 
 
 pub fn session_error(req: &HttpRequest, user_session:&UserSession, str:&str) -> HttpResponse {

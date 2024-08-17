@@ -24,10 +24,11 @@
 
 </script>
 
-<button class="px-4 py-2 bg-blue-500 text-white rounded" on:click={triggerToast}>Show Toast</button>
 {#if is_dev_loaded}
 	<ToastPanel/>
-	<slot></slot>
+	<slot>
+		
+	</slot>
 {:else}
 	<DevLoading/>
 {/if}

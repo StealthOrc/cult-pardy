@@ -10,10 +10,9 @@ use std::hash::{Hash, Hasher};
 use std::string::ToString;
 use wasm_bindgen::prelude::*;
 
-use crate::wasm_lib::hashs::filechunk::FileChunkHash;
 use crate::wasm_lib::hashs::validate::ValidateHash;
 use crate::wasm_lib::ids::usersession::{self, UserSessionId};
-use crate::wasm_lib::{DiscordUser, FileData, QuestionType, Vector2D};
+use crate::wasm_lib::{DiscordUser, QuestionType, Vector2D};
 
 
 

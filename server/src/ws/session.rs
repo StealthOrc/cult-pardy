@@ -6,8 +6,8 @@ use actix::prelude::*;
 use cult_common::{compress, decompress};
 use serde::{Deserialize, Serialize};
 
-use crate::servers::game::{self, GameServer};
-use crate::servers::lobby::{AddLobbySessionScore, ClientMessage, Lobby, LobbyBackClick, LobbyClick, ReciveVideoEvent, UpdateWebsocketPing, WebsocketConnect, WebsocketDisconnect};
+use crate::services::game::{self, GameServer};
+use crate::services::lobby::{AddLobbySessionScore, ClientMessage, Lobby, LobbyBackClick, LobbyClick, ReciveVideoEvent, UpdateWebsocketPing, WebsocketConnect, WebsocketDisconnect};
 use actix_web::web;
 use actix_web_actors::ws;
 use actix_web_actors::ws::WebsocketContext;

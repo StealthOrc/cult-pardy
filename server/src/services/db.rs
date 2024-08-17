@@ -16,8 +16,8 @@ use serde::{Deserialize, Serialize};
 use strum::{Display, EnumIter};
 use cult_common::wasm_lib::ids::usersession::UserSessionId;
 use crate::data::FileData;
-use crate::servers::db::DBDatabase::CultPardy;
-use crate::servers::game::UserSession;
+use crate::services::db::DBDatabase::CultPardy;
+use crate::services::game::UserSession;
 use crate::ws::session;
 
 use super::authentication::{self, Admin};

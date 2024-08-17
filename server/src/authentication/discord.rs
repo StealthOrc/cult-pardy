@@ -19,9 +19,9 @@ use cult_common::wasm_lib::ids::discord::DiscordID;
 use crate::apis::api::{get_session_or_create_new, get_session_or_create_new_session_request, get_token, remove_cookie, set_cookie, set_session_token_cookie};
 use crate::apis::data::{extract_value};
 use crate::authentication::discord::DiscordRedirectURL::{Grant, Login};
-use crate::servers::authentication::{AddDiscordAccount, AuthenticationServer, CheckAdminAccess, DiscordAccountStatus, RedeemAdminAccessToken};
-use crate::servers::db::MongoServer;
-use crate::servers::game::{DiscordData, GameServer, UserSession};
+use crate::services::authentication::{AddDiscordAccount, AuthenticationServer, CheckAdminAccess, DiscordAccountStatus, RedeemAdminAccessToken};
+use crate::services::db::MongoServer;
+use crate::services::game::{DiscordData, GameServer, UserSession};
 
 #[derive(Clone, Display,Debug)]
 enum DiscordRedirectURL{
@@ -267,7 +267,6 @@ async fn add_discord_account(srv:&web::Data<Addr<AuthenticationServer>>, user_se
 
     added.unwrap_or(DiscordAccountStatus::NotAdded)
 }
-
 
 
 

@@ -8,8 +8,8 @@ use tokio::{io};
 use tokio::io::{AsyncBufReadExt};
 use anyhow::{Result};
 use strum::{Display, EnumIter, IntoEnumIterator};
-use crate::servers::authentication::{AuthenticationServer, NewAdminAccessToken};
-use crate::servers::input::Commands::HELP;
+use crate::services::authentication::{AuthenticationServer, NewAdminAccessToken};
+use crate::services::input::Commands::HELP;
 
 #[derive(Debug, PartialEq, EnumIter, Display)]
 enum Commands{

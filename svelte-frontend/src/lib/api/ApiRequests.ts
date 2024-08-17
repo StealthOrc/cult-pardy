@@ -2,8 +2,6 @@
 import {
     type ApiResponse,
     type DiscordUser,
-    type DTOFileData, type DTOFileToken,
-    type FileDataReponse,
     type JeopardyBoard,
     type UserSessionId
 } from "cult-common";
@@ -24,22 +22,25 @@ let cookies : SessionCookies | null = null;
 let updater : boolean = false;
 
 
-    const INFO_URL: string = 'api/info';
+//    const INFO_URL: string = 'api/info';
     const SESSION_DATA_URL: string = 'api/session-data';
     const AUTHORIZATION_URL: string = 'api/authorization';
     const DISCORD_SESSION_URL: string = 'api/discord_session';
     const JOIN_URL: string = 'api/join';
     const BOARD_URL: string = 'api/board';
-    const FILEDATA_URL:string = 'api/upload/filedata';
-    const FILECHUNK_URL:string = 'api/upload/filechunk';
-    const FILECHUNK_URL2:string = 'api/upload/filechunk2';
     const FILEPART:string = 'api/upload/filepart';
-    const GETFILE_URL:string = 'api/file/'; // add filename after the slash
-    const GETFILE_URL2:string = 'api/file2/'; // add filename after the slash
+    const GETFILE_URL:string = 'api/file';
+
+
+export enum RequestContentType {
+    FORM_DATA = "multipart/form-data",
+    JSON = "application/json",
+    OCTET_STREAM = "application/octet-stream"  
+}
 
 
 export async function authorization(): Promise<ApiResponse> {
-    const response : Response = await api_get_request(AUTHORIZATION_URL);
+    const response : Response = await api_get_request(AUTHORIZATION_URL, RequestContentType.JSON);
     if (response == null || !response.ok) {
         return {success: false};
     }
@@ -47,12 +48,12 @@ export async function authorization(): Promise<ApiResponse> {
 }
 
 export async function discord_session(): Promise<DiscordUser> {
-    const response : Response = await api_get_request(DISCORD_SESSION_URL);
+    const response : Response = await api_get_request(DISCORD_SESSION_URL, RequestContentType.JSON);
     return await response.json();
 }
 
 export async function session_data(): Promise<SessionData> {
-    const response : Response  = await api_get_request(SESSION_DATA_URL);
+    const response : Response  = await api_get_request(SESSION_DATA_URL, RequestContentType.JSON);
     const json = await response.json();
     const user_session_id: UserSessionId = json.user_session_id;
     const session_token: SessionToken = json.session_token;
@@ -63,7 +64,7 @@ export async function session_data(): Promise<SessionData> {
 
 
 export async function join(): Promise<ApiResponse> {
-    const response : Response = await api_get_request(JOIN_URL);
+    const response : Response = await api_get_request(JOIN_URL, RequestContentType.JSON);
     if (response == null || !response.ok) {
         return {success: false};
     }
@@ -71,7 +72,7 @@ export async function join(): Promise<ApiResponse> {
 }
 
 export async function board(): Promise<JeopardyBoard | null> {
-    const response : Response  = await api_get_request(BOARD_URL);
+    const response : Response  = await api_get_request(BOARD_URL, RequestContentType.JSON);
     if (response == null || !response.ok) {
         return null;
     }
@@ -80,8 +81,8 @@ export async function board(): Promise<JeopardyBoard | null> {
 
 
 export async function UserInfo() {
-    const discord = api_get_request(DISCORD_SESSION_URL);
-    const auth = api_get_request(AUTHORIZATION_URL);
+    const discord = api_get_request(DISCORD_SESSION_URL, RequestContentType.JSON);
+    const auth = api_get_request(AUTHORIZATION_URL, RequestContentType.JSON);
 
     const [discord_response, auth_response] = await Promise.all([discord, auth]);
 
@@ -94,37 +95,18 @@ export async function UserInfo() {
 
 }
 
-export async function upload_data(data:DTOFileData): Promise<FileDataReponse> {
-    const response : Response = await api_post_request(FILEDATA_URL, data, "");
-    if (response == null || !response.ok) {
-        return {
-            Failed: "Failed to upload data"
-        }
-    }
-    return await response.json();
-}
-
-export async function upload_chunk(data:ArrayBuffer, filename: string, fileindex: number, validate_hash: string, token:DTOFileToken): Promise<Response> {
-    const myblob = new Blob([data], { type: "application/octet-stream" })
-    return await api_post_binrequest(FILECHUNK_URL, myblob, filename, fileindex, validate_hash, token.token);
-}
-
-export async function upload_chunk2(data:any , filename: string): Promise<Response> {
-    return await api_post_binrequest(FILECHUNK_URL2, data, filename, 2, "", "");
-}
-
 export async function get_file(filename: string): Promise<Response> {
-    return await api_get_request(GETFILE_URL + filename);
+    const headers = new Headers();
+    headers.append("file-name", filename);
+    return await api_get_request(GETFILE_URL, RequestContentType.OCTET_STREAM, headers);
 }
 
-export async function get_file2(filename: string): Promise<Response> {
-    return await api_get_request(GETFILE_URL2 + filename);
+
+export async function upload_file_part(file:FormData): Promise<Response> {
+    return await api_post_formrequest(FILEPART, file, RequestContentType.FORM_DATA);
 }
 
-export async function upload_chunk3(file:FormData): Promise<Response> {
-    return await api_post_formrequest(FILEPART, file);
-}
-
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function objectToFormData(obj: Record<string, any>, formData = new FormData(), parentKey = ''): FormData {
     for (const [key, value] of Object.entries(obj)) {
         const formKey = parentKey ? `${parentKey}[${key}]` : key;
@@ -145,7 +127,7 @@ export function objectToFormData(obj: Record<string, any>, formData = new FormDa
 }
 
 
-export async function api_post_request(url: string, data:unknown,token:string ): Promise<Response> {
+export async function api_post_request(url: string, data:unknown,token:string, type: RequestContentType): Promise<Response> {
     try {
         if (!updater) {
             CookieStore.subscribe((c) => {
@@ -159,7 +141,7 @@ export async function api_post_request(url: string, data:unknown,token:string ):
         return await fetch(url + `?user-session-id=${cookies.userSessionId.id}&session-token=${cookies.sessionToken}&file-token=${token}`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': type
             },
             body: JSON.stringify(data),
         });
@@ -170,38 +152,8 @@ export async function api_post_request(url: string, data:unknown,token:string ):
     }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function api_post_binrequest(url: string, data:any, filename: string, fileindex: number, validatehash: string, token:string): Promise<Response> {
-    try {
-        if (!updater) {
-            CookieStore.subscribe((c) => {
-                cookies = c;
-            });
-            updater = true;
-        }
-        if (cookies == null) {
-            throw new Error("No cookies");
-        }
-        const uri = `${url}?file-name=${encodeURIComponent(filename)}&file-index=${encodeURIComponent(fileindex)}&validate-hash=${encodeURIComponent(validatehash)}&file-token=${encodeURIComponent(token)}`;
-        //const uri = `${url}?file-name=${filename}`;
-        console.log(uri);
-        console.log(data);
-        return await fetch(uri, {
 
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/octet-stream',
-                //'file-token': token
-            },
-            body: data,
-        });
-
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    } catch (e ) {
-        throw new Error("Failed to fetch");
-    }
-}
-export async function api_post_formrequest(url: string, form:FormData): Promise<Response> {
+export async function api_post_formrequest(url: string, form:FormData, type: RequestContentType ): Promise<Response> {
     try {
         if (!updater) {
             CookieStore.subscribe((c) => {
@@ -217,7 +169,7 @@ export async function api_post_formrequest(url: string, form:FormData): Promise<
         return await fetch(url + `?user-session-id=${cookies.userSessionId.id}&session-token=${cookies.sessionToken}?file-name=FlyHigh3.mp4`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'multipart/form-data'
+                'Content-Type': type
             },
             body: form,
         });
@@ -232,7 +184,7 @@ export async function api_post_formrequest(url: string, form:FormData): Promise<
 
 
 
-export async function api_get_request(url: string): Promise<Response> {
+export async function api_get_request(url: string, type: RequestContentType, headers: Headers = new Headers()): Promise<Response> {
     try {
         if (!updater) {
             CookieStore.subscribe((c) => {
@@ -243,11 +195,10 @@ export async function api_get_request(url: string): Promise<Response> {
         if (cookies == null) {
             throw new Error("No cookies");
         }
+        headers.append("Content-Type", type);
         return await fetch(url + `?user-session-id=${cookies.userSessionId.id}&session-token=${cookies.sessionToken}`, {
             method: 'GET',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: headers,
             //credentials: 'include'
         });
 

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
 
-use super::{filechunk::FileChunkHash, filedata::FileDataHash};
+use super::{filedata::FileDataHash};
 
 
 
@@ -17,11 +17,7 @@ impl ValidateHash {
         self.hash.clone()
     }
 
-    pub fn validate_file_chunk(&self, hash: &FileChunkHash) -> bool {
-        self.hash == hash.get_hash()
-    }
-
-    pub fn validate_file_data(&self, hash: &FileDataHash) -> bool {
+    pub fn validate_file_chunk(&self, hash: &FileDataHash) -> bool {
         self.hash == hash.get_hash()
     }
 

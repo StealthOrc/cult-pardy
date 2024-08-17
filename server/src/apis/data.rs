@@ -3,7 +3,7 @@ use cult_common::wasm_lib::ids::lobby::LobbyId;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::servers::lobby::Lobby;
+use crate::services::lobby::Lobby;
 
 
 #[derive(Deserialize, Serialize)]

@@ -9,11 +9,11 @@ use std::sync::Arc;
 use cult_common::wasm_lib::ids::lobby::LobbyId;
 use crate::apis::api::{ get_session_or_create_new, get_session_with_token_update_or_create_new, remove_cookie, session_error, set_cookie, set_session_token_cookie};
 use crate::authentication::discord::{is_admin, to_main_page};
-use crate::servers::authentication::{AuthenticationServer, CheckAdminAccessToken};
-use crate::servers::db::MongoServer;
-use crate::servers::lobby::CanJoinLobby;
-use crate::servers::{game};
-use crate::servers::game::{GameServer};
+use crate::services::authentication::{AuthenticationServer, CheckAdminAccessToken};
+use crate::services::db::MongoServer;
+use crate::services::lobby::CanJoinLobby;
+use crate::services::{game};
+use crate::services::game::{GameServer};
 
 
 pub fn index_response(req: &HttpRequest) -> HttpResponse{

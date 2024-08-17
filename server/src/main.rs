@@ -2,10 +2,11 @@ mod apis;
 mod frontend;
 mod ws;
 mod authentication;
-mod servers;
+mod services;
 mod data;
 
 
+use std::io::{self, Read};
 use std::sync::Arc;
 
 use crate::apis::api::{board, create_game_lobby, discord_session, has_authorization, join_game};
@@ -18,25 +19,25 @@ use actix_web::{get, post, web, App, HttpRequest, HttpResponse, HttpServer, Resp
 use actix_ws::Message;
 use anyhow::Result;
 
-use apis::api::{ get_session_or_create_new, session_data_request, set_session_token_cookie, upload_file_chunk, upload_file_chunk2, upload_file_part, upload_file_data};
+use apis::api::{ get_session_or_create_new, session_data_request, set_session_token_cookie, upload_file_part};
 use apis::data::extract_header_string;
 use authentication::discord::is_admin;
-use bson::binary;
-use bytes::BytesMut;
-use dto::{file, DTOFileData};
+use bson::{binary, doc};
+use bytes::{Bytes, BytesMut};
+use dto::file;
+use futures::stream::once;
 use futures::{AsyncReadExt, StreamExt};
-use servers::authentication::AuthenticationServer;
-use servers::db::{self, MongoServer};
-use servers::game::GameServer;
+use services::authentication::AuthenticationServer;
+use services::db::{self, MongoServer};
+use services::game::GameServer;
 use tokio::runtime::Runtime;
 use cult_common::*;
 use cult_common::backend::JeopardyBoard;
 use wasm_lib::JeopardyMode;
-use ws::filewebsocket;
 use crate::authentication::discord;
 use crate::frontend::frontend::{assets, find_game, grant_admin_access, index};
-use crate::servers::input::{InputServer};
-use crate::servers::Services;
+use crate::services::input::{InputServer};
+use crate::services::Services;
 use crate::ws::gamewebsocket;
 
 
@@ -88,8 +89,6 @@ async fn main() -> Result<()> {
             )
             .app_data(web::PayloadConfig::default() .limit(104857600)) // Increase PayloadConfig limit (100MB)
             .route("/ws", web::get().to(gamewebsocket::start_ws))
-            .route("/filews", web::get().to(filewebsocket::start_ws))
-            .route("/filews2", web::get().to(ws))
             .service(discord::discord_oauth)
             .service(discord::grant_access)
             .service(discord::login_only)
@@ -104,13 +103,7 @@ async fn main() -> Result<()> {
             .service(discord_session)
             .service(create_game_lobby)
             .service(join_game)
-            .service(download)
-            .service(upload_file_chunk)
-            .service(upload_file_data)
             .service(get_file_from_name)
-            .service(get_file_from_name2)
-            .service(upload_streaming_data)
-            .service(upload_file_chunk2)
             .service(upload_file_part)
             .default_service(
                 web::route().to(not_found)
@@ -133,99 +126,72 @@ async fn not_found() -> std::result::Result<HttpResponse, actix_web::Error> {
 
 
 
-#[get("/api/download")]
-async fn download(_req: HttpRequest) -> std::result::Result<HttpResponse, actix_web::Error> {
-    let json_data = serde_json::to_string_pretty(&JeopardyBoard::default(JeopardyMode::NORMAL)).expect("Test?");
-    Ok(HttpResponse::Ok()
-        .content_type("application/json")
-        .append_header(("Content-Disposition", "attachment; filename=test.json"))
-        .body(json_data))
-}
 
-#[post("/api/upload")]
-async fn upload_streaming_data(mut payload: web::Payload) -> std::result::Result<HttpResponse, actix_web::Error> {
-
-    let bytes = &mut Vec::new();
-
-    while let Some(chunk) = payload.next().await {
-        let result =  match chunk {
-            Ok(data) => data,
-            Err(_) => return Ok(HttpResponse::BadRequest().finish()),
-        };
-        bytes.extend_from_slice(&result);
-
-    }
-    println!("Received {} bytes", bytes.len());
-
-    Ok(HttpResponse::Ok().finish())
+pub struct CFile {
+    pub file_name: String,
+    pub file_type: String,
+    pub data: Bytes,
 }
 
 
 
-#[get("/api/file/{name}")]
-async fn get_file_from_name(path: web::Path<String>, req: HttpRequest,  db: web::Data<Arc<MongoServer>> , auth: web::Data<Addr<AuthenticationServer>> ) -> Result<HttpResponse, actix_web::Error> {
+
+#[get("/api/file")]
+async fn get_file_from_name(req: HttpRequest,  db: web::Data<Arc<MongoServer>>) -> Result<HttpResponse, actix_web::Error> {
     let user_session = get_session_or_create_new(&req, &db).await;
 
-    let name = path.into_inner();
-    if name.is_empty() {
-        return Ok(HttpResponse::from(HttpResponse::BadRequest()));
-    }
+    let file_name = match extract_header_string(&req, "file-name") {
+        Ok(data) => data,
+        Err(_) => return Ok(HttpResponse::BadRequest().json("No file name provided")),
+    };
         
     if is_admin(&user_session, &db).await == false {
-        return Ok(HttpResponse::from(HttpResponse::Unauthorized()));
+        return Ok(HttpResponse::from(HttpResponse::Unauthorized().json("You are not authorized to access this file")));
     }
-
-    let file = db.get_cfile_from_name(&name).await;
-
-
-
-    let mut response = match file {
-        None => HttpResponse::from(HttpResponse::NotFound()),
-        Some(data) => {
-            let bytes = data.get_as_bytes();
-            HttpResponse::Ok()
-            .insert_header(("file-name", data.file_data.file_name))
-            .insert_header(("validate-hash", data.file_data.validate_hash.get_hash()))
-            .insert_header(("file-type", data.file_data.file_type))
-            .insert_header(("uploader", data.file_data.uploader.id))
-            .insert_header(("upload-data", data.file_data.upload_data.to_string()))
-            .content_type("application/octet-stream")
-            .body(bytes)
+    let file_data = match db.collections.file_bucket_files.find_one(doc!{"filename":Some(file_name.clone())}).await {
+        Ok(data) => {
+            if let Some(data) = data {
+                  data
+            } else {
+                return Ok(HttpResponse::NotFound().json("File not found"));
+            }
+            
+        }
+        Err(err) => {
+            println!("Error while downloading file: {:#?}", err);
+            return Ok(HttpResponse::InternalServerError().json("Error while downloading file1"));
         }
     };
-    set_session_token_cookie(&mut response, &user_session);
-    Ok(response)
-}
+
+    let mut test = match db.collections.file_bucket.open_download_stream_by_name(file_name.clone()).await {
+        Ok(data) => data,
+        Err(_) => return Ok(HttpResponse::InternalServerError().json("Error while downloading file")),
+    };
+    println!("Downloading file: {}", file_name);
+
+    let file_meta = match file_data.metadata{
+        Some(data) => data,
+        None => return Ok(HttpResponse::InternalServerError().json("Error while downloading file2")),
+    };
 
 
 
-#[get("/api/file2/{name}")]
-async fn get_file_from_name2(path: web::Path<String>, req: HttpRequest,  db: web::Data<Arc<MongoServer>> , auth: web::Data<Addr<AuthenticationServer>> ) -> Result<HttpResponse, actix_web::Error> {
-    let user_session = get_session_or_create_new(&req, &db).await;
-
-    let name = path.into_inner();
-    if name.is_empty() {
-        return Ok(HttpResponse::from(HttpResponse::BadRequest()));
-    }
-        
-    if is_admin(&user_session, &db).await == false {
-        return Ok(HttpResponse::from(HttpResponse::Unauthorized()));
-    }
-
-    //let file = db.get_cfile_from_name(&name).await;
-
-    let mut test = db.collections.file_bucket.open_download_stream_by_name(&name).await.expect("Failed to open download stream");
     let mut buf = Vec::new();
-    let result = test.read_to_end(&mut buf).await?;
-
+    if let Err(_) = test.read_to_end(&mut buf).await {
+        return Ok(HttpResponse::InternalServerError().json("Error while downloading file3"));
+    }
     
-    
-
-    let mut response =             HttpResponse::Ok()
-    .content_type("application/octet-stream")
-    .body(buf);
-
-
+    let mut response =  HttpResponse::Ok()
+                                        .insert_header(("file-name", file_name))
+                                        .insert_header(("file-type", file_meta.file_type))
+                                        .insert_header(("file-size", file_data.length))
+                                        .insert_header(("file-upload-date", file_data.upload_date.to_string()))
+                                        .insert_header(("uploader-id", file_meta.uploader.id))
+                                        .insert_header(("validate-hash", file_meta.validate_hash.get_hash()))
+                                        .content_type("application/octet-stream")
+                                        .streaming(once(async move {
+                                            Ok::<_, actix_web::Error>(Bytes::from(buf))
+                                        }));
 
     set_session_token_cookie(&mut response, &user_session);
     Ok(response)
@@ -233,43 +199,4 @@ async fn get_file_from_name2(path: web::Path<String>, req: HttpRequest,  db: web
 
 
 
-async fn ws(req: HttpRequest, body: web::Payload) -> actix_web::Result<impl Responder> {
-    let (response, mut session, mut msg_stream) = actix_ws::handle(&req, body)?;
-    println!("Starting WS2");
-    let mut file_chunks = BytesMut::new();
-
-    actix_web::rt::spawn(async move {
-        while let Some(Ok(msg)) = msg_stream.next().await {
-            let mut session2 = session.clone();
-            match msg {
-                Message::Ping(bytes) => {
-                    session2.pong(&bytes).await.expect("Failed to send pong");
-
-
-                }
-                Message::Text(msg) => println!("Got text: {msg}"),
-                Message::Binary(data) => {
-                    file_chunks.extend_from_slice(&data);
-                    if session2.text("ack").await.is_err() {
-                        return;
-                    }
-                }
-                Message::Continuation(_) => todo!(),
-                Message::Pong(_) => {
-                    session2.ping(b"").await.expect("Failed to send ping");
-                }
-                Message::Close(_) => {
-                    println!("Recived {} bytes", file_chunks.len());
-                    session2.close(None).await.expect("Failed to close connection");
-                    return;
-                }
-                Message::Nop =>{
-                    println!("Nop");
-                    session2.close(None).await.expect("Failed to close connection");
-                }
-            }
-        }
-    });
-
-    Ok(response)
-}
+    

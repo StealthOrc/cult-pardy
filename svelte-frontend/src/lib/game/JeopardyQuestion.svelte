@@ -9,11 +9,16 @@
 	import type { YTPP_Options } from 'youtube-player-plus/types';
 	import JeopardyBoard from './JeopardyBoard.svelte';
 	import { JeopardyBoardStore } from '$lib/stores/JeopardyBoardStore';
-	import { get_file, get_file2 } from '$lib/api/ApiRequests';
+	import { get_file } from '$lib/api/ApiRequests';
 	import { buildUint8ArrayFromChunks} from '$lib/BinaryConversion';
 	import { decompress } from 'fflate';
-	import { decompressData } from '$lib/create/fileUploadUtils';
+	import { decompressData, formatSpeed } from '$lib/create/fileUploadUtils';
 	import { XXH64 } from 'xxh3-ts';
+	import { BlobType, downloadBlob, getBlobType, type FileDownloadProgress } from './blobdisplay/blodUtils';
+	import ImageBlob from './blobdisplay/ImageBlob.svelte';
+	import AudioBlob from './blobdisplay/AudioBlob.svelte';
+	import TextBlob from './blobdisplay/TextBlob.svelte';
+	import VideoBlob from './blobdisplay/VideoBlob.svelte';
     
     export let question: DtoQuestion;
     let open_request = false;
@@ -24,11 +29,46 @@
             ws = value;
         })
     }
+    let download_request = false;
 
+    let blob: Blob | null = null;
     let current : DtoQuestion | null = null;
+
+    let file_download_progress: FileDownloadProgress | null = null;
+
+    const onProgress = (progress: FileDownloadProgress) => {
+        console.log('Progress:', progress);
+        if (progress.blob != null) {
+            blob = progress.blob;
+        } else {
+            file_download_progress = progress;
+        }
+    };
+
+
+
+    async function loadVideoToBlob() {
+        try {
+            if (current != null && current.vector2d.x === question.vector2d.x && current.vector2d.y === question.vector2d.y && current.question_text != null && !download_request && blob == null) {
+                download_request = true;
+                await downloadBlob(current.question_text, onProgress)
+                download_request = false;
+            } 
+        } catch (error) {
+            download_request = false;
+            //console.error('Error loading video to blob:', error);
+        }
+        
+    }
+
+
+
     JeopardyBoardStore.subscribe(value => {
         if (value != null) {
             current = value.current;
+            if (current != null && current.vector2d.x === question.vector2d.x && current.vector2d.y === question.vector2d.y) {
+                loadVideoToBlob();
+            }
         }
     })
 
@@ -125,61 +165,30 @@
         return byteArray;
     }
     // Function to load the video into a Blob
-    let videoBlobUrl: string;
-    async function loadVideoToBlob(url: string) {
+
+
+
+
+    function get_Blob_Type(): BlobType {
+        return getBlobType(blob);
+    }
+
+    function get_blob(): Blob {
         try {
-                //TODO: Remove hardcoded filename and read from question!
-                const filename = 'FlyHigh.mp4';
-                let response;
-                Promise.all([get_file(filename), get_file2("FlyHigh2.mp4")]).then((values) => {
-                    console.log("values", values);
-                    response = values[1];
-                });
-                while (response == null) {
-                    await new Promise(r => setTimeout(r, 100));
-                }
-                
-                //const response = await get_file(filename);
-                //const response2 = await get_file2("FlyHigh2.mp4");
-                const data: ArrayBuffer = await response.arrayBuffer();
-                const validatehash = XXH64(Buffer.from(data)).toString();
-                console.log("validatehash", validatehash);
-                console.log("response.headers.get('validate-hash')", response.headers.get('validate-hash'));
-                console.log("filename", filename);
-                
-                let type = response.headers.get('file-type');
-                // if (type == null) return;
-
-
-                if ((filename !== response.headers.get('file-name')) && (validatehash !== response.headers.get('validate-hash'))) {
-                    console.error(`File name or validate hash did not match. filename should be: "${filename}", was: "${response.headers.get('file-name')}", validatehash should be: "${validatehash}", was: "${response.headers.get('validate-hash')}"`);
-                   // return;
-                }
-
-
-
-                console.log("loadVideoToBlob",);
-                const decom : ArrayBuffer = await decompressData(data);
-
-                const videoBlob: Blob = new Blob([decom], { type: "video/mp4" });
-
-                // Create a URL for the Blob
-                videoBlobUrl = URL.createObjectURL(videoBlob);
-            
-            
+            if (blob == null) {
+                throw new Error('Blob is null');
+            }
+            if (blob == undefined) {
+                throw new Error('Blob is undefined');
+            }
+            return blob;
         } catch (error) {
-            console.error('Error loading video:', error);
+            console.error('Error getting blob:', error);
+            throw error;
         }
     }
 
-    // Load the video when the component is mounted
-    onMount(() => {
-        //todo: DEBUG ONLY!! load video for all instances!
-        if (question && question.vector2d.x == 0 && question.vector2d.y == 1) {
-            const videoUrl = '/assets/FlyHigh.mp4';
-            loadVideoToBlob(videoUrl);
-        }
-    });
+
 </script>
 
 <div class="player" id="player"></div>
@@ -192,13 +201,20 @@
     {#if current && current.vector2d.x === question.vector2d.x && current.vector2d.y === question.vector2d.y}
         <div class="overlay" role="dialog">
             <div class="overlay-content">
-                {#if videoBlobUrl}
-                    <!-- Render the video element once the Blob URL is available -->
-                    <video src={videoBlobUrl} controls>
-                        <track kind="captions" />
-                    </video>
+                {#if blob != null}
+                    {#if get_Blob_Type() == BlobType.IMAGE}
+                        <ImageBlob image={get_blob()}/>
+                    {:else if get_Blob_Type() == BlobType.VIDEO}
+                        <VideoBlob video={get_blob()}/>
+                    {:else if get_Blob_Type() == BlobType.AUDIO}
+                        <AudioBlob audio={get_blob()}/>
+                    {:else if get_Blob_Type() == BlobType.TEXT}
+                        <TextBlob text={get_blob()}/>
+                    {:else}
+                        <p>Unsupported file type</p>
+                    {/if}
                 {:else}
-                    <p>Loading video...</p>
+                    <p>{file_download_progress?.current || 0} % /  {100} %  | Speed {file_download_progress?.speed}</p>
                 {/if}
                 {#if is_youtuve()}
                     <!--edit hier with tailwind -->
