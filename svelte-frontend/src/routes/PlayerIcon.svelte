@@ -1,11 +1,8 @@
 <script lang="ts">
 	import { CookieStore, dev_loaded, type  SessionCookies } from '$lib/stores/cookies';
 	import { authorization } from '$lib/api/ApiRequests';
-    import init, { type ApiResponse,type DiscordUser } from 'cult-common';
-    
-	import { onDestroy, onMount } from 'svelte';
-	import { on } from 'svelte/events';
-	import wasm from 'vite-plugin-wasm';
+    import { type ApiResponse,type DiscordUser } from 'cult-common';
+	import { onMount } from 'svelte';
 
     export let discord_user: DiscordUser | null;
     let cookies : SessionCookies | null = null;

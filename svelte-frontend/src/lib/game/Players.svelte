@@ -1,19 +1,12 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
-    import type { DtoQuestion, DTOSession, Vector2D, WebsocketPing } from 'cult-common';
+    import type { DTOSession } from 'cult-common';
     import PlayerCard from './PlayerCard.svelte';
-	import type { WebSocketSubject } from 'rxjs/webSocket';
-	import { SessionPingsStore } from '$lib/stores/SessionPings';
 	import { CurrentSessionsStore } from '$lib/stores/SessionStore';
-
 
     let current_session : DTOSession[] = [];
     CurrentSessionsStore.subscribe(value => {
         current_session = value;
     })
-
-
-
 </script>
 
 <div class="player-container">

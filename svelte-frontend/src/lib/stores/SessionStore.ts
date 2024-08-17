@@ -37,12 +37,34 @@ function createCurrentSessionsStore() {
     function removeSessionById(sessionId: UserSessionId) {
         store.update((curr) => {
             const found: DTOSession | undefined = curr.find((s) => s.user_session_id.id === sessionId.id);
-            if (found == undefined) return curr.sort(doSort);
+            if (found == undefined) 
+                return curr.sort(doSort);
             curr.splice(curr.indexOf(found), 1);
             return curr.sort(doSort);
         });
     }
 
+    function getSessionById(sessionId: UserSessionId) : DTOSession {
+        let found: DTOSession | undefined = undefined;
+        store.update((curr) => {
+            found = curr.find((s) => s.user_session_id.id === sessionId.id);
+            return curr;
+        });
+        if (found == undefined) {
+            console.error(`SessionStore: Session with id ${sessionId.id} not found`);
+            //TODO: throw error to handle with toast
+            return {
+                user_session_id: {
+                    id: "unknown" 
+                },
+                score: 0,
+                discord_user: null,
+                is_admin: false
+            };
+        }
+        return found;
+    }
+    
     function setSessions(sessions: DTOSession[]) {
         store.set(sessions.sort(doSort));
     }
@@ -65,6 +87,7 @@ function createCurrentSessionsStore() {
         store,
         addSession,
         removeSessionById,
+        getSessionById,
         setSessions,
         subscribe,
     }

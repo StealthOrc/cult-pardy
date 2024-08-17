@@ -1,28 +1,28 @@
 <script lang="ts" type="module">
+	import { CookieStore, type SessionCookies } from "$lib/stores/cookies";
 	import { JeopardyBoardStore } from "$lib/stores/JeopardyBoardStore";
 	import { SessionPingsStore } from "$lib/stores/SessionPings";
+	import { CurrentSessionsStore } from "$lib/stores/SessionStore";
 	import { WebsocketStore } from "$lib/stores/WebsocketStore";
 	import type { DtoQuestion, DTOSession, Vector2D, WebsocketSessionEvent } from "cult-common";
 	import { WebSocketSubject } from "rxjs/webSocket";
 
+    export let session: DTOSession;
 
-    export let session : DTOSession
-    let default_avatar : string= "https://cdn-icons-png.flaticon.com/512/149/149071.png"
+    const default_avatar: string = "https://cdn-icons-png.flaticon.com/512/149/149071.png"
+    let ping: number = 0; 
+    SessionPingsStore.get_ping_update_by_session_id(session.user_session_id,value => {
+        ping = value.ping;
+    })
 
-    let current : DtoQuestion | null = null;
+    let current: DtoQuestion | null = null;
     JeopardyBoardStore.subscribe(value => {
         if (value != null) {
             current = value.current;
         }
     })
 
-    let ping: number = 0; 
-    SessionPingsStore.get_ping_update_by_session_id(session.user_session_id,value => {
-        ping = value.ping;
-    })
-
-
-    let ws : WebSocketSubject<WebsocketSessionEvent>;
+    let ws: WebSocketSubject<WebsocketSessionEvent>;
     if (WebsocketStore != null) {
         WebsocketStore.subscribe(value => {
         ws = value;
@@ -30,7 +30,7 @@
     }
     
     function getAvatar() {
-        if (session.discord_user === null) {
+        if (!session || session.discord_user === null) {
             return default_avatar
         }
         const discord_user = session.discord_user;
@@ -65,10 +65,6 @@
         }
     }
 
- 
-
-
-
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -77,7 +73,12 @@
     {#key session.score}
         <img src="{getAvatar()}" alt="Avatar" class="h-14 w-14 rounded-full">
         <div class="flex flex-col w-full overflow-hidden">
-            <p class="text-base font-bold overflow-hidden text-ellipsis">{getUserName(session)}</p> 
+            <div class="flex flex-row items-center">
+                {#if session.is_admin}
+                    <p class="text-red-500 text-sm font-bold mr-1">[A]</p>
+                {/if}
+                <p class="text-base font-bold overflow-hidden text-ellipsis">{getUserName(session)}</p> 
+            </div>
             <p class="m-0 text-lg text-gray-500">{session.score}</p>
         </div>
         <div class="absolute bottom-0 right-0 mx-1 font-bold {get_ping_class()}">

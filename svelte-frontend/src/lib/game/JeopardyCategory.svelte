@@ -1,6 +1,6 @@
 <!-- JeopardyCategory.svelte -->
 <script lang="ts">
-	import type { DtoCategory, DtoQuestion, Vector2D }  from 'cult-common';
+	import type { DtoCategory, DTOSession }  from 'cult-common';
     import JeopardyQuestion from './JeopardyQuestion.svelte';
 
     export let category: DtoCategory;
