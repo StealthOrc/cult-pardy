@@ -32,9 +32,11 @@ export default {
           return path.replace(/^\/game\/api/, '/api');
         },
       },
-
-
-
+      '/ws': {
+        target: 'ws://0.0.0.0:8000',
+        changeOrigin: true,
+        ws: true,
+      },
       '/discord': {
         target: 'http://0.0.0.0:8000',
         changeOrigin: true,
