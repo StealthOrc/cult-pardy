@@ -1,15 +1,11 @@
 <script lang="ts">
 	import { WebsocketStore } from '$lib/stores/WebsocketStore';
-	import type { ApiResponse, DTOCFile, DTOFileChunk, DtoQuestion, DTOSession, Vector2D, WebsocketSessionEvent } from 'cult-common';
+	import type { DtoQuestion, DTOSession, WebsocketSessionEvent } from 'cult-common';
 	import type { WebSocketSubject } from 'rxjs/webSocket';
-	import { onMount } from 'svelte';
 	import { match, P } from 'ts-pattern';
     import YouTubePlayerPlus from 'youtube-player-plus';
 	import type { YTPP_Options } from 'youtube-player-plus/types';
 	import { JeopardyBoardStore } from '$lib/stores/JeopardyBoardStore';
-	import { get_file } from '$lib/api/ApiRequests';
-	import { decompressData, formatSpeed } from '$lib/create/fileUploadUtils';
-	import { XXH64 } from 'xxh3-ts';
 	import { BlobType, downloadBlob, getBlobType, type FileDownloadProgress } from './blobdisplay/blodUtils';
 	import ImageBlob from './blobdisplay/ImageBlob.svelte';
 	import AudioBlob from './blobdisplay/AudioBlob.svelte';
@@ -17,6 +13,7 @@
 	import VideoBlob from './blobdisplay/VideoBlob.svelte';
 	import { CurrentSessionsStore } from '$lib/stores/SessionStore';
 	import { CookieStore, type SessionCookies } from '$lib/stores/cookies';
+	import { VideoPlayerType } from '$lib/types';
     
     export let question: DtoQuestion;
 
@@ -38,6 +35,7 @@
     let current : DtoQuestion | null = null;
 
     let file_download_progress: FileDownloadProgress | null = null;
+    let videoType: VideoPlayerType = VideoPlayerType.NONE;
 
     function isAdmin(): boolean {
         return CurrentSessionsStore
@@ -54,30 +52,42 @@
         }
     };
 
-    async function loadVideoToBlob() {
+    async function loadVideoToBlob(video: string) {
         try {
-            if (current != null && 
-            current.vector2d.x === question.vector2d.x && current.vector2d.y === question.vector2d.y && 
-            current.question_type != "Question" && current.question_type.Media && 
-            !download_request && blob == null) {
+            if (!download_request && blob == null) {
                 download_request = true;
-                console.log("loadVideoToBlob: ", current);
+                console.log("loadVideoToBlob: ", video);
                 //TODO eval if type is yt or custom and if custom use custom provided as filename
-                await downloadBlob(current.question_type.Media, onProgress)
+                await downloadBlob(video, onProgress)
                 download_request = false;
             } 
         } catch (error) {
             download_request = false;
             //console.error('Error loading video to blob:', error);
         }
-        
     }
 
     JeopardyBoardStore.subscribe(value => {
         if (value != null) {
             current = value.current;
-            if (current != null && current.vector2d.x === question.vector2d.x && current.vector2d.y === question.vector2d.y) {
-                loadVideoToBlob();
+            if ((current != null) && 
+                (current.vector2d.x === question.vector2d.x && current.vector2d.y === question.vector2d.y)
+            ) {
+                match(question.question_type)
+                .with({ Video: P.select() }, async (vid) => {
+                    videoType = VideoPlayerType.VIDEO;
+                        loadVideoToBlob(vid)
+                })
+                .with({ Youtube: P.select() }, async (aud) => {
+                    videoType = VideoPlayerType.YOUTUBE;
+                    createYouTubePlayer(); 
+                })
+                .otherwise(() => {
+                    download_request = false;
+                });
+                if (blob === null)
+                    return;
+                ;
             }
         }
     })
@@ -106,22 +116,6 @@
 
     let player: YouTubePlayerPlus | null = null;
 
-    function is_youtuve() : boolean {
-        if (current == null) {
-            return false;
-        }
-        let result = false;
-        match(current.question_type)
-        .with({ Media: P.select() }, (data) => {
-            console.log(current);
-            result = true;
-        })
-        .otherwise(() => {
-            result = false;
-        });
-        return result;
-    }
-
     function createYouTubePlayer() : boolean {
         if (current == null) {
             return false;
@@ -131,10 +125,11 @@
         }
         let result = false;
         match(current.question_type)
-        .with({ Media: P.select() }, (data) => {
+        .with({ Youtube: P.select() }, (data) => {
             //if element #player is not found, return false
-            console.log("?", document.getElementsByClassName("player").length > 0);
-            if (document.getElementsByClassName("player").length == 0) {
+            const playerElement = document.getElementById("player");
+            console.log("?", playerElement);
+            if (!playerElement) {
                 result = false;
                 return
             }
@@ -150,7 +145,7 @@
                 playsInline: false,
             }
 
-            player = new YouTubePlayerPlus('#player', options)
+            player = new YouTubePlayerPlus(playerElement, options)
             player.load(data)
             player.setVolume(100)
             result = true;
@@ -211,33 +206,30 @@
     {#if current && current.vector2d.x === question.vector2d.x && current.vector2d.y === question.vector2d.y}
         <div class="overlay" role="dialog">
             <div class="overlay-content">
-                {#if blob != null}
-                    {#if get_Blob_Type() == BlobType.IMAGE}
-                        <ImageBlob image={get_blob()}/>
-                    {:else if get_Blob_Type() == BlobType.VIDEO}
-                        <VideoBlob video={get_blob()} currUserIsAdmin={isAdmin()}/>
-                    {:else if get_Blob_Type() == BlobType.AUDIO}
-                        <AudioBlob audio={get_blob()}/>
-                    {:else if get_Blob_Type() == BlobType.TEXT}
-                        <TextBlob text={get_blob()}/>
+                {#if videoType == VideoPlayerType.VIDEO}
+                    {#if blob != null}
+                        {#if get_Blob_Type() == BlobType.IMAGE}
+                            <ImageBlob image={get_blob()}/>
+                        {:else if get_Blob_Type() == BlobType.VIDEO}
+                            <VideoBlob video={get_blob()} currUserIsAdmin={isAdmin()}/>
+                        {:else if get_Blob_Type() == BlobType.AUDIO}
+                            <AudioBlob audio={get_blob()}/>
+                        {:else if get_Blob_Type() == BlobType.TEXT}
+                            <TextBlob text={get_blob()}/>
+                        {:else}
+                            <p>Unsupported file type</p>
+                        {/if}
                     {:else}
-                        <p>Unsupported file type</p>
+                        <p>{file_download_progress?.current || 0} % /  {100} %  | Speed {file_download_progress?.speed}</p>
                     {/if}
-                {:else}
-                    <p>{file_download_progress?.current || 0} % /  {100} %  | Speed {file_download_progress?.speed}</p>
-                {/if}
-                {#if is_youtuve()}
+                {:else if videoType == VideoPlayerType.YOUTUBE}
                     <!--edit hier with tailwind -->
-                    <p class="player container mx-auto"></p>
+                    <p id="player" class="player container mx-auto"></p>
                     <h1>${current.value}</h1>
                     <p>{current.question_type}</p>
-
-                    {#if createYouTubePlayer()}
-
                     <button on:click={() => player?.play()}>Play</button>
                     <button on:click={() => player?.pause()}>Pause</button>
                     <button on:click={() => player?.stop()}>Stop</button>
-                    {/if}
                 {:else}
                     <h1>${current.value}</h1>
                     <p>{current.question_text}</p>

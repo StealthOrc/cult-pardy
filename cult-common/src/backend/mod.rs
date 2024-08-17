@@ -50,11 +50,10 @@ impl JeopardyBoard {
             for question in 0..mode.field_size() {
                 let mut question_type : QuestionType = QuestionType::Question;
                 if question == 0 && category == 0 {
-                    question_type = QuestionType::Media("dQw4w9WgXcQ".to_string());
-
-
-
-
+                    question_type = QuestionType::Youtube("dQw4w9WgXcQ".to_string());
+                }
+                if question == 1 && category == 0 {
+                    question_type = QuestionType::Video("FlyHigh.mp4".to_string());
                 }
                 let question_name = format!("question_{}", question);
                 let answer_name = format!("answer{}", question);
