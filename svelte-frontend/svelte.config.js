@@ -24,7 +24,7 @@ const config = {
 		
 		paths: {
 			//TODO PRODUTION IP NEED TO BE SET, Currently local Test IP set
-			assets: 'http://cultparty-assets.shirocloud.de/assets',
+			assets: 'http://cultparty-assets.shirocloud.de:8000/assets',
 		}
 	}
 };
