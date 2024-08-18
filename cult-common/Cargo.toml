@@ -24,3 +24,4 @@ tsify-next = { version = "0.5.3" }
 getrandom = { version = "0.2", features = ["js"] }
 bytes = { version = "1.7.1", features = ["serde"] }
 twox-hash = "1.6"
+utoipa = { version = "4", features = ["actix_extras"] }

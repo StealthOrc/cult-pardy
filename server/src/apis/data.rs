@@ -16,27 +16,9 @@ use cult_common::wasm_lib::ids::lobby::LobbyId;
 use cult_common::wasm_lib::ids::usersession::UserSessionId;
 use crate::services::game::UserSession;
 
-#[derive(Deserialize, Serialize)]
-enum ErrorType {
-    Missing,
-    Empty,
-    StringConversion,
-}
+use super::error::{ApiRequestError, ErrorType, ToApiError, ToResponse};
 
-#[derive(Deserialize, Serialize)]
-struct RequestError {
-    header_name: String,
-    error_type: ErrorType,
-}
 
-impl RequestError {
-    fn new(name: &str, error_type: ErrorType) -> Self {
-        RequestError {
-            header_name: name.to_string(),
-            error_type,
-        }
-    }
-}
 pub fn get_internal_server_error_json(body: Value) -> HttpResponse {
     HttpResponse::InternalServerError().json(body)
 }
@@ -46,7 +28,7 @@ pub fn extract_value(req: &HttpRequest, key: &str) -> Result<String, HttpRespons
     let query_string = req.query_string();
     if query_string.is_empty() {
         return Err(
-            HttpResponse::InternalServerError().json(RequestError::new(key, ErrorType::Empty))
+            ApiRequestError::RequestError(key.to_string(), ErrorType::Missing).to_api_error().to_response()
         );
     }
     for pair in query_string.split('&') {
@@ -60,23 +42,21 @@ pub fn extract_value(req: &HttpRequest, key: &str) -> Result<String, HttpRespons
         }
     }
     return Err(
-        HttpResponse::InternalServerError().json(RequestError::new(key, ErrorType::Missing))
+        ApiRequestError::RequestError(key.to_string(), ErrorType::Missing).to_api_error().to_response()
     );
 }
 
 pub fn extract_header_string(req: &HttpRequest, header_name: &str) -> Result<String, HttpResponse> {
     match req.headers().get(header_name) {
-        None => Err(HttpResponse::InternalServerError()
-            .json(RequestError::new(header_name, ErrorType::Missing))),
+        None => Err(ApiRequestError::RequestError(header_name.to_string(), ErrorType::Missing).to_api_error().to_response()),
         Some(value) => {
             if value.is_empty() {
-                Err(HttpResponse::InternalServerError()
-                    .json(RequestError::new(header_name, ErrorType::Empty)))
+                Err(ApiRequestError::RequestError(header_name.to_string(), ErrorType::Empty).to_api_error().to_response())
             } else {
                 match value.to_str() {
                     Ok(text) => Ok(text.to_string()),
                     Err(_) => Err(HttpResponse::InternalServerError()
-                        .json(RequestError::new(header_name, ErrorType::StringConversion))),
+                        .json(ApiRequestError::RequestError(header_name.to_string(), ErrorType::StringConversion).to_api_error())),
                 }
             }
         }

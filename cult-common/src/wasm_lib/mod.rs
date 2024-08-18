@@ -1,6 +1,7 @@
 use ids::discord::DiscordID;
 use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
+use utoipa::ToSchema;
 use std::hash::Hash;
 use std::string::ToString;
 use wasm_bindgen::prelude::*;
@@ -45,7 +46,7 @@ impl JeopardyMode {
 }
 
 
-#[derive(Tsify, Default, Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash)]
+#[derive(Tsify, Default, Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash, ToSchema)]
 pub struct DiscordUser {
     // Fields are private and not exposed to JavaScript
     pub discord_id: DiscordID,

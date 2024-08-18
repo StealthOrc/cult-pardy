@@ -20,6 +20,7 @@ use rand::distributions::Alphanumeric;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
+use utoipa::ToSchema;
 use crate::authentication::discord::DiscordME;
 use crate::services::authentication::RedeemAdminAccessToken;
 use crate::services::StartingServices;
@@ -99,7 +100,7 @@ pub struct GameServer {
 
 
 
-#[derive(Debug, Clone,Serialize, Deserialize)]
+#[derive(Debug, Clone,Serialize, Deserialize,ToSchema)]
 pub struct UserSession {
     pub user_session_id:UserSessionId,
     pub discord_auth: Option<DiscordData>,
@@ -107,7 +108,7 @@ pub struct UserSession {
     pub username: Option<String>,
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Deserialize, Serialize, ToSchema)]
 pub struct SessionToken {
     pub token: String,
     pub expire: DateTime<Local>,
@@ -175,7 +176,7 @@ pub struct FileMetadata {
 }
 
 
-#[derive(Debug, Clone,Serialize, Deserialize)]
+#[derive(Debug, Clone,Serialize, Deserialize, ToSchema)]
 pub struct DiscordData {
     pub(crate) discord_user:Option<DiscordUser>,
     pub(crate) basic_token_response:BasicTokenResponse
@@ -245,6 +246,8 @@ impl DiscordData {
         None
     }
 }
+
+
 
 
 impl UserSession {

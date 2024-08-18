@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use crate::apis::error::{ApiError, ApiSessionError, ToResponse};
 use crate::data::{SessionRequest};
 use crate::services::db::MongoServer;
 use crate::services::game::{CreateLobby, FileMetadata};
@@ -19,13 +20,29 @@ use serde::Serialize;
 use serde_json::json;
 use cult_common::backend::JeopardyBoard;
 use cult_common::wasm_lib::ids::lobby::LobbyId;
+use utoipa::ToSchema;
 use crate::apis::data::{extract_header_string, extract_value, get_internal_server_error_json, get_lobby_id_from_header, get_session, get_session_with_token_update_or_create_new, set_session_token_cookie};
 use crate::authentication::discord::is_admin;
 use crate::services::game;
 use crate::services::game::UserSession;
 
-
-
+#[utoipa::path(
+    get,
+    path = "/api/info",
+    params(
+        ("user_session_id" = Option<String>, Query, description = "User session ID"),
+        ("user_session_token" = Option<String>, Query, description = "User session token"),
+        ("lobby-id" = String, Header, description = "Lobby ID")
+    ),
+    responses(
+        (status = 200, description = "User session retrieved successfully", body = UserSessionWithAdmin),
+        (status = 404, description = "No User Session", body = ApiSessionError),
+        (status = 500, description = "No Lobby found", body = ApiError)
+    ),
+    security(
+        ("cookie" = ["user_session_id", "user_session_token"])
+    )
+)]
 #[get("/api/info")]
 async fn game_info(req: HttpRequest, srv: web::Data<Addr<game::GameServer>>) -> Result<HttpResponse, actix_web::Error> {
     println!("{:?}", extract_value(&req, "key"));
@@ -47,18 +64,35 @@ async fn game_info(req: HttpRequest, srv: web::Data<Addr<game::GameServer>>) -> 
     };
     Ok(HttpResponse::from(HttpResponse::Ok().json(user)))
 }
-
-#[derive(Debug, Clone,Serialize)]
-struct UserSessionWithAdmin{
+#[derive(Debug, Clone,Serialize, ToSchema)]
+pub struct UserSessionWithAdmin{
     user_session:UserSession,
     is_admin:bool
 }
 
+
+#[utoipa::path(
+    get,
+    path = "/api/session",
+    params(
+        ("user_session_id" = Option<String>, Query, description = "User session ID"),
+        ("user_session_token" = Option<String>, Query, description = "User session token")
+    ),
+    responses(
+        (status = 200, description = "User session retrieved successfully", body = UserSessionWithAdmin),
+        (status = 404, description = "No User Session", body = ApiSessionError)
+    ),
+    security(
+        ("cookie" = ["user_session_id", "user_session_token"])
+    )
+    
+
+)]
 #[get("/api/session")]
 async fn api_session_request(req: HttpRequest ,db:web::Data<Arc<MongoServer>> ) -> Result<HttpResponse, actix_web::Error> {
     let user_session = match get_session(&req, &db).await {
         Some(data) => data,
-        None => return Ok(HttpResponse::InternalServerError().json("No User Session")),
+        None => return Ok(ApiError::Session(ApiSessionError::SessionNotFound).to_response()),
     };
     let is_admin = is_admin(&user_session, &db).await;
     let mut response = HttpResponse::from(HttpResponse::Ok().json(UserSessionWithAdmin{user_session:user_session.clone(), is_admin}));

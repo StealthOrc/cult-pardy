@@ -16,22 +16,33 @@ use actix_web::error::ErrorBadRequest;
 use actix_web::{get, web, App, HttpRequest, HttpResponse, HttpServer};
 use anyhow::Result;
 
-use apis::api::{session_data_request, upload_file_part};
+use apis::api::{session_data_request, upload_file_part, UserSessionWithAdmin};
 use apis::data::{extract_header_string, get_session, set_session_token_cookie};
+use apis::error::{ApiError, ApiSessionError, ApiRequestError};
+use attohttpc::Session;
 use authentication::discord::is_admin;
 use bson::doc;
 use bytes::Bytes;
+use data::BasicTokenResponse;
 use futures::stream::once;
 use futures::AsyncReadExt;
 use services::db::MongoServer;
+use services::game::{DiscordData, SessionToken, UserSession};
 use settings::Settings;
 use tokio::runtime::Runtime;
 use cult_common::*;
+
+use utoipa::{openapi, OpenApi};
+use utoipa_swagger_ui::SwaggerUi;
+use wasm_lib::ids::discord::DiscordID;
+use wasm_lib::ids::usersession::UserSessionId;
+use wasm_lib::DiscordUser;
 use crate::authentication::discord;
 use crate::frontend::frontend::{assets, find_game, grant_admin_access, index};
 use crate::services::input::InputServer;
 use crate::services::Services;
 use crate::ws::gamewebsocket;
+
 
 
 
@@ -48,9 +59,37 @@ async fn main() -> Result<()> {
     let port = settings.backend_settings.port;
     let addr = parse_addr_str(addr, port);
 
-    let services = Services::init(&settings).await;
 
-    //std::env::set_var("RUST_LOG", "debug");
+
+    let services = Services::init(&settings).await;
+    #[derive(OpenApi)]
+    #[openapi(
+        servers(
+            (url = "http://localhost:8000", description = "Local server"),
+            (url = "http://10.100.20.3:8000", description = "Remote server")
+        ),
+        paths(
+            apis::api::api_session_request,
+        ),
+        components(
+            schemas(
+                UserSessionWithAdmin,
+                UserSession,
+                UserSessionId,
+                DiscordData,
+                SessionToken,
+                DiscordUser,
+                BasicTokenResponse,
+                DiscordID,
+                ApiError,
+                ApiSessionError,
+                ApiRequestError
+            ))
+    )]
+    struct ApiDoc;
+
+
+    let api_doc = ApiDoc::openapi();
 
     let input_server =  InputServer::init(services.authentication_server.clone());
     let rt = Runtime::new().expect("Somethings wrong with the Runtime");
@@ -71,7 +110,7 @@ async fn main() -> Result<()> {
             .app_data(
                 web::JsonConfig::default()
                     .limit(104857600) // Increase JSON JsonConfig limit (100MB)
-                    .error_handler(|err, _req| {
+                    .error_handler(|err: actix_web::error::JsonPayloadError, _req| {
                         let error_message = format!("Error: {}", err);
                         ErrorBadRequest(error_message)
                     })
@@ -86,6 +125,10 @@ async fn main() -> Result<()> {
             )
             .app_data(web::PayloadConfig::default() .limit(104857600)) // Increase PayloadConfig limit (100MB)
             .route("/ws", web::get().to(gamewebsocket::start_ws))
+            .service(
+                SwaggerUi::new("/swagger-ui/{_:.*}")
+                .url("/api-doc/openapi.json", api_doc.clone())
+            )
             .service(discord::discord_oauth)
             .service(discord::grant_access)
             .service(discord::login_only)

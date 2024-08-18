@@ -1,8 +1,9 @@
 use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
+use utoipa::ToSchema;
 use wasm_bindgen::prelude::wasm_bindgen;
 
-#[derive(Tsify, Default, Debug, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
+#[derive(Tsify, Default, Debug, Clone, PartialEq, Eq, Hash, Deserialize, Serialize, ToSchema)]
 pub struct DiscordID {
     pub id: String,
 }

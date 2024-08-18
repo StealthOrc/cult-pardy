@@ -1,9 +1,10 @@
 use rand::random;
 use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
+use utoipa::ToSchema;
 use wasm_bindgen::prelude::wasm_bindgen;
 
-#[derive(Tsify,Default, Debug,Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Tsify,Default, Debug,Clone, PartialEq, Eq, Hash, Serialize, Deserialize,ToSchema)]
 pub struct UserSessionId {
      pub id: String,
 }
