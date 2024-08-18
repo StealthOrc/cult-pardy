@@ -90,7 +90,7 @@ impl DiscordUser {
 
 
 
-#[derive(Tsify,Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Default)]
+#[derive(Tsify,Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Default,ToSchema)]
 pub enum QuestionType {
     Video(String),
     Youtube(String),

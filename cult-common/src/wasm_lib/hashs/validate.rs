@@ -1,12 +1,13 @@
 use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
+use utoipa::ToSchema;
 
 use super::{filedata::FileDataHash};
 
 
 
 
-#[derive(Tsify,Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Tsify,Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize, Default, ToSchema)]
 pub struct ValidateHash {
     hash: String,
 }

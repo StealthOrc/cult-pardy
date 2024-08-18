@@ -3,10 +3,11 @@ use std::fmt::{Display, Formatter};
 use rand::{distributions::Alphanumeric, Rng};
 use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
+use utoipa::ToSchema;
 use wasm_bindgen::prelude::wasm_bindgen;
 
 
-#[derive(Tsify, Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Tsify, Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
 #[wasm_bindgen]
 pub struct LobbyId {
     #[wasm_bindgen(skip)]

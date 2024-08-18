@@ -1,18 +1,23 @@
 
+use std::fs::File;
+
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
+use utoipa::ToSchema;
 use wasm_bindgen::prelude::*;
 
 use crate::wasm_lib::hashs::validate::ValidateHash;
 use crate::wasm_lib::ids::discord::DiscordID;
 
 
-#[derive(Tsify,Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[derive(Tsify,Debug, Serialize, Deserialize, Default, ToSchema)]
 pub struct FileMultiPart {
     pub file_name: Option<String>,
     pub file_type: Option<String>,
     pub validate_hash: Option<ValidateHash>,
+    
+    pub data: Option<Vec<u8>>,
     pub uploader_id: Option<DiscordID>,
 }
 

@@ -41,7 +41,7 @@ pub struct FileData {
 
 
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Default, ToSchema)]
 pub struct SessionRequest {
     pub user_session_id: UserSessionId,
     pub session_token: SessionToken,

@@ -16,14 +16,17 @@ use actix_web::error::ErrorBadRequest;
 use actix_web::{get, web, App, HttpRequest, HttpResponse, HttpServer};
 use anyhow::Result;
 
-use apis::api::{game_info, session_data_request, upload_file_part, UserSessionWithAdmin};
+use apis::api::{game_info, session_data_request, upload_file_part, DiscordSessionResponse, UserSessionWithAdmin};
 use apis::data::{extract_header_string, get_session, set_session_token_cookie};
-use apis::error::{ApiError, ApiGameError, ApiRequestError, ApiSessionError};
+use apis::error::{ApiError, ApiGameError, ApiRequestError, ApiSessionError, ApiFileError };
 use attohttpc::Session;
 use authentication::discord::is_admin;
+use backend::{Category, JeopardyBoard, LobbyCreateResponse, Question};
 use bson::doc;
 use bytes::Bytes;
-use data::BasicTokenResponse;
+use data::{BasicTokenResponse, SessionRequest};
+use dto::api::ApiResponse;
+use dto::file::FileMultiPart;
 use futures::stream::once;
 use futures::AsyncReadExt;
 use services::db::MongoServer;
@@ -34,9 +37,11 @@ use cult_common::*;
 
 use utoipa::{openapi, OpenApi};
 use utoipa_swagger_ui::SwaggerUi;
+use wasm_lib::hashs::validate::ValidateHash;
 use wasm_lib::ids::discord::DiscordID;
+use wasm_lib::ids::lobby::LobbyId;
 use wasm_lib::ids::usersession::UserSessionId;
-use wasm_lib::DiscordUser;
+use wasm_lib::{DiscordUser, QuestionType};
 use crate::authentication::discord;
 use crate::frontend::frontend::{assets, find_game, grant_admin_access, index};
 use crate::services::input::InputServer;
@@ -53,13 +58,15 @@ use crate::ws::gamewebsocket;
 #[actix_web::main]
 async fn main() -> Result<()> {
     let settings = Arc::new(Settings::new().expect("Failed to load configuration"));
-    
+
 
     let addr = settings.backend_settings.host.as_str();
     let port = settings.backend_settings.port;
     let addr = parse_addr_str(addr, port);
 
     let services = Services::init(&settings).await;
+
+    let schemas : LobbyId;
     #[derive(OpenApi)]
     #[openapi(
         servers(
@@ -68,7 +75,13 @@ async fn main() -> Result<()> {
         ),
         paths(
             apis::api::api_session_request,
-            apis::api::game_info
+            apis::api::game_info,
+            apis::api::upload_file_part,
+            apis::api::session_data_request,
+            apis::api::has_authorization,
+            apis::api::discord_session,
+            apis::api::create_game_lobby,
+            apis::api::join_game,
         ),
         components(
             schemas(
@@ -83,11 +96,23 @@ async fn main() -> Result<()> {
                 ApiError,
                 ApiSessionError,
                 ApiRequestError,
-                ApiGameError
+                ApiGameError,
+                ApiFileError,
+                FileMultiPart,
+                ValidateHash,
+                SessionRequest,
+                DiscordSessionResponse,
+                ApiResponse,
+                JeopardyBoard,
+                Category,
+                Question,
+                QuestionType,
+                LobbyCreateResponse,
+                LobbyId,
             ))
     )]
     struct ApiDoc;
-
+    
 
     let api_doc = ApiDoc::openapi();
 

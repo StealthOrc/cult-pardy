@@ -1,8 +1,7 @@
-use actix_web::HttpResponse;
+use actix_web::{http, HttpResponse};
 use serde::{Deserialize, Serialize};
-use utoipa::{openapi::{RefOr, Response, ResponseBuilder}, ToResponse, ToSchema};
+use utoipa::{openapi::{security::Http, RefOr, Response, ResponseBuilder}, ToSchema};
 
-#[allow(dead_code)]
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 pub enum ApiError {
@@ -10,32 +9,78 @@ pub enum ApiError {
     Game(ApiGameError),
     Request(ApiRequestError),
     Internal(String),
+    File(ApiFileError),
 
 }
 
-pub trait ToResponse2 {
+pub trait ToResponse {
     fn to_response(&self) -> HttpResponse;
+    fn to_status_code(&self) -> http::StatusCode;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+pub enum ApiFileError {
+    FileError(String),
+    FileInvalid(String),
+    FileNotFound(String),
+    FileExists,
+}
+
+impl ToApiError for ApiFileError {
+    fn to_api_error(&self) -> ApiError {
+        ApiError::File(self.clone())
+    }
     
 }
+
+impl ToResponse for ApiFileError {
+    fn to_response(&self) -> HttpResponse {
+        HttpResponse::build(self.to_status_code()).json(self)
+    }
+
+    fn to_status_code(&self) -> http::StatusCode {
+        match self.clone(){
+            ApiFileError::FileError(_) => http::StatusCode::INTERNAL_SERVER_ERROR, // 500
+            ApiFileError::FileInvalid(_) => http::StatusCode::BAD_REQUEST, // 400
+            ApiFileError::FileNotFound(_) => http::StatusCode::NOT_FOUND, // 404
+            ApiFileError::FileExists => http::StatusCode::CONFLICT, // 409
+        }
+    }
+}
+
+
 
 pub trait ToApiError {
     fn to_api_error(&self) -> ApiError;
     
 }
 
-impl ToResponse2 for ApiError {
+impl ToResponse for ApiError {
      fn to_response(&self) -> HttpResponse {
         match self.clone(){
             ApiError::Session(error) => error.to_response(), 
             ApiError::Request(error) =>  error.to_response(),
             ApiError::Game(error) => error.to_response(),
+            ApiError::File(error) => error.to_response(),
             ApiError::Internal(_) =>  HttpResponse::InternalServerError().json(self), // 500
+        }
+    }
+
+    fn to_status_code(&self) -> http::StatusCode {
+        match self.clone(){
+            ApiError::Session(error) => error.to_status_code(), 
+            ApiError::Request(error) =>  error.to_status_code(),
+            ApiError::Game(error) => error.to_status_code(),
+            ApiError::File(error) => error.to_status_code(),
+            ApiError::Internal(_) => http::StatusCode::INTERNAL_SERVER_ERROR, // 500
         }
     }
     
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema, ToResponse)]
+
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 pub enum ApiGameError {
     GameError(String),
     LobbyInvalid(String),
@@ -46,45 +91,67 @@ impl ToApiError for ApiGameError {
     fn to_api_error(&self) -> ApiError {
         ApiError::Game(self.clone())
     }
+    
 }
 
-impl ToResponse2 for ApiGameError {
+impl ToResponse for ApiGameError {
+
     fn to_response(&self) -> HttpResponse {
+        HttpResponse::build(self.to_status_code()).json(self)
+    }
+
+    fn to_status_code(&self) -> http::StatusCode {
         match self.clone(){
-            ApiGameError::GameError(_) => HttpResponse::InternalServerError().json(self), // 500
-            ApiGameError::LobbyInvalid(_) => HttpResponse::BadRequest().json(self), // 400
-            ApiGameError::LobbyNotFound(_) => HttpResponse::NotFound().json(self), // 404
+            ApiGameError::GameError(_) => http::StatusCode::INTERNAL_SERVER_ERROR, // 500
+            ApiGameError::LobbyInvalid(_) => http::StatusCode::BAD_REQUEST, // 400
+            ApiGameError::LobbyNotFound(_) => http::StatusCode::NOT_FOUND, // 404
         }
     }
+    
+
+
     
 }
 
 
 
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema, ToResponse)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 pub enum ApiSessionError {
-    SessionNotFound,
-    SessionExpired(String),
-    SessionInvalid(String),
-    SessionError(String),
-    SessionNotAuthorized(String),
-    SessionNotAuthenticated(String),
-    SessionNotAdmin(String),
+    NotFound,
+    Expired,
+    Invalid(String),
+    Error(String),
+    NoDiscordData,
+    NotAuthorized,
+    NotAuthenticated,
+    NotAdmin,
 }
 
-impl ToResponse2 for ApiSessionError { 
+impl ToResponse for ApiSessionError {
+
+
+
     fn to_response(&self) -> HttpResponse {
+        HttpResponse::build(self.to_status_code()).json(self)
+    }
+
+
+    fn to_status_code(&self) -> http::StatusCode {
         match self.clone(){
-            ApiSessionError::SessionNotFound => HttpResponse::NotFound().json(self), // 404
-            ApiSessionError::SessionExpired(_) => HttpResponse::Unauthorized().json(self), // 401
-            ApiSessionError::SessionInvalid(_) => HttpResponse::BadRequest().json(self), // 400 
-            ApiSessionError::SessionError(_) => HttpResponse::InternalServerError().json(self), // 500 
-            ApiSessionError::SessionNotAuthorized(_) => HttpResponse::Unauthorized().json(self), // 401 
-            ApiSessionError::SessionNotAuthenticated(_) => HttpResponse::Unauthorized().json(self), // 401
-            ApiSessionError::SessionNotAdmin(_) => HttpResponse::Unauthorized().json(self), // 401
+            ApiSessionError::NotFound => http::StatusCode::NOT_FOUND, // 404
+            ApiSessionError::Expired => http::StatusCode::UNAUTHORIZED, // 401
+            ApiSessionError::Invalid(_) => http::StatusCode::BAD_REQUEST, // 400 
+            ApiSessionError::Error(_)=> http::StatusCode::INTERNAL_SERVER_ERROR, // 500 
+            ApiSessionError::NoDiscordData => http::StatusCode::FORBIDDEN, // 400
+            ApiSessionError::NotAuthorized => http::StatusCode::UNAUTHORIZED, // 401 
+            ApiSessionError::NotAuthenticated => http::StatusCode::UNAUTHORIZED, // 401
+            ApiSessionError::NotAdmin=> http::StatusCode::UNAUTHORIZED, // 401
         }
     }
+    
+
+    
     
 }
 
@@ -96,24 +163,17 @@ impl ToApiError for ApiSessionError {
 }
 
 
+
+
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 pub enum ApiRequestError {
-    RequestError(String, ErrorType),
-    RequestInvalid(String, ErrorType),
-    RequestNotFound(String),
-    
+    Error(String, ErrorType),
+    Invalid(String, ErrorType),
+    NotFound(String),
 }
 
-impl ToResponse2 for ApiRequestError {
-    fn to_response(&self) -> HttpResponse {
-        match self.clone(){
-            ApiRequestError::RequestError(_,_) => HttpResponse::InternalServerError().json(self), // 500
-            ApiRequestError::RequestInvalid(_,_) => HttpResponse::BadRequest().json(self), // 400
-            ApiRequestError::RequestNotFound(_) => HttpResponse::NotFound().json(self), // 404 
-        }
-    }
-    
-}
+
 
 impl ToApiError for ApiRequestError {
     fn to_api_error(&self) -> ApiError {
@@ -121,26 +181,33 @@ impl ToApiError for ApiRequestError {
     }
 }
 
-impl ApiRequestError {
-    pub fn new_error(message: String) -> ApiRequestError {
-        ApiRequestError::RequestError(message, ErrorType::StringConversion)
-    }
 
-    pub fn new_invalid(message: String) -> ApiRequestError {
-        ApiRequestError::RequestInvalid(message, ErrorType::StringConversion)
-    }
+impl ToResponse for ApiRequestError {
 
-    pub fn new_not_found(message: String) -> ApiRequestError {
-        ApiRequestError::RequestNotFound(message)
+    fn to_response(&self) -> HttpResponse {
+        HttpResponse::build(self.to_status_code()).json(self)
     }
 
 
+    fn to_status_code(&self) -> http::StatusCode {
+        match self.clone(){
+            ApiRequestError::Error(_,_) => http::StatusCode::INTERNAL_SERVER_ERROR, // 500
+            ApiRequestError::Invalid(_,_) => http::StatusCode::BAD_REQUEST, // 400
+            ApiRequestError::NotFound(_) => http::StatusCode::NOT_FOUND, // 404 
+        }
+    }
+    
 }
+
+
+
+
 
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 
 pub enum ErrorType {
+    Default,
     Missing,
     Empty,
     StringConversion,

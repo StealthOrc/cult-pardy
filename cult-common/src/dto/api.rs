@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
+use utoipa::ToSchema;
 
 
 
@@ -7,7 +8,7 @@ use tsify_next::Tsify;
 
 
 
-#[derive(Tsify,Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Default)]
+#[derive(Tsify,Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Default, ToSchema)]
 pub struct ApiResponse {
     pub success: bool,
 

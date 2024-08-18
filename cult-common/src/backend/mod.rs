@@ -1,6 +1,7 @@
 use chrono::{DateTime, Local};
 use serde::{Deserialize, Deserializer, Serialize};
 use tsify_next::Tsify;
+use utoipa::ToSchema;
 use std::string::ToString;
 use wasm_bindgen::prelude::*;
 
@@ -9,13 +10,13 @@ use crate::wasm_lib::ids::lobby::LobbyId;
 use crate::wasm_lib::ids::usersession::UserSessionId;
 use crate::wasm_lib::{JeopardyMode, QuestionType, Vector2D};
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, ToSchema)]
 pub enum LobbyCreateResponse {
     Created(LobbyId),
     Error(String),
 }
 
-#[derive(Tsify,Debug, Clone, Serialize, Eq, PartialEq)]
+#[derive(Tsify,Debug, Clone, Serialize, Eq, PartialEq, ToSchema)]
 pub struct JeopardyBoard {
     pub title: String,
     pub categories: Vec<Category>,
@@ -217,7 +218,7 @@ impl MediaPlayer {
 }
 
 
-#[derive(Tsify,Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Tsify,Debug, Clone, Serialize, Deserialize, Eq, PartialEq, ToSchema)]
 pub struct Category {
     pub title: String,
     pub questions: Vec<Question>,
@@ -242,7 +243,7 @@ impl Category {
 }
 
 
-#[derive(Tsify, Debug, Clone, Serialize, Eq, PartialEq)]
+#[derive(Tsify, Debug, Clone, Serialize, Eq, PartialEq, ToSchema)]
 pub struct Question {
     pub question_type: QuestionType,
     pub question: String,
