@@ -1,12 +1,8 @@
-
 import { dev } from "$app/environment";
-import type { DtoJeopardyBoard, DtoQuestion } from "cult-common";
+import type { ActionState, DtoJeopardyBoard, DtoQuestion } from "cult-common";
 import { writable, type Subscriber, type Unsubscriber} from "svelte/store"; 
 
-
 export const JeopardyBoardStore = createJeopardyBoardStore();
-
-
 
 if(dev) {
     if (import.meta.hot) {
@@ -18,12 +14,9 @@ if(dev) {
     }
 }
 
-
-
 function createJeopardyBoardStore() {
 
     const store = writable<DtoJeopardyBoard|null>(null);
-
 
     function setBoard(board: DtoJeopardyBoard) {
         store.set(board);        
@@ -39,16 +32,24 @@ function createJeopardyBoardStore() {
         });       
     }
 
+    function setActionState(state: ActionState) {
+        store.update((board) => {
+            if (board == null) {
+                return board;
+            }
+            board.action_state = state;
+            return board;
+        });       
+    }
 
     function subscribe(this: void, run: Subscriber<DtoJeopardyBoard | null>): Unsubscriber {
         return store.subscribe(run);
     }
 
-    
-
     return {
         store,
         setCurrent,
+        setActionState,
         setBoard,
         subscribe,
     }

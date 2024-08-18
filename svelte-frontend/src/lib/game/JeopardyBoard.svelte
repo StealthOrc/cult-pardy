@@ -1,7 +1,7 @@
 <script lang="ts">
     export const prerender = false;
     import JeopardyCategory from './JeopardyCategory.svelte';
-    import { onMount } from 'svelte';
+    import { getContext, onMount, setContext } from 'svelte';
     import {WebSocketSubject} from "rxjs/webSocket";
     import { CookieStore, type SessionCookies} from "$lib/stores/cookies.js";
     import { match, P } from 'ts-pattern';
@@ -12,8 +12,28 @@
 	import { newWebSocketStore, WebsocketStore} from '$lib/stores/WebsocketStore';
 	import { JeopardyBoardStore } from '$lib/stores/JeopardyBoardStore';
 	import { inflate } from 'fflate';
+	import type { MediaPlayerContext } from '$lib/types';
+	import { CONST } from '$lib/const';
+	import { mediaPlayerStore } from '$lib/stores/MediaPlayerStore';
+	import { SvelteDate } from 'svelte/reactivity';
 
-    export let lobbyId: string = "main";	
+    type Props = { 
+        lobbyId: string;
+    }
+
+    let { lobbyId = "main" }: Props = $props();	
+
+    let playerCtx: MediaPlayerContext = $state(getContext(CONST.MEDIAPLAYERCTX));
+    mediaPlayerStore.subscribe(value => {
+        if (!value) {
+            return;
+        }
+        playerCtx = value;
+    })
+    setContext(CONST.BOARDCTX,{
+         requestPlay: () => requestPlayerPlay(), 
+         requestPause: (value: number) => requestPlayerPause(value) 
+    });
 
     var cookies : SessionCookies;
     let wsStore: WebsocketStore
@@ -27,7 +47,7 @@
     })
     let loc= location.host;
 
-    let gameData: DtoJeopardyBoard | null = null;
+    let gameData: DtoJeopardyBoard | null = $state(null);
     JeopardyBoardStore.subscribe(value => {
         gameData = value;
     })
@@ -46,42 +66,12 @@
         document.documentElement.style.setProperty('--grid-columns', gridColumnTemplate);
     }
 
-    onMount(() => {
-        if (ws != null) {
-            ws.subscribe({
-                next: (message) => {
-                    if (message instanceof ArrayBuffer) {
-                        let u8 = new Uint8Array(message);
-                        inflate(u8, (err, infalte) => {
-                            if (err) {
-                                console.error('Deflation error:', err);
-                            } else {
-                                const decoder = new TextDecoder();
-                                let json : string = decoder.decode(infalte);
-                                const parsed : WebsocketServerEvents = JSON.parse(json);
-                                const updated = handleEvent(parsed);
-                                if (updated) {
-                                    updateGridColumns();
-                                }
-                            }
-
-                        });
-                    };
-                },
-                error: (error) => {
-                    console.log(error);
-                    wsStore.stop();
-                }
-            });
-        }
-    });
-
     function handleEvent(event: WebsocketServerEvents): boolean {
         match(event)
         //BoardEvents
         .with({ Board: P.select() }, (boardEvent) => handleBoardEvent(boardEvent))
         //SessionEvents
-        .with({Session: P.select() }, (boardEvent) => handleSessionEvent(boardEvent))
+        .with({Session: P.select() }, (sessionEvent) => handleSessionEvent(sessionEvent))
         //TextEvents
         .with({ Text: P.select() }, (textEvent) => console.log('Websocket textEvent not implemented:', textEvent))
         //ErrorEvents
@@ -89,8 +79,20 @@
         //WebsocketEvents
         .with({ Websocket: P.select() }, (websocketEvent) => handleWebsocketEvent(websocketEvent))
         .with({ ActionState: P.select()}, (data) => {
-                console.log("ActionStateEvent: ", data);
-                            return true;
+            console.log("ActionState: ", data);
+            match(data.Media)
+            .with("Play", (data) => {
+                console.log("playing", SvelteDate.now());
+                playerCtx.play();
+            })
+            .with("Pause", (data) => {
+                console.log("pausing", SvelteDate.now());
+                playerCtx.pause();
+            })
+            .otherwise((data) => {
+               console.error("undhandled ActionStateEvent: ",data) 
+            })
+            return true;
         })
         .exhaustive();
         return true;
@@ -107,6 +109,7 @@
         })
         .with({ CurrentQuestion: P.select() }, (data) => {
             JeopardyBoardStore.setCurrent(data[0]);
+            JeopardyBoardStore.setActionState(data[1]);
             updateGridColumns();
             return true;
         })    
@@ -159,6 +162,56 @@
         .exhaustive();
         return true;
     }
+
+    function requestPlayerPlay(): boolean {
+        console.log("requestPlayerStart");
+        if (ws == null) {
+            return false;
+        }
+        let playEvent: WebsocketSessionEvent = { VideoEvent: "Play" };
+        ws.next(playEvent);
+        return true;
+    }
+
+    function requestPlayerPause(currPlayTime: number): boolean {
+        console.log("requestPlayerPause");
+        if (ws == null) {
+           return false; 
+        }
+        let pauseEvent: WebsocketSessionEvent = { VideoEvent: {Pause: currPlayTime} };
+        ws.next(pauseEvent);
+        return true;
+    }
+
+    onMount(() => {
+        if (ws != null) {
+            ws.subscribe({
+                next: (message) => {
+                    if (message instanceof ArrayBuffer) {
+                        let u8 = new Uint8Array(message);
+                        inflate(u8, (err, infalte) => {
+                            if (err) {
+                                console.error('Deflation error:', err);
+                            } else {
+                                const decoder = new TextDecoder();
+                                let json : string = decoder.decode(infalte);
+                                const parsed : WebsocketServerEvents = JSON.parse(json);
+                                const updated = handleEvent(parsed);
+                                if (updated) {
+                                    updateGridColumns();
+                                }
+                            }
+
+                        });
+                    };
+                },
+                error: (error) => {
+                    console.log(error);
+                    wsStore.stop();
+                }
+            });
+        }
+    });
 </script>
 
 {#if gameData != null && gameData.categories != null}

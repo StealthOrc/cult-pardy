@@ -7,6 +7,9 @@
         FILEPART: 'api/upload/filepart',
         GETFILE_URL: 'api/file',
         CREATE_LOBBY_URL: 'api/create',
+        //Contexts
+        MEDIAPLAYERCTX: 'mediaplayer',
+        BOARDCTX: 'board',
     }
 
     export { CONST };

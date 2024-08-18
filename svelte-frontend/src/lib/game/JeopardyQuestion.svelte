@@ -17,7 +17,6 @@
     
     export let question: DtoQuestion;
 
-    let session: DTOSession;
     let cookies: SessionCookies;
     CookieStore.subscribe(value => {
        cookies = value; 
@@ -155,25 +154,6 @@
         });
         return result;
     }
-
-    function binaryToByteArray(binaryString: string): Uint8Array {
-        if (binaryString.length % 8 !== 0) {
-            throw new Error('Binary string length must be a multiple of 8');
-        }
-        
-        const byteArray = new Uint8Array(binaryString.length / 8);
-        
-        for (let i = 0; i < byteArray.length; i++) {
-            byteArray[i] = parseInt(binaryString.slice(i * 8, (i + 1) * 8), 2);
-        }
-        
-        return byteArray;
-    }
-    // Function to load the video into a Blob
-
-
-
-
     function get_Blob_Type(): BlobType {
         return getBlobType(blob);
     }
