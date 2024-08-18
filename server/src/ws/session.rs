@@ -229,7 +229,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                                             vector2d
                                         });
                                     }
-                                    WebsocketSessionEvent::ViedeoEvent(event) => {
+                                    WebsocketSessionEvent::VideoEvent(event) => {
                                         self.lobby_addr.do_send(ReciveVideoEvent{
                                         user_session_id: self.player.user_session_id.clone(),
                                         lobby_id: self.player.lobby_id.clone(),

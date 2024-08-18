@@ -127,7 +127,7 @@
         match(current.question_type)
         .with({ Youtube: P.select() }, (data) => {
             //if element #player is not found, return false
-            const playerElement = document.getElementById("player");
+            const playerElement = document.getElementById("ytplayer");
             console.log("?", playerElement);
             if (!playerElement) {
                 result = false;
@@ -196,7 +196,6 @@
 
 </script>
 
-<div class="player" id="player"></div>
 <div class="jeopardy-question">
     {#if question.won_user_id !== null}
         <button disabled>WON</button>
@@ -224,7 +223,7 @@
                     {/if}
                 {:else if videoType == VideoPlayerType.YOUTUBE}
                     <!--edit hier with tailwind -->
-                    <p id="player" class="player container mx-auto"></p>
+                    <div class="ytplayer" id="player"></div>
                     <h1>${current.value}</h1>
                     <p>{current.question_type}</p>
                     <button on:click={() => player?.play()}>Play</button>

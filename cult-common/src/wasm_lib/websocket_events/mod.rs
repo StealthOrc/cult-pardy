@@ -84,7 +84,7 @@ pub enum WebsocketSessionEvent {
     Click(Vector2D),
     Back,
     AddUserSessionScore(UserSessionId, Vector2D),
-    ViedeoEvent(VideoEvent),
+    VideoEvent(VideoEvent),
     
 }
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, Display)]
