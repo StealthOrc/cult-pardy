@@ -1,9 +1,8 @@
 <script lang="ts">
+
 	import { onMount } from "svelte";
 	import { session_data, SessionData } from "$lib/api/ApiRequests";
-	import { CookieStore, dev_loaded, type SessionCookies } from "$lib/stores/cookies";
-	import { on } from "svelte/events";
-
+	import { CookieStore, dev_loaded, is_loading, type SessionCookies } from "$lib/stores/cookies";
 
 
 
@@ -16,21 +15,34 @@
             cookies = value;
     });
     console.log("LOADING!!!")
-    let is_loading = false;
+    let loading = false;
+
+    is_loading.subscribe(value => {
+        loading = value;
+    })
 
     onMount(async () => {
         if (dev_loaded) {
-            if (is_loading) {
+            if (loading) {
                 return;
             }
-            let sessiondata : SessionData | null = await session_data();
-            while (sessiondata === null) {
-                sessiondata = await session_data();
-                await new Promise(r => setTimeout(r, 10000));
+            is_loading.set(true);
+            try {
+                console.log("Request 1")
+                let sessiondata : SessionData | null = await session_data();
+                let tries = 0;
+                    while (sessiondata === null) {
+                        tries++;
+                        console.log("Request" + tries);
+                        sessiondata = await session_data();
+                        await new Promise(r => setTimeout(r, 5000));
+                    }
+                    CookieStore.update_with_sessionData(sessiondata);
+                    dev_loaded.set(true);
+                    is_loading.set(false);
+            } catch (e) {
+                console.log("Backend not loaded");
             }
-            is_loading = true;
-            CookieStore.update_with_sessionData(sessiondata);
-            dev_loaded.set(true);
         }
     })
 

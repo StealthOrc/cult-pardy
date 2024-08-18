@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use crate::apis::error::{ApiError, ApiSessionError, ToResponse};
+use crate::apis::error::{ApiError, ApiGameError, ApiSessionError, ToResponse2};
 use crate::data::{SessionRequest};
 use crate::services::db::MongoServer;
 use crate::services::game::{CreateLobby, FileMetadata};
@@ -26,6 +26,8 @@ use crate::authentication::discord::is_admin;
 use crate::services::game;
 use crate::services::game::UserSession;
 
+use super::data;
+
 #[utoipa::path(
     get,
     path = "/api/info",
@@ -35,9 +37,10 @@ use crate::services::game::UserSession;
         ("lobby-id" = String, Header, description = "Lobby ID")
     ),
     responses(
-        (status = 200, description = "User session retrieved successfully", body = UserSessionWithAdmin),
-        (status = 404, description = "No User Session", body = ApiSessionError),
-        (status = 500, description = "No Lobby found", body = ApiError)
+        (status = 200, description = "Lobby exits", body = String),
+        (status = 404, description = "No Lobby found", body = ApiError),
+        (status = 500, description = "Game error", body = ApiError),
+        (status = 500, description = "Request error", body = ApiError)
     ),
     security(
         ("cookie" = ["user_session_id", "user_session_token"])
@@ -51,15 +54,14 @@ async fn game_info(req: HttpRequest, srv: web::Data<Addr<game::GameServer>>) -> 
         Ok(data) => data,
         Err(error) => return Ok(error),
     };
-    let lobby = srv.send(game::LobbyExists { lobby_id: LobbyId::of(lobby_id.clone())}).await.expect("No Lobby found!");
-    let error = json!(
-        {
-            "Error": "Lobby not found",
-            "Lobby": lobby_id
-        }
-    );
-    let user =match lobby {
-        false => return Ok(HttpResponse::from(HttpResponse::InternalServerError().json(error))),
+
+    let lobby =  match srv.send(game::LobbyExists { lobby_id: LobbyId::of(lobby_id.clone())}).await {
+        Ok(data) => data,
+        Err(_) => return Ok(ApiGameError::GameError(lobby_id).to_response()),
+    };
+
+    let user = match lobby {
+        false => return Ok(ApiGameError::LobbyNotFound(lobby_id).to_response()),
         true => "Found something"
     };
     Ok(HttpResponse::from(HttpResponse::Ok().json(user)))
@@ -290,7 +292,6 @@ async fn session_data_request(req: HttpRequest, db: web::Data<Arc<MongoServer>>)
      user_session_id: user_session.user_session_id.clone(), 
      session_token: user_session.session_token.clone() 
     };
-
     let mut response = HttpResponse::from(HttpResponse::Ok().json(sessionrequest));
     set_session_token_cookie(&mut response, &user_session);
     Ok(response)

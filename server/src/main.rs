@@ -16,9 +16,9 @@ use actix_web::error::ErrorBadRequest;
 use actix_web::{get, web, App, HttpRequest, HttpResponse, HttpServer};
 use anyhow::Result;
 
-use apis::api::{session_data_request, upload_file_part, UserSessionWithAdmin};
+use apis::api::{game_info, session_data_request, upload_file_part, UserSessionWithAdmin};
 use apis::data::{extract_header_string, get_session, set_session_token_cookie};
-use apis::error::{ApiError, ApiSessionError, ApiRequestError};
+use apis::error::{ApiError, ApiGameError, ApiRequestError, ApiSessionError};
 use attohttpc::Session;
 use authentication::discord::is_admin;
 use bson::doc;
@@ -59,8 +59,6 @@ async fn main() -> Result<()> {
     let port = settings.backend_settings.port;
     let addr = parse_addr_str(addr, port);
 
-
-
     let services = Services::init(&settings).await;
     #[derive(OpenApi)]
     #[openapi(
@@ -70,6 +68,7 @@ async fn main() -> Result<()> {
         ),
         paths(
             apis::api::api_session_request,
+            apis::api::game_info
         ),
         components(
             schemas(
@@ -83,7 +82,8 @@ async fn main() -> Result<()> {
                 DiscordID,
                 ApiError,
                 ApiSessionError,
-                ApiRequestError
+                ApiRequestError,
+                ApiGameError
             ))
     )]
     struct ApiDoc;
@@ -129,6 +129,7 @@ async fn main() -> Result<()> {
                 SwaggerUi::new("/swagger-ui/{_:.*}")
                 .url("/api-doc/openapi.json", api_doc.clone())
             )
+            .service(game_info)
             .service(discord::discord_oauth)
             .service(discord::grant_access)
             .service(discord::login_only)

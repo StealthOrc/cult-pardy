@@ -126,6 +126,7 @@ impl Lobby {
                 if websocket_session.ping <= 1 || !websocket_session.addr.connected() {
                     continue;
                 }
+                println!("Sending pings to session {:?} in lobby={:?}", websocket_session.user_session_id.id, &act.lobby_id.id);
                 let event = SessionEvent::SessionsPing(session_pings.clone());
                 websocket_session.addr.do_send(SendSessionMessageType::Data(WebsocketServerEvents::Session(event)));
             }

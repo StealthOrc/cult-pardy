@@ -16,7 +16,7 @@ use cult_common::wasm_lib::ids::lobby::LobbyId;
 use cult_common::wasm_lib::ids::usersession::UserSessionId;
 use crate::services::game::UserSession;
 
-use super::error::{ApiRequestError, ErrorType, ToApiError, ToResponse};
+use super::error::{ApiRequestError, ErrorType, ToApiError, ToResponse2};
 
 
 pub fn get_internal_server_error_json(body: Value) -> HttpResponse {
@@ -143,14 +143,27 @@ pub fn get_validate_hash_from_value(req: &HttpRequest) -> Option<ValidateHash> {
 }
 
 pub async fn get_session_with_token_update_or_create_new(req: &HttpRequest, db: &web::Data<Arc<MongoServer>>) -> UserSession {
-    let user_session_id = match get_user_id_from_value(&req).or(get_user_id_from_cookie(&req)) {
+    let user_session_id_cookie = get_user_id_from_cookie(&req);
+    let user_session_id_value = get_user_id_from_value(&req);
+
+    
+
+
+    //println!("User-session-id-value: {:?} User-session-id-cookie: {:?}", user_session_id_value.clone().unwrap_or(UserSessionId::server()).id, user_session_id_cookie.clone().unwrap_or(UserSessionId::server()).id);
+
+    let user_session_id = match user_session_id_value.or(user_session_id_cookie) {
         Some(data) => data,
         None =>  {
             println!("User-session-id cookie not found");
             return db.new_user_session().await
         }
     };
-    let session_token = match get_session_token_from_value(&req).or(get_session_token_from_cookie(&req)) {
+
+    let session_token_cookie = get_session_token_from_cookie(&req);
+    let session_token_value = get_session_token_from_value(&req);
+    // println!("Session-token-value: {:?} Session-token-cookie: {:?}", session_token_value.clone().unwrap_or(SessionToken::server()).token, session_token_cookie.clone().unwrap_or(SessionToken::server()).token);
+
+    let session_token = match session_token_value.or(session_token_cookie) {
         Some(data) => data,
         None =>  {
             println!("Session-cookie not found");

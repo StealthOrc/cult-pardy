@@ -1,18 +1,19 @@
 use actix_web::HttpResponse;
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
+use utoipa::{openapi::{RefOr, Response, ResponseBuilder}, ToResponse, ToSchema};
 
 #[allow(dead_code)]
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 pub enum ApiError {
     Session(ApiSessionError),
+    Game(ApiGameError),
     Request(ApiRequestError),
     Internal(String),
 
 }
 
-pub trait ToResponse {
+pub trait ToResponse2 {
     fn to_response(&self) -> HttpResponse;
     
 }
@@ -22,12 +23,37 @@ pub trait ToApiError {
     
 }
 
-impl ToResponse for ApiError {
+impl ToResponse2 for ApiError {
      fn to_response(&self) -> HttpResponse {
         match self.clone(){
-            ApiError::Session(error) => error.to_response(),
+            ApiError::Session(error) => error.to_response(), 
             ApiError::Request(error) =>  error.to_response(),
-            ApiError::Internal(_) =>  HttpResponse::InternalServerError().json(self),
+            ApiError::Game(error) => error.to_response(),
+            ApiError::Internal(_) =>  HttpResponse::InternalServerError().json(self), // 500
+        }
+    }
+    
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema, ToResponse)]
+pub enum ApiGameError {
+    GameError(String),
+    LobbyInvalid(String),
+    LobbyNotFound(String),
+}
+
+impl ToApiError for ApiGameError {
+    fn to_api_error(&self) -> ApiError {
+        ApiError::Game(self.clone())
+    }
+}
+
+impl ToResponse2 for ApiGameError {
+    fn to_response(&self) -> HttpResponse {
+        match self.clone(){
+            ApiGameError::GameError(_) => HttpResponse::InternalServerError().json(self), // 500
+            ApiGameError::LobbyInvalid(_) => HttpResponse::BadRequest().json(self), // 400
+            ApiGameError::LobbyNotFound(_) => HttpResponse::NotFound().json(self), // 404
         }
     }
     
@@ -36,8 +62,7 @@ impl ToResponse for ApiError {
 
 
 
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema, ToResponse)]
 pub enum ApiSessionError {
     SessionNotFound,
     SessionExpired(String),
@@ -48,16 +73,16 @@ pub enum ApiSessionError {
     SessionNotAdmin(String),
 }
 
-impl ToResponse for ApiSessionError { 
+impl ToResponse2 for ApiSessionError { 
     fn to_response(&self) -> HttpResponse {
         match self.clone(){
-            ApiSessionError::SessionNotFound => HttpResponse::NotFound().json(self),
-            ApiSessionError::SessionExpired(_) => HttpResponse::Unauthorized().json(self),
-            ApiSessionError::SessionInvalid(_) => HttpResponse::BadRequest().json(self),
-            ApiSessionError::SessionError(_) => HttpResponse::InternalServerError().json(self),
-            ApiSessionError::SessionNotAuthorized(_) => HttpResponse::Unauthorized().json(self),
-            ApiSessionError::SessionNotAuthenticated(_) => HttpResponse::Unauthorized().json(self),
-            ApiSessionError::SessionNotAdmin(_) => HttpResponse::Unauthorized().json(self),
+            ApiSessionError::SessionNotFound => HttpResponse::NotFound().json(self), // 404
+            ApiSessionError::SessionExpired(_) => HttpResponse::Unauthorized().json(self), // 401
+            ApiSessionError::SessionInvalid(_) => HttpResponse::BadRequest().json(self), // 400 
+            ApiSessionError::SessionError(_) => HttpResponse::InternalServerError().json(self), // 500 
+            ApiSessionError::SessionNotAuthorized(_) => HttpResponse::Unauthorized().json(self), // 401 
+            ApiSessionError::SessionNotAuthenticated(_) => HttpResponse::Unauthorized().json(self), // 401
+            ApiSessionError::SessionNotAdmin(_) => HttpResponse::Unauthorized().json(self), // 401
         }
     }
     
@@ -79,12 +104,12 @@ pub enum ApiRequestError {
     
 }
 
-impl ToResponse for ApiRequestError {
+impl ToResponse2 for ApiRequestError {
     fn to_response(&self) -> HttpResponse {
         match self.clone(){
-            ApiRequestError::RequestError(_,_) => HttpResponse::InternalServerError().json(self),
-            ApiRequestError::RequestInvalid(_,_) => HttpResponse::BadRequest().json(self),
-            ApiRequestError::RequestNotFound(_) => HttpResponse::NotFound().json(self),
+            ApiRequestError::RequestError(_,_) => HttpResponse::InternalServerError().json(self), // 500
+            ApiRequestError::RequestInvalid(_,_) => HttpResponse::BadRequest().json(self), // 400
+            ApiRequestError::RequestNotFound(_) => HttpResponse::NotFound().json(self), // 404 
         }
     }
     

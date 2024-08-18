@@ -77,6 +77,7 @@ impl MongoServer {
         };
 
         collections.user_sessions.create_index(IndexModel::builder().keys(doc! {"user_session_id.id": 1}).build()).await.expect("Failed to create index");
+        collections.user_sessions.create_index(IndexModel::builder().keys(doc! {"session_token.token": 1}).build()).await.expect("Failed to create index");
         //discord_auth.discord_user.discord_id.id
         collections.user_sessions.create_index(IndexModel::builder().keys(doc! {"discord_auth.discord_user.discord_id.id": 1}).build()).await.expect("Failed to create index");
 
@@ -101,11 +102,11 @@ impl MongoServer {
     
 
     pub async fn get_user_session_with_id(&self, user_session_id: &UserSessionId, session_token:&SessionToken) -> Option<UserSession> {
-        println!("get_user_session_with_id {:?}", user_session_id);
         let result = self.collections.user_sessions.find_one(doc! {"user_session_id.id": &user_session_id.id}).await;
         match result {
-            Err(_) => {
-                println!("Something went wrong");
+            Err(e) => {
+                println!("{:?}", e);
+                println!("Something went wrong {:?} {:?}", user_session_id, session_token);
                 return None;
             }
             Ok(data) => {
@@ -114,11 +115,11 @@ impl MongoServer {
                         //TOKEN CHECK
                         return Some(self.check_token(session, &session_token).await)
                     } else {
-                        println!("Token is not the same");
+                        println!("Token is not the same found session{:?} current{:?}", session.session_token.token, session_token.token);
                         return None;
                     }
                 } else {
-                    println!("No UserSession found");
+                    println!("No UserSession found with id {:?} {:?}", user_session_id, session_token);
                     return None;
                 }
             },
@@ -133,18 +134,17 @@ impl MongoServer {
 
 
     pub async fn get_user_session_with_token_check(&self, user_session_id: &UserSessionId, session_token:&SessionToken) -> UserSession {
-        println!("Checking UserSession with Token {:?} {:?}", user_session_id, session_token);
         let result = self.collections.user_sessions.find_one(doc! {"user_session_id.id": &user_session_id.id, "session_token.token": &session_token.token}).await;
         let optional_session = match result {
             Err(_) => {
-                println!("Something went wrong");
+                println!("Something went wrong2 {:?} {:?}", user_session_id, session_token);
                 return self.new_user_session().await;
             }
             Ok(data) => data,
         };
         return match optional_session {
             None =>  {
-                println!("No UserSession found");
+                println!("No UserSession found with id {:?} {:?}", user_session_id, session_token);
                 return self.new_user_session().await;
             },
             Some(session) => self.check_token(session, &session_token).await
@@ -165,25 +165,28 @@ impl MongoServer {
                     println!("Saved new Token {:?}", clone.session_token.token);
                     return clone.clone()
                 } else {
-                    println!("Failed to save new Token");
+                    println!("Failed to save new Token {:?} {:?} {:?}", cloned.session_token.token, cloned.user_session_id, cloned.session_token.expire);
                     return self.new_user_session().await;
                 }
             }
             return db_user_session.clone()
         } else{
-            print!("Token is not the same");
+            println!("Token is not the same found session{:?} current{:?}", db_user_session.session_token.token, current_token.token);
             return self.new_user_session().await;
          }
     }
+
+    
 
 
     pub async fn update_user_session_token(&self, user_session_id:  &UserSessionId, session_token: &SessionToken) -> bool {
         let status = self.collections.user_sessions.update_one(
             doc! {"user_session_id.id": &user_session_id.id},
-            doc! {"$set": {"session_token.token": &session_token.token, "session_token.expire": &session_token.expire}},
+            doc! {"$set": {"session_token": &session_token}},
         ).await;
         match status {
             Err(_) => {
+                
                 return false;
             }
             Ok(update) => {
@@ -202,6 +205,7 @@ impl MongoServer {
         let result = self.collections.user_sessions.find_one(doc! {"user_session_id.id": &user_session_id.id}).await;
         match result {
             Err(_) => {
+                println!("Something went wrong {:?}", user_session_id);
                 return None;
             }
             Ok(data) => data,

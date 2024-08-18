@@ -110,6 +110,7 @@ impl JeopardyBoard {
             creator,
             categories: cat,
             current,
+            action_state: self.action_state.clone(),
         }
     }
 

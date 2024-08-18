@@ -37,6 +37,7 @@ function getCookies(): SessionCookies {
 export const CookieStore = createCookieStore();
 
 export const dev_loaded : Writable<boolean> = writable(dev ? false : true);
+export const is_loading : Writable<boolean> = writable(false);
 
 
 function createCookieStore() {
@@ -63,7 +64,12 @@ function createCookieStore() {
     }
 
     function update_with_sessionData(sessionData: SessionData) {
+        console.log("SD: id", sessionData.user_session_id.id, "token", sessionData.session_token.token);
+
+
         store.update((cookies) => {
+            console.log("curre id", cookies.userSessionId.id, "token", cookies.sessionToken);
+
             if (cookies.userSessionId.id !== sessionData.user_session_id.id) {
                 cookies.userSessionId.id = sessionData.user_session_id.id;
                 Cookies.set("user-session-id", sessionData.user_session_id.id);

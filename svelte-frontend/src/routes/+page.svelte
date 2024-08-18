@@ -5,7 +5,6 @@
 	import { type DiscordUser } from "cult-common";
 	import PlayerIcon from "./PlayerIcon.svelte";
 	import { discord_session} from "$lib/api/ApiRequests";
-	import LoadingPage from "./DevLoading.svelte";
 	import FileUpload from "$lib/create/FileUpload.svelte";
 	import { FileUploadType } from "$lib/types";
     let lobbyid = '';
@@ -93,8 +92,6 @@
                         <p class="self-center">Login with Discord</p>
                     </a>
                 {/if}
-        {:else}
-            <LoadingPage/>
         {/if}
         <div class="flex space-x-4">
             <FileUpload title="Upload Question File"/>

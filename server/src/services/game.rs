@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use std::sync::Arc;
 use actix::{Actor, Addr, Context, Handler, Message, MessageResult};
-use chrono::{DateTime, Duration, Local};
+use chrono::{DateTime, Duration, Local, Utc};
 
 use cult_common::backend::{JeopardyBoard, LobbyCreateResponse};
 use cult_common::dto::board::DTOSession;
@@ -25,7 +25,7 @@ use crate::authentication::discord::DiscordME;
 use crate::services::authentication::RedeemAdminAccessToken;
 use crate::services::StartingServices;
 use crate::services::db::MongoServer;
-
+use serde::{Deserializer, Serializer};
 use super::lobby::Lobby;
 
 
@@ -111,8 +111,20 @@ pub struct UserSession {
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Deserialize, Serialize, ToSchema)]
 pub struct SessionToken {
     pub token: String,
+    #[serde(serialize_with = "serialize_rfc3339", deserialize_with = "deserialize_rfc3339")]
     pub expire: DateTime<Local>,
 }
+
+
+impl From<SessionToken> for Bson {
+    fn from(token: SessionToken) -> Self {
+        let mut doc = Document::new();
+        doc.insert("token", token.token);
+        doc.insert("expire", token.expire.to_rfc3339());
+        Bson::Document(doc)
+    }
+}
+
 
 impl Default for SessionToken {
     fn default() -> Self {
@@ -123,6 +135,22 @@ impl Default for SessionToken {
     }
 }
 
+fn serialize_rfc3339<S>(date: &DateTime<Local>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let s = date.to_rfc3339();
+    serializer.serialize_str(&s)
+}
+
+fn deserialize_rfc3339<'de, D>(deserializer: D) -> Result<DateTime<Local>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    let date = s.parse::<DateTime<Local>>().map_err(serde::de::Error::custom)?;
+    Ok(date)
+}
 
 
 
@@ -161,6 +189,13 @@ impl SessionToken {
         self.expire < Local::now()
     }
 
+    pub fn server() -> SessionToken {
+        SessionToken {
+            token: "SERVER".to_string(),
+            expire: Local::now(),
+        }
+    }
+
 
 }
 
@@ -181,6 +216,11 @@ pub struct DiscordData {
     pub(crate) discord_user:Option<DiscordUser>,
     pub(crate) basic_token_response:BasicTokenResponse
 }
+
+
+
+
+
 
 
 

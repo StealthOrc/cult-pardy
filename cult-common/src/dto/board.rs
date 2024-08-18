@@ -4,6 +4,7 @@ use tsify_next::Tsify;
 use std::hash::Hash;
 use wasm_bindgen::prelude::*;
 
+use crate::backend::ActionState;
 use crate::wasm_lib::ids::usersession::UserSessionId;
 use crate::wasm_lib::{DiscordUser, QuestionType, Vector2D};
 
@@ -29,11 +30,11 @@ impl DTOSession {
 }
 
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, PartialEq)]
-
 pub struct DtoJeopardyBoard {
     pub creator: UserSessionId,
     pub categories: Vec<DtoCategory>,
     pub current: Option<DtoQuestion>,
+    pub action_state: ActionState,
 }
 
 impl DtoJeopardyBoard {
