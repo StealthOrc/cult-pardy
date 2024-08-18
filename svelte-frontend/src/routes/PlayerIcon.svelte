@@ -43,7 +43,7 @@
 {#if loaded && isAdmin && cookies}  
     <div class="fixed top-5 w-full flex justify-center items-center z-10">
         <div class="relative bg-gray-700 p-4 rounded-lg flex items-center space-x-4 shadow-lg">
-            <!-- Shadow Overlay -->  ´
+            <!-- Shadow Overlay -->  
         
                 <div class="absolute inset-0 bg-gray-900 opacity-50 rounded-lg z-[-1]"></div>
                 {#key discord_user}
