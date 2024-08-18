@@ -147,7 +147,7 @@ pub async fn discord_oauth(
         .append_header(("Location", authorize_url.to_string()))
         .finish();
 
-    set_session_token_cookie(&mut response, &user_session);
+    set_session_token_cookie(&mut response, &settings, &user_session);
     Ok(response)
 }
 
@@ -316,22 +316,22 @@ pub async fn login_only(
             }
         }
     }
-    set_session_token_cookie(&mut response, &user_session);
+    set_session_token_cookie(&mut response, &setings, &user_session);
     Ok(response)
 }
 
 
-fn to_response(mut response: HttpResponse,  user_session: &UserSession) -> anyhow::Result<HttpResponse, actix_web::Error> {
-    set_session_token_cookie(&mut response,  &user_session);
+fn to_response(mut response: HttpResponse, setings: &web::Data<Arc<Settings>>, user_session: &UserSession) -> anyhow::Result<HttpResponse, actix_web::Error> {
+    set_session_token_cookie(&mut response, &setings,  &user_session);
     Ok(response)
 }
 
-pub fn to_main_page(user_session: &UserSession, setting:&Arc<Settings>) -> anyhow::Result<HttpResponse, actix_web::Error> {
+pub fn to_main_page(user_session: &UserSession, settings:&web::Data<Arc<Settings>>) -> anyhow::Result<HttpResponse, actix_web::Error> {
     println!("TO MAIN PAGE");
     let mut response = HttpResponse::Found()
-        .append_header(("Location", setting.backend_settings.get_host()))
+        .append_header(("Location", settings.backend_settings.get_host()))
         .finish();
-    set_session_token_cookie(&mut response,  &user_session);
+    set_session_token_cookie(&mut response, &settings,  &user_session);
     Ok(response)
 }
 
@@ -403,7 +403,7 @@ pub async fn grant_access(
 
 
 
-    set_session_token_cookie(&mut response, &user_session);
+    set_session_token_cookie(&mut response, &settings, &user_session);
     remove_cookie(&mut response, &req, "token");
     Ok(response)
 }

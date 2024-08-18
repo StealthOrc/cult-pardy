@@ -205,7 +205,7 @@ pub struct CFile {
 
 
 #[get("/api/file")]
-async fn get_file_from_name(req: HttpRequest,  db: web::Data<Arc<MongoServer>>) -> Result<HttpResponse, actix_web::Error> {
+async fn get_file_from_name(req: HttpRequest,  db: web::Data<Arc<MongoServer>>, settings:web::Data<Arc<Settings>>) -> Result<HttpResponse, actix_web::Error> {
     let user_session = match get_session(&req, &db).await {
         Some(data) => data,
         None => return Ok(HttpResponse::Unauthorized().json("You are not authorized to access this file")),
@@ -264,7 +264,7 @@ async fn get_file_from_name(req: HttpRequest,  db: web::Data<Arc<MongoServer>>) 
                                             Ok::<_, actix_web::Error>(Bytes::from(buf))
                                         }));
 
-    set_session_token_cookie(&mut response, &user_session);
+    set_session_token_cookie(&mut response, &settings,&user_session);
     Ok(response)
 }
 

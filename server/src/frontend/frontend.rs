@@ -58,7 +58,7 @@ async fn find_game(
 
     let lobby_addr = match srv.send(game::LobbyAddrRequest{lobby_id:lobby_id.clone()}).await.expect("No Lobby found!") {
         Some(data) => data,
-        None => return Ok(session_error(&user_session, "No Lobby Found")),
+        None => return Ok(session_error(&settings, &user_session, "No Lobby Found")),
     };
 
     let can_join = lobby_addr.send(CanJoinLobby { user_session_id: user_session.user_session_id.clone()}).await.expect("No Lobby found!");
@@ -69,7 +69,7 @@ async fn find_game(
         return to_main_page(&user_session, &settings)
     }
     let mut response = index_response(&req);
-    set_session_token_cookie(&mut response, &user_session);
+    set_session_token_cookie(&mut response, &settings,&user_session);
     Ok(response)
 }
 
@@ -109,8 +109,8 @@ async fn grant_admin_access(
         }
     }
 
-    set_session_token_cookie(&mut response, &user_session);
-    set_cookie(&mut response,"token", &grand_id.to_string());
+    set_session_token_cookie(&mut response, &settings, &user_session);
+    set_cookie(&mut response, &settings,"token", &grand_id.to_string());
     Ok(response)
 }
 
@@ -118,12 +118,13 @@ async fn grant_admin_access(
 async fn index(
     req: HttpRequest,
     db : web::Data<Arc<MongoServer>>,
+    settings: web::Data<Arc<settings::Settings>>,
 ) -> actix_web::Result<HttpResponse> {
     let user_session = get_session_with_token_update_or_create_new(&req, &db).await;
     let mut response = index_response(&req);
     remove_cookie(&mut response, &req, "token");
     println!("Session: {:#?}", user_session);
-    set_session_token_cookie(&mut response, &user_session);
+    set_session_token_cookie(&mut response,&settings, &user_session);
     Ok(response)
 }
 

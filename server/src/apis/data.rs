@@ -3,6 +3,7 @@ use std::sync::Arc;
 use crate::data::SessionRequest;
 use crate::services::db::MongoServer;
 use crate::services::game::SessionToken;
+use crate::settings::Settings;
 
 use actix_web::cookie::Cookie;
 use actix_web::{HttpRequest, HttpResponse, web};
@@ -145,7 +146,7 @@ pub fn get_validate_hash_from_value(req: &HttpRequest) -> Option<ValidateHash> {
 pub async fn get_session_with_token_update_or_create_new(req: &HttpRequest, db: &web::Data<Arc<MongoServer>>) -> UserSession {
     let user_session_id_cookie = get_user_id_from_cookie(&req);
     let user_session_id_value = get_user_id_from_value(&req);
-    
+
     
 
 
@@ -248,21 +249,21 @@ pub fn get_token(req: &HttpRequest) -> Option<usize> {
 
 
 
-pub fn set_cookie(res: &mut HttpResponse, cookie_name: &str, value: &String){
+pub fn set_cookie(res: &mut HttpResponse, settings: &web::Data<Arc<Settings>>,cookie_name: &str, value: &String){
     let cookie = format!("{}={}", cookie_name, value);
     res.headers_mut().append(COOKIE, HeaderValue::from_str(&cookie).unwrap());
     let _cookie = Cookie::build(cookie_name, value)
         .path("/")
         .permanent()
-        .secure(true)
+        .secure(settings.backend_settings.ssl)
         .finish();
     res.add_cookie(&_cookie).expect("Can´t add cookies to the Response");
 }
 
 
-pub fn set_session_token_cookie(response: &mut HttpResponse, user_session: &UserSession){
-    set_cookie(response, "user-session-id", &user_session.user_session_id.id.to_string());
-    set_cookie(response, "session-token", &user_session.session_token.token);
+pub fn set_session_token_cookie(response: &mut HttpResponse, settings: &web::Data<Arc<Settings>>, user_session: &UserSession){
+    set_cookie(response,settings, "user-session-id", &user_session.user_session_id.id.to_string());
+    set_cookie(response, settings,"session-token", &user_session.session_token.token);
 }
 
 

@@ -4,6 +4,7 @@ use crate::data::{SessionRequest};
 use crate::services::db::MongoServer;
 use crate::services::game::{CreateLobby, FileMetadata};
 use crate::services::lobby::CanJoinLobby;
+use crate::settings::Settings;
 use actix::Addr;
 
 use actix_multipart::Multipart;
@@ -92,14 +93,14 @@ pub struct UserSessionWithAdmin{
 
 )]
 #[get("/api/session")]
-async fn api_session_request(req: HttpRequest ,db:web::Data<Arc<MongoServer>> ) -> Result<HttpResponse, actix_web::Error> {
+async fn api_session_request(req: HttpRequest ,db:web::Data<Arc<MongoServer>>, settings: web::Data<Arc<Settings>>) -> Result<HttpResponse, actix_web::Error> {
     let user_session = match get_session(&req, &db).await {
         Some(data) => data,
         None => return Ok(ApiError::Session(ApiSessionError::NotFound).to_response()),
     };
     let is_admin = is_admin(&user_session, &db).await;
     let mut response = HttpResponse::from(HttpResponse::Ok().json(UserSessionWithAdmin{user_session:user_session.clone(), is_admin}));
-    set_session_token_cookie(&mut response,  &user_session);
+    set_session_token_cookie(&mut response, &settings, &user_session);
     Ok(response)
 }
 
@@ -293,11 +294,11 @@ pub async fn file_part_error(stream: Option<GridFsUploadStream>,api_error:ApiErr
 }
 
 
-pub fn session_error(user_session:&UserSession, str:&str) -> HttpResponse {
+pub fn session_error(settings: &web::Data<Arc<Settings>>, user_session:&UserSession, str:&str) -> HttpResponse {
     let mut response = HttpResponse::InternalServerError().json(json!({
         "Error": str
     }));
-    set_session_token_cookie(&mut response,  &user_session);
+    set_session_token_cookie(&mut response, settings, &user_session);
     response
 }
 
@@ -321,7 +322,7 @@ pub fn session_error(user_session:&UserSession, str:&str) -> HttpResponse {
     )
 )]
 #[get("/api/session-data")]
-async fn session_data_request(req: HttpRequest, db: web::Data<Arc<MongoServer>>) -> Result<HttpResponse, actix_web::Error> {
+async fn session_data_request(req: HttpRequest, db: web::Data<Arc<MongoServer>>, settings: web::Data<Arc<Settings>>) -> Result<HttpResponse, actix_web::Error> {
     println!("SESSION DATA REQUEST");
     let user_session = get_session_with_token_update_or_create_new(&req, &db).await;
     let sessionrequest : SessionRequest = SessionRequest{
@@ -329,7 +330,7 @@ async fn session_data_request(req: HttpRequest, db: web::Data<Arc<MongoServer>>)
      session_token: user_session.session_token.clone() 
     };
     let mut response = HttpResponse::from(HttpResponse::Ok().json(sessionrequest));
-    set_session_token_cookie(&mut response, &user_session);
+    set_session_token_cookie(&mut response,&settings, &user_session);
     Ok(response)
 }
 
@@ -357,14 +358,14 @@ async fn session_data_request(req: HttpRequest, db: web::Data<Arc<MongoServer>>)
     )
 )]
 #[get("/api/authorization")]
-async fn has_authorization(req: HttpRequest, db: web::Data<Arc<MongoServer>>) -> HttpResponse {
+async fn has_authorization(req: HttpRequest, db: web::Data<Arc<MongoServer>>, settings: web::Data<Arc<Settings>>) -> HttpResponse {
     let user_session = match get_session(&req, &db).await {
         Some(data) => data,
         None => return ApiSessionError::NotFound.to_api_error().to_response(),
     };
     let admin = is_admin(&user_session, &db).await;
     let mut response = HttpResponse::from(HttpResponse::Ok().json(ApiResponse::new(admin)));
-    set_session_token_cookie(&mut response, &user_session);
+    set_session_token_cookie(&mut response, &settings, &user_session);
     response
 }
 
@@ -394,7 +395,7 @@ pub struct DiscordSessionResponse{
     )
 )]
 #[get("/api/discord_session")]
-async fn discord_session(req: HttpRequest, db: web::Data<Arc<MongoServer>>) -> HttpResponse {
+async fn discord_session(req: HttpRequest, db: web::Data<Arc<MongoServer>>, settings: web::Data<Arc<Settings>>) -> HttpResponse {
     let user_session = match get_session(&req, &db).await {
         Some(data) => data,
         None => return ApiSessionError::NotFound.to_api_error().to_response(),
@@ -404,7 +405,7 @@ async fn discord_session(req: HttpRequest, db: web::Data<Arc<MongoServer>>) -> H
         Some(data) => data.discord_user,
     };
     let mut response = HttpResponse::from(HttpResponse::Ok().json(discord_user));
-    set_session_token_cookie(&mut response, &user_session);
+    set_session_token_cookie(&mut response, &settings, &user_session);
     response
 }
 
@@ -440,7 +441,7 @@ async fn discord_session(req: HttpRequest, db: web::Data<Arc<MongoServer>>) -> H
     )
 )]
 #[post("/api/create")]
-async fn create_game_lobby(req: HttpRequest,json: web::Json<Option<JeopardyBoard>>, srv: web::Data<Addr<game::GameServer>>, db: web::Data<Arc<MongoServer>>) -> HttpResponse {
+async fn create_game_lobby(req: HttpRequest,json: web::Json<Option<JeopardyBoard>>, srv: web::Data<Addr<game::GameServer>>, db: web::Data<Arc<MongoServer>>, settings: web::Data<Arc<Settings>>) -> HttpResponse {
     let user_session = match get_session(&req, &db).await {
         Some(data) => data,
         None => return ApiSessionError::NotFound.to_api_error().to_response(),
@@ -460,7 +461,7 @@ async fn create_game_lobby(req: HttpRequest,json: web::Json<Option<JeopardyBoard
     };
 
     let mut response = HttpResponse::from(HttpResponse::Ok().json(data));
-    set_session_token_cookie(&mut response, &user_session);
+    set_session_token_cookie(&mut response, &settings, &user_session);
     response
 }
 
@@ -492,7 +493,7 @@ async fn create_game_lobby(req: HttpRequest,json: web::Json<Option<JeopardyBoard
     )
 )]
 #[get("/api/join")]
-async fn join_game(req: HttpRequest, srv: web::Data<Addr<game::GameServer>>, db: web::Data<Arc<MongoServer>>) -> Result<HttpResponse, actix_web::Error> {
+async fn join_game(req: HttpRequest, srv: web::Data<Addr<game::GameServer>>, db: web::Data<Arc<MongoServer>>, settings: web::Data<Arc<Settings>>) -> Result<HttpResponse, actix_web::Error> {
     println!("{:?}", extract_header_string(&req, "lobby-id"));
     let lobby_id = match get_lobby_id_from_header(&req){
         Some(data) => data,
@@ -515,7 +516,7 @@ async fn join_game(req: HttpRequest, srv: web::Data<Addr<game::GameServer>>, db:
         Err(_) => return Ok(ApiGameError::GameError("No Lobby found!".to_string()).to_response()),
     };
     let mut response = HttpResponse::from(HttpResponse::Ok().json(ApiResponse::new(can_join)));
-    set_session_token_cookie(&mut response, &user_session);
+    set_session_token_cookie(&mut response, &settings, &user_session);
     Ok(response)
 }
 
