@@ -20,6 +20,10 @@
     let loaded = false;
 
     onMount(async () => {
+
+
+
+        
         let session_res= await discord_session();
         if (session_res) {
             discord_user = session_res;

@@ -29,6 +29,7 @@ export type SessionCookies = {
 function getCookies(): SessionCookies {
     default_cookies.userSessionId.id =  Cookies.get("user-session-id") || "";
     default_cookies.sessionToken = Cookies.get("session-token") || "";
+    console.log("Cookies", default_cookies);
     return default_cookies;
 }
 

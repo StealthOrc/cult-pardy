@@ -122,6 +122,7 @@ async fn index(
     let user_session = get_session_with_token_update_or_create_new(&req, &db).await;
     let mut response = index_response(&req);
     remove_cookie(&mut response, &req, "token");
+    println!("Session: {:#?}", user_session);
     set_session_token_cookie(&mut response, &user_session);
     Ok(response)
 }

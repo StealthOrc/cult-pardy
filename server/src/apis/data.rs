@@ -145,7 +145,7 @@ pub fn get_validate_hash_from_value(req: &HttpRequest) -> Option<ValidateHash> {
 pub async fn get_session_with_token_update_or_create_new(req: &HttpRequest, db: &web::Data<Arc<MongoServer>>) -> UserSession {
     let user_session_id_cookie = get_user_id_from_cookie(&req);
     let user_session_id_value = get_user_id_from_value(&req);
-
+    
     
 
 
