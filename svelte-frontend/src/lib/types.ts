@@ -1,4 +1,5 @@
-import type { DtoJeopardyBoard, ActionState } from "cult-common"
+import type { MediaState } from "cult-common";
+
 
 export enum FileUploadType {
     BOARDJSON,
@@ -14,9 +15,11 @@ export enum VideoPlayerType {
 export type BoardContext = {
   requestPlay: () => boolean;
   requestPause: (value: number) => boolean;
+  changeMediaState: (state: MediaState) => void;
+  requestSyncBackward: () => void;
+  requestSyncForward: (calculated_diff: number) => void;
 };
 
 export type MediaPlayerContext = {
-    play: () => void;
-    pause: () => void;
+    changeState(state: MediaState): void;    
 }

@@ -1,12 +1,13 @@
-use ids::discord::DiscordID;
+use ids::{discord::DiscordID, usersession::UserSessionId, websocketsession::{self, WebsocketSessionId}};
 use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
 use utoipa::ToSchema;
+use websocket_events::MediaState;
 use std::hash::Hash;
 use std::string::ToString;
 use wasm_bindgen::prelude::*;
 
-use crate::backend::{ActionState, MediaPlayer};
+use crate::backend::{ActionState};
 
 pub mod ids;
 pub mod websocket_events;
@@ -112,9 +113,9 @@ pub enum MediaType {
 
 
 impl QuestionType {
-    pub fn get_action_state(self: &QuestionType) -> ActionState {
+    pub fn get_action_state(self: &QuestionType, user_session_id:&UserSessionId, websocketsession:&WebsocketSessionId) -> ActionState {
         match self {
-            QuestionType::Video(_) =>  ActionState::MediaPlayer(MediaPlayer::default()),
+            QuestionType::Video(_) =>  ActionState::MediaPlayer(MediaState::new(websocketsession)),
             _ => ActionState::None,
         }
     }

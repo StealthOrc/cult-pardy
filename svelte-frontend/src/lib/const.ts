@@ -12,6 +12,9 @@ const CONST ={
         //Contexts
         MEDIAPLAYERCTX: 'mediaplayer',
         BOARDCTX: 'board',
+        num_time_sync_cycles: 10,
+        PLAYING_THRESH: 1,
+        PAUSED_THRESH: 0.05,
     }
 
  export { CONST };

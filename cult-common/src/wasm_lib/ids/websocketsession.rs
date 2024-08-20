@@ -4,7 +4,7 @@ use tsify_next::Tsify;
 use wasm_bindgen::prelude::wasm_bindgen;
 
 
-#[derive(Tsify,Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Tsify,Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize, Default)]
 pub struct WebsocketSessionId {
     pub id: String,
 }

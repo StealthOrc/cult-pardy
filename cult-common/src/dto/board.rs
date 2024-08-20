@@ -29,7 +29,7 @@ impl DTOSession {
 
 }
 
-#[derive(Tsify,Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Tsify,Debug, Clone, Serialize, Deserialize)]
 pub struct DtoJeopardyBoard {
     pub creator: UserSessionId,
     pub categories: Vec<DtoCategory>,

@@ -37,7 +37,7 @@ if(dev) {
 function get_ws(lobbyId: string, userSessionId: UserSessionId, sessionToken: string) : WebSocketSubject<WebsocketSessionEvent> {
     const host = location.host
     console.log("HOST", host)
-     return webSocket({
+    const ws = webSocket({
         url: `ws://${host}/ws?lobby-id=${lobbyId}&user-session-id=${userSessionId.id}&session-token=${sessionToken}`,
         //use binaryType: 'arraybuffer' if you are sending binary data
         binaryType: 'arraybuffer',
@@ -54,6 +54,7 @@ function get_ws(lobbyId: string, userSessionId: UserSessionId, sessionToken: str
             return deflated;
         }
     });
+    return ws;
 }
 
 
@@ -86,6 +87,7 @@ function createWebsocketStore(lobbyId: string, userSessionId: UserSessionId, ses
             return ws;
         });
     }
+
 
 
     return {

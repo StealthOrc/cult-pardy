@@ -1,4 +1,5 @@
 
+use chrono::{Local, Utc};
 use serde::{Deserialize, Serialize};
 use strum::Display;
 use tsify_next::Tsify;
@@ -10,7 +11,7 @@ use crate::dto::board::{DTOSession, DtoJeopardyBoard, DtoQuestion};
 
 use super::ids::lobby::LobbyId;
 use super::ids::usersession::UserSessionId;
-use super::ids::websocketsession::WebsocketSessionId;
+use super::ids::websocketsession::{self, WebsocketSessionId};
 use super::Vector2D;
 
 
@@ -42,8 +43,9 @@ impl WebsocketServerEvents {
 
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, Display)]
 pub enum ActionStateEvent {
-    Media(ActionMediaEvent)
-
+    Media(ActionMediaEvent),
+    SyncForward(f64),
+    SyncBackward(i64),
 
 }
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, Display)]
@@ -51,8 +53,32 @@ pub enum ActionMediaEvent {
     Play,
     Pause,
     Resume,
+    ChangeState(MediaState),
 }
 
+#[derive(Tsify,Debug, Clone, Serialize,Deserialize,)]
+pub struct MediaState {
+    pub video_timestamp: f64,
+    pub last_updated: f64,
+    pub playing: bool,
+    pub global_timestamp: f64,
+    //Skip
+    #[serde(skip)]
+    pub interaction_id: WebsocketSessionId,
+}
+
+impl MediaState {
+    pub fn new(websocketsession:&WebsocketSessionId) -> Self {
+        MediaState {
+            video_timestamp: 0.0,
+            last_updated: Local::now().timestamp_millis() as f64,
+            playing: false,
+            global_timestamp: 0.0,
+            interaction_id: websocketsession.clone(),
+        }
+    }
+    
+}
 
 
 
@@ -85,13 +111,18 @@ pub enum WebsocketSessionEvent {
     Back,
     AddUserSessionScore(UserSessionId, Vector2D),
     VideoEvent(VideoEvent),
+    SyncBackwardRequest,
+    SyncForwardRequest(f64)
     
 }
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, Display)]
 pub enum VideoEvent {
     Play,
-    Pause(i64),
-    Resume(i64),
+    Pause(f64),
+    Resume,
+    ChangeState(MediaState),
+    
+    
 }
 
 

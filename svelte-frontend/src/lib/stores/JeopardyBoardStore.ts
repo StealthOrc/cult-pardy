@@ -42,6 +42,29 @@ function createJeopardyBoardStore() {
         });       
     }
 
+    function getActionState() : ActionState {
+        let state: ActionState = "None";
+        store.update((board) => {
+            if (board == null) {
+                return board;
+            }
+            state = board.action_state;
+            return board;
+        });
+        return state;
+    } 
+
+    function subscribeActionState(this: void, run: Subscriber<ActionState>): Unsubscriber {
+        return store.subscribe((data) => {
+            if (data != null) {
+                run(data.action_state);
+            }   
+        });
+    }
+    
+
+
+
     function subscribe(this: void, run: Subscriber<DtoJeopardyBoard | null>): Unsubscriber {
         return store.subscribe(run);
     }
@@ -52,6 +75,8 @@ function createJeopardyBoardStore() {
         setActionState,
         setBoard,
         subscribe,
+        getActionState,
+        subscribeActionState,
     }
 }
 

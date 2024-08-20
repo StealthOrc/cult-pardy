@@ -25,6 +25,13 @@ export default {
         target: 'http://0.0.0.0:8000',
         changeOrigin: true,
       },
+      '/game/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        rewrite: (path : string) => {
+          return path.replace(/^\/game\/api/, '/api');
+        },
+      },
       '/ws': {
         target: 'ws://0.0.0.0:8000',
         changeOrigin: true,

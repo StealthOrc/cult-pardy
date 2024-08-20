@@ -43,7 +43,6 @@
     }
 
     const onProgress = (progress: FileDownloadProgress) => {
-        console.log('Progress:', progress);
         if (progress.blob != null) {
             blob = progress.blob;
         } else {

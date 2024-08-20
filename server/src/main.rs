@@ -216,9 +216,6 @@ async fn get_file_from_name(req: HttpRequest,  db: web::Data<Arc<MongoServer>>, 
         Err(_) => return Ok(HttpResponse::BadRequest().json("No file name provided")),
     };
         
-    if is_admin(&user_session, &db).await == false {
-        return Ok(HttpResponse::from(HttpResponse::Unauthorized().json("You are not authorized to access this file")));
-    }
     let file_data = match db.collections.file_bucket_files.find_one(doc!{"filename":Some(file_name.clone())}).await {
         Ok(data) => {
             if let Some(data) = data {

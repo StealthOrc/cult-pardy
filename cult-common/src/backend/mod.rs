@@ -3,11 +3,13 @@ use serde::{Deserialize, Deserializer, Serialize};
 use tsify_next::Tsify;
 use utoipa::ToSchema;
 use std::string::ToString;
+use std::sync::{Arc, Mutex};
 use wasm_bindgen::prelude::*;
 
 use crate::dto::board::{DtoCategory, DtoJeopardyBoard, DtoQuestion};
 use crate::wasm_lib::ids::lobby::LobbyId;
 use crate::wasm_lib::ids::usersession::UserSessionId;
+use crate::wasm_lib::websocket_events::MediaState;
 use crate::wasm_lib::{JeopardyMode, QuestionType, Vector2D};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, ToSchema)]
@@ -16,7 +18,7 @@ pub enum LobbyCreateResponse {
     Error(String),
 }
 
-#[derive(Tsify,Debug, Clone, Serialize, Eq, PartialEq, ToSchema)]
+#[derive(Tsify,Debug, Clone, Serialize, ToSchema)]
 pub struct JeopardyBoard {
     pub title: String,
     pub categories: Vec<Category>,
@@ -25,7 +27,7 @@ pub struct JeopardyBoard {
     #[serde(skip_serializing)]
     pub create: DateTime<Local>,
     #[serde(skip_serializing)]
-    pub action_state: ActionState,
+    pub action_state: Arc<Mutex<ActionState>>,
 }
 
 
@@ -66,7 +68,7 @@ impl JeopardyBoard {
             categories,
             current: None,
             create: Local::now(),
-            action_state: ActionState::None,
+            action_state: Arc::new(Mutex::new(ActionState::None)),
         }
     }
 
@@ -111,7 +113,7 @@ impl JeopardyBoard {
             creator,
             categories: cat,
             current,
-            action_state: self.action_state.clone(),
+            action_state: self.action_state.lock().expect("Error while locking action state").clone(),
         }
     }
 
@@ -182,19 +184,30 @@ impl<'de> Deserialize<'de> for JeopardyBoard {
             categories: partial_board.categories,
             current: None,
             create: Local::now(),
-            action_state: ActionState::None,
+            action_state:   Arc::new(Mutex::new(ActionState::None)),
         };
 
         Ok(board)
     }
 }
-#[derive(Tsify,Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Tsify,Debug, Clone, Serialize, Deserialize)]
 pub enum ActionState {
     None,
-    MediaPlayer(MediaPlayer),
+    MediaPlayer(MediaState),
 }
 
-#[derive(Tsify,Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+
+
+impl ActionState {
+
+    pub fn update(&mut self, action: ActionState) {
+        *self = action;
+    }
+    
+}
+
+
+/*#[derive(Tsify,Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct MediaPlayer {
     pub starting_time: DateTime<Local>,
     pub video_start: i32,
@@ -215,7 +228,7 @@ impl MediaPlayer {
         }
     }
     
-}
+}*/
 
 
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, Eq, PartialEq, ToSchema)]

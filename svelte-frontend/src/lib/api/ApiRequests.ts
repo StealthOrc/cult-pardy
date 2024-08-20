@@ -121,7 +121,7 @@ export function objectToFormData(obj: Record<string, any>, formData = new FormDa
 }
 
 
-export async function api_post_request(url: string, data:unknown,token:string, type: RequestContentType): Promise<Response> {
+export async function api_post_request(url: string, data:unknown, type: RequestContentType): Promise<Response> {
     try {
         if (!updater) {
             CookieStore.subscribe((c) => {
@@ -132,7 +132,7 @@ export async function api_post_request(url: string, data:unknown,token:string, t
         if (cookies == null) {
             throw new Error("No cookies");
         }
-        return await fetch(url + `?user-session-id=${cookies.userSessionId.id}&session-token=${cookies.sessionToken}&file-token=${token}`, {
+        return await fetch(url + `?user-session-id=${cookies.userSessionId.id}&session-token=${cookies.sessionToken}`, {
             method: 'POST',
             headers: {
                 'Content-Type': type
@@ -160,7 +160,7 @@ export async function api_post_formrequest(url: string, form:FormData, type: Req
         }
        
         // POST Rquest with form data
-        return await fetch(url + `?user-session-id=${cookies.userSessionId.id}&session-token=${cookies.sessionToken}?file-name=FlyHigh3.mp4`, {
+        return await fetch(url + `?user-session-id=${cookies.userSessionId.id}&session-token=${cookies.sessionToken}`, {
             method: 'POST',
             headers: {
                 'Content-Type': type
@@ -189,6 +189,7 @@ export async function api_get_request(url: string, type: RequestContentType, hea
         if (cookies == null) {
             throw new Error("No cookies");
         }
+        console.log("URL222222", url);
         headers.append("Content-Type", type);
         return await fetch(url + `?user-session-id=${cookies.userSessionId.id}&session-token=${cookies.sessionToken}`, {
             method: 'GET',

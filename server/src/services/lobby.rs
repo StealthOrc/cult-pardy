@@ -5,13 +5,14 @@ use std::sync::Arc;
 use std::time::Duration;
 use actix::{Actor, ActorFutureExt, Addr, AsyncContext, Context, Handler, Message, Recipient, ResponseActFuture, WrapFuture};
 
-use cult_common::backend::{JeopardyBoard, Question};
+use chrono::{Local, Utc};
+use cult_common::backend::{ActionState, JeopardyBoard, Question};
 use cult_common::dto::board::DTOSession;
 use cult_common::wasm_lib::ids::discord::DiscordID;
 use cult_common::wasm_lib::ids::lobby::LobbyId;
 use cult_common::wasm_lib::ids::usersession::UserSessionId;
 use cult_common::wasm_lib::ids::websocketsession::WebsocketSessionId;
-use cult_common::wasm_lib::websocket_events::{ActionMediaEvent, ActionStateEvent, BoardEvent, SessionEvent, VideoEvent, WebsocketEvent, WebsocketPing, WebsocketServerEvents};
+use cult_common::wasm_lib::websocket_events::{ActionMediaEvent, ActionStateEvent, BoardEvent, MediaState, SessionEvent, VideoEvent, WebsocketEvent, WebsocketPing, WebsocketServerEvents};
 use cult_common::wasm_lib::Vector2D;
 use mongodb::bson::doc;
 use ritelinked::{LinkedHashMap, LinkedHashSet};
@@ -206,11 +207,12 @@ impl Lobby {
         self.creator.eq(user_session_id)
     }
 
-    pub fn set_current_question(&mut self, vector2d: Vector2D) -> Option<Question>{
+    pub fn set_current_question(&mut self, vector2d: Vector2D, user_session_id: &UserSessionId, websocket_session_id: &WebsocketSessionId) -> Option<Question>{
         let qeuestion = self.jeopardy_board.get_mut_question(vector2d).cloned();
         if let Some(value) = qeuestion.clone() {
             self.jeopardy_board.current = Some(vector2d);
-            self.jeopardy_board.action_state = value.question_type.get_action_state();
+            let mut state = self.jeopardy_board.action_state.lock().expect("Failed to lock action state");
+            state.update(value.question_type.get_action_state(user_session_id, websocket_session_id));
         }
          qeuestion
     }
@@ -429,9 +431,13 @@ impl Handler<LobbyClick> for Lobby {
                 is_editor(&user_session_id, &creator, db).await
             }.into_actor(self).map(move |allowed, lobby, _|  {
             if allowed.clone() {
+                let ws_id: WebsocketSessionId = match msg.user_data.websocket_session_id.clone() {
+                    None => return,
+                    Some(id) => id,
+                };
                 let vec = msg.vector_2d.clone();
-                if let Some(question) = lobby.set_current_question(vec){
-                    let action_state = question.question_type.get_action_state();
+                if let Some(question) = lobby.set_current_question(vec, &msg.user_data.user_session_id, &ws_id) {
+                    let action_state = question.question_type.get_action_state(&msg.user_data.user_session_id, &ws_id);
                     let event = WebsocketServerEvents::Board(BoardEvent::CurrentQuestion(question.dto(true, vec.clone()), action_state));
                     lobby.send_lobby_message(&event);
                 }
@@ -593,10 +599,10 @@ impl Handler<UpdateWebsocketPing> for Lobby {
 #[rtype(result = "()")]
 pub struct ReciveVideoEvent{
     pub user_session_id: UserSessionId,
-    pub lobby_id: LobbyId,
+    pub websocket_session_id: WebsocketSessionId,
     pub event: VideoEvent,
 }
-
+const THRESH_IGNORANCE: f64 = 250.0;
 
 impl Handler<ReciveVideoEvent> for Lobby {
     type Result = ResponseActFuture<Self, ()>;
@@ -605,21 +611,56 @@ impl Handler<ReciveVideoEvent> for Lobby {
         let user_session_id = msg.user_session_id.clone();
         let creator = self.creator.clone();
         let db = self.starting_services.mongo_server.clone();
+
         Box::pin(
             async move {
                 is_editor(&user_session_id, &creator, db).await
         }.into_actor(self).map(move |allowed, lobby: &mut Lobby, _|  {
+            let mut state = lobby.jeopardy_board.action_state.lock().expect("Failed to lock action state");
+            let current_state = match state.clone() {
+                cult_common::backend::ActionState::None => MediaState::new(&msg.websocket_session_id),
+                cult_common::backend::ActionState::MediaPlayer(media) => media,
+            };
             if allowed.clone() {
                 match msg.event {
+                    VideoEvent::ChangeState(mut new_state) => {
+                        //Timestand from utc =
+                        new_state.interaction_id = msg.websocket_session_id.clone();
+                        println!(" ");
+                        println!("msg.websocket_session_id.id {:?}",msg.websocket_session_id.id);
+                        let to_soon = (Local::now().timestamp_millis() as f64 - current_state.last_updated) < THRESH_IGNORANCE;
+                        let other_ws = !current_state.interaction_id.id.eq(&msg.websocket_session_id.id);
+                        let stale  = new_state.last_updated < current_state.last_updated;
+                        println!(" ");
+
+
+
+                        println!("To soon {:?} - {:?} - {:?} - {:?} - {:?}", to_soon, Local::now().timestamp_millis() as f64, current_state.last_updated, Local::now().timestamp_millis() as f64 - current_state.last_updated, THRESH_IGNORANCE);
+                        println!("Other ws {:?} - {:?} - {:?} ", other_ws, current_state.interaction_id.id, current_state.interaction_id.id.eq(&msg.websocket_session_id.id));
+                        println!("Stale {:?} - {:?} - {:?} {:?} ", stale, new_state.last_updated, current_state.last_updated, new_state.last_updated - current_state.last_updated);
+                        println!(" ");
+
+
+
+                        if !stale && !(to_soon && other_ws) {
+                            println!("Changing state to {:?}", new_state.clone());
+                            state.update(ActionState::MediaPlayer(new_state.clone()));
+                            let event = WebsocketServerEvents::ActionState(ActionStateEvent::Media(ActionMediaEvent::ChangeState(new_state)));
+                            lobby.send_lobby_message(&event);
+                        }
+                    }
+                    //NOT USESD
                     VideoEvent::Play => {
                         let event = WebsocketServerEvents::ActionState(ActionStateEvent::Media(ActionMediaEvent::Play));
                         lobby.send_lobby_message(&event);
                     }
+                    //NOT USESD
                     VideoEvent::Pause(_) => {
                         let event = WebsocketServerEvents::ActionState(ActionStateEvent::Media(ActionMediaEvent::Pause));
                         lobby.send_lobby_message(&event);
                     }
-                    VideoEvent::Resume(_) => {
+                    //NOT USESD
+                    VideoEvent::Resume => {
                         let event = WebsocketServerEvents::ActionState(ActionStateEvent::Media(ActionMediaEvent::Resume));
                         lobby.send_lobby_message(&event);
                     }
@@ -629,6 +670,45 @@ impl Handler<ReciveVideoEvent> for Lobby {
 
     }
 }
+
+
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct SyncBackwardRequest{
+    pub websocket_session_id: WebsocketSessionId,
+}
+
+impl Handler<SyncBackwardRequest> for Lobby {
+    type Result = ();
+
+    fn handle(&mut self, msg: SyncBackwardRequest, _: &mut Self::Context) -> Self::Result {
+        let current_time = Local::now().timestamp_millis();
+        let event = WebsocketServerEvents::ActionState(ActionStateEvent::SyncBackward(current_time));
+        self.send_websocket_session_message(&msg.websocket_session_id, event);
+    }
+}
+
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct SyncForwardRequest{
+    pub websocket_session_id: WebsocketSessionId,
+    pub current_time: f64,
+}
+
+impl Handler<SyncForwardRequest> for Lobby {
+    type Result = ();
+
+    fn handle(&mut self, msg: SyncForwardRequest, _: &mut Self::Context) -> Self::Result {
+        let current_time = msg.current_time - Local::now().timestamp_millis() as f64;
+        let event = WebsocketServerEvents::ActionState(ActionStateEvent::SyncForward(current_time));
+        self.send_websocket_session_message(&msg.websocket_session_id, event)
+    }
+}
+
+
+
+
+
 
 
 pub struct WebsocketConnect {

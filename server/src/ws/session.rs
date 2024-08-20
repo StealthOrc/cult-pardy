@@ -5,7 +5,7 @@ use cult_common::{compress, decompress};
 use serde::{Deserialize, Serialize};
 
 use crate::services::game::{self};
-use crate::services::lobby::{AddLobbySessionScore, Lobby, LobbyBackClick, LobbyClick, ReciveVideoEvent, UpdateWebsocketPing, WebsocketConnect, WebsocketDisconnect};
+use crate::services::lobby::{AddLobbySessionScore, Lobby, LobbyBackClick, LobbyClick, ReciveVideoEvent, SyncBackwardRequest, SyncForwardRequest, UpdateWebsocketPing, WebsocketConnect, WebsocketDisconnect};
 use actix_web::web;
 use actix_web_actors::ws;
 use chrono::{DateTime, Local};
@@ -230,14 +230,37 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                                         });
                                     }
                                     WebsocketSessionEvent::VideoEvent(event) => {
+                                        let id = match self.player.websocket_session_id.clone() {
+                                            Some(data) => data,
+                                            None => return,
+                                        };
                                         self.lobby_addr.do_send(ReciveVideoEvent{
                                         user_session_id: self.player.user_session_id.clone(),
-                                        lobby_id: self.player.lobby_id.clone(),
+                                        websocket_session_id: id,
                                         event
                                     })
                                     }
+                                    WebsocketSessionEvent::SyncBackwardRequest => {
+                                        let id = match self.player.websocket_session_id.clone() {
+                                            Some(data) => data,
+                                            None => return,
+                                        };
+                                        self.lobby_addr.do_send(SyncBackwardRequest{
+                                            websocket_session_id: id,
+                                        });
+                                    }
+                                    WebsocketSessionEvent::SyncForwardRequest(time) => {
+                                        let id = match self.player.websocket_session_id.clone() {
+                                            Some(data) => data,
+                                            None => return,
+                                        };
+                                        self.lobby_addr.do_send(SyncForwardRequest{
+                                            websocket_session_id: id,
+                                            current_time: time,
+                                        });
+                                    }
                                 }
-                                println!("Receive an client event {:?}", event);
+                                //println!("Receive an client event {:?}", event);
                             }
                             Err(err) => {
                                 println!("Error deserializing JSON data:  {:?}", err);
