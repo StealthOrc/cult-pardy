@@ -18,7 +18,7 @@
     let player: HTMLVideoElement | null = null;
     
 
-    onMount(async () => {
+    onMount(() => {
         player = document.getElementById("player") as HTMLVideoElement;
         if (player == null) return;
         console.log("TEK ONLOADING!!!!!", player);
@@ -220,14 +220,14 @@
 
 
 
-    function seekToTime(time: number) {
+    async function seekToTime(time: number): Promise<void> {
         return new Promise<void>((resolve, reject) => {
             if (!player) return;
             const timer = setTimeout(() => {
                 if (!player) return;
                 player.removeEventListener('seeked', onSeeked);
                 reject(new Error('Seek operation timed out after 5 seconds'));
-            }, 1000);
+            }, 2000);
             function onSeeked() {
                 if (!player) return;
                 clearTimeout(timer);

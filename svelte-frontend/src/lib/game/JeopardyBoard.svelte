@@ -136,6 +136,7 @@
             return true;
         })  
         .with({SessionPing: P.select()}, (data) => {
+            console.log("SessionPing: ", data);
             SessionPingsStore.updateWebsocketPing(data);
             return true;
         })  

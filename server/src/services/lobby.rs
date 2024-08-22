@@ -83,6 +83,7 @@ impl WebsocketSession {
         if count > 0 {
             ping = ping / count;
         } 
+        println!("Ping is {:?} {:#?}", ping, self.pings);
         ping
     }
 
@@ -634,6 +635,7 @@ impl Handler<UpdateWebsocketPing> for Lobby {
                 ping,
             };
             let event = SessionEvent::SessionPing(web_socket_ping);
+            println!("Setting ping to {:?} session ping {:?}", msg.ping, ping);
             self.send_lobby_message(&WebsocketServerEvents::Session(event))
         }
     }
@@ -670,23 +672,10 @@ impl Handler<ReciveVideoEvent> for Lobby {
             if allowed.clone() {
                 match msg.event {
                     VideoEvent::ChangeState(mut new_state) => {
-                        //Timestand from utc =
                         new_state.interaction_id = msg.websocket_session_id.clone();
-                        println!(" ");
-                        println!("msg.websocket_session_id.id {:?}",msg.websocket_session_id.id);
                         let to_soon = (Local::now().timestamp_millis() as f64 - current_state.last_updated) < THRESH_IGNORANCE;
                         let other_ws = !current_state.interaction_id.id.eq(&msg.websocket_session_id.id);
                         let stale  = new_state.last_updated < current_state.last_updated;
-                        println!(" ");
-
-
-
-                        println!("To soon {:?} - {:?} - {:?} - {:?} - {:?}", to_soon, Local::now().timestamp_millis() as f64, current_state.last_updated, Local::now().timestamp_millis() as f64 - current_state.last_updated, THRESH_IGNORANCE);
-                        println!("Other ws {:?} - {:?} - {:?} ", other_ws, current_state.interaction_id.id, current_state.interaction_id.id.eq(&msg.websocket_session_id.id));
-                        println!("Stale {:?} - {:?} - {:?} {:?} ", stale, new_state.last_updated, current_state.last_updated, new_state.last_updated - current_state.last_updated);
-                        println!(" ");
-
-
 
                         if !stale && !(to_soon && other_ws) {
                             println!("Changing state to {:?}", new_state.clone());
