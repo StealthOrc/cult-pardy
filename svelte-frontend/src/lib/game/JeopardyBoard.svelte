@@ -226,7 +226,7 @@
     }
 
 
-    onMount(async () => {
+    onMount(() => {
         if (ws != null) {
             ws.webSocketSubject.subscribe({
                 next: (message) => {
@@ -250,20 +250,30 @@
                 },
                 error: (error) => {
                     console.log(error);
+                    JeopardyBoardStore.store.set(null);
+                    SessionPingsStore.store.set([]);
+                    CurrentSessionsStore.store.set([]);
+                
+                    wsStore.stop();
+                },
+                complete: () => {
+                    JeopardyBoardStore.store.set(null);
+                    SessionPingsStore.store.set([]);
+                    CurrentSessionsStore.store.set([]);
+                    console.log("Websocket completed");
                     wsStore.stop();
                 }
             });
 
             for (let i = 0; i < CONST.num_time_sync_cycles; i++) {
-		        await timeout(500);
 		        ws.webSocketSubject.next( "SyncBackwardRequest" );
-                await timeout(500);
                 ws.webSocketSubject.next({SyncForwardRequest: get_global_time(0)});
 	        }
             console.log("JeopardyBoard: Websocket connected");
             //print all $mediaStateStore
             console.log($mediaStateStore)
         }
+        ws.webSocketSubject.observed
     
     });
 </script>
