@@ -66,6 +66,9 @@ function createMediaStateStore() {
             curr.over_estimates.push(time);
             curr.over_estimate = median(curr.over_estimates);
             curr.correction = (curr.under_estimate +curr.over_estimate) / 2;
+            console.log("over_estimates", curr.over_estimates)
+            console.log("over_estimate", curr.over_estimate)
+            console.log("under_estimate", curr.under_estimate)
             console.log(`%c Updated val for over_estimate is ${curr.over_estimate}`, "color:green");
             console.log(`%c New correction time is ${curr.correction} miliseconds`, 'color:red; font-size:12px');
             return curr
@@ -78,6 +81,9 @@ function createMediaStateStore() {
             curr.under_estimates.push(time - get_global_time(0));
             curr.under_estimate = median(curr.under_estimates);
             curr.correction = (curr.under_estimate + curr.over_estimate) / 2;
+            console.log("under_estimates", curr.under_estimates)
+            console.log("under_estimate", curr.under_estimate)
+            console.log("over_estimate", curr.over_estimate)
             console.log(`%c Updated val for under_estimate is ${curr.under_estimate}`, "color:green");
             console.log(`%c New correction time is ${curr.correction} miliseconds`, 'color:red; font-size:12px');
             return curr
