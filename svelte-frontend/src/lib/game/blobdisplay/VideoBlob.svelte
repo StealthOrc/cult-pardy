@@ -244,7 +244,7 @@
     
     async function determinePlayAndSeekPlay(mediaState: MediaState) {
         if (!player) return;
-
+        console.log()
         let proposed_time = (get_global_time(media.correction) - mediaState.global_timestamp) / 1000 + mediaState.video_timestamp; // Video timestamp from global timestamp from the server 
         let isSeeking = Math.abs(proposed_time - player.currentTime) > CONST.PLAYING_THRESH;
         let isPlaying = !player.paused;

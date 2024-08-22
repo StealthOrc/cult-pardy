@@ -745,7 +745,7 @@ impl Handler<SyncForwardRequest> for Lobby {
     type Result = ();
 
     fn handle(&mut self, msg: SyncForwardRequest, _: &mut Self::Context) -> Self::Result {
-        let current_time = msg.current_time - Local::now().timestamp_millis() as f64;
+        let current_time =  Local::now().timestamp_millis() as f64 - msg.current_time;
         let event = WebsocketServerEvents::ActionState(ActionStateEvent::SyncForward(current_time));
         self.send_websocket_session_message(&msg.websocket_session_id, event)
     }
