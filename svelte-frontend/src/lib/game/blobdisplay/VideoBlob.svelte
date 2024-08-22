@@ -4,20 +4,48 @@
 	import { mediaPlayerContextStore } from "$lib/stores/MediaPlayerStore";
 	import { mediaStateStore, type MediaPlayerSessionType } from "$lib/stores/MediaStateStore";
 	import type { BoardContext, MediaPlayerContext } from "$lib/types";
-	import type { MediaState } from "cult-common";
+	import type { MediaState, WebsocketSessionEvent } from "cult-common";
 	import { getContext, onMount, setContext } from "svelte";
 	import JeopardyBoard from "../JeopardyBoard.svelte";
 	import { JeopardyBoardStore } from "$lib/stores/JeopardyBoardStore";
 	import JeopardyCategory from "../JeopardyCategory.svelte";
 	import { match, P } from "ts-pattern";
+	import type { EventHandler } from "svelte/elements";
+	import { get_websocketStore, newWebSocketStore } from "$lib/stores/WebsocketStore";
 
     export let video: Blob
     export let currUserIsAdmin: boolean = false;
+    let player: HTMLVideoElement | null = null;
+    
 
-
+    onMount(async () => {
+        player = document.getElementById("player") as HTMLVideoElement;
+        if (player == null) return;
+        console.log("TEK ONLOADING!!!!!", player);
+        match(JeopardyBoardStore.getActionState())
+        .with({MediaPlayer: P.select()}, (data) => {
+            if (!player) return
+            if (data.playing) determinePlayAndSeekPlay(data);
+            else determinePauseAndPauseSeek(data);
+            ignore = true;
+            mediaStateStore.setMediaState(data);
+        })
+        
+        
+    })
+    let ignore = false
     let media: MediaPlayerSessionType;
     mediaStateStore.subscribe(value => {
         media = value;
+        if(value == null || value.mediaState == null || ignore) {
+            ignore = false;
+            return;
+        };
+        if (player == null) {
+            JeopardyBoardStore.setActionState({MediaPlayer: value.mediaState});
+        } else {
+            doMediaStateChange(value.mediaState);
+        }
     })
 
 
@@ -25,189 +53,122 @@
         NONE = "NONE",
         PLAY = "PLAY",
         PAUSE = "PAUSE",
+        START_SEEKING = "START_SEEKING",//MAYBE
+        START_SEEKING_PLAY = "START_SEEKING_PLAY",//MAYBE
+        PAUSE_START_SEEKING = "PAUSE_START_SEEKING",//MAYBE
         SEEKING = "SEEKING",
         SEEKING_PLAY = "SEEKING_PLAY",
-        PAUSE_SEEKING = "PAUSE_SEEKING",
-    }
-
-    enum EventSource {
-        USER = "USER",
-        WEBSOCKET = "WEBSOCKET",
     }
 
 
+    let status = EventStatusEnum.NONE;
+    let eventSourceLog = Array<EventStatusEnum>();
 
-
-    let event_status = {
-        websocket : EventStatusEnum.NONE,
-        user: EventStatusEnum.NONE,
+    let wsStore = get_websocketStore();
+    if (wsStore == null) {
+        throw new Error("Websocket store is null");
     }
-
-
-
-    const boardCtx: BoardContext = getContext(CONST.BOARDCTX);
-    setContext(CONST.MEDIAPLAYERCTX, {
-        changeState: (state: MediaState) => doMediaStateChange(state)
-    }); 
-    mediaPlayerContextStore.set(getContext(CONST.MEDIAPLAYERCTX));
-
-
-    function seekToTime(time: number) {
-        return new Promise<void>((resolve, reject) => {
-            const timer = setTimeout(() => {
-                player.removeEventListener('seeked', onSeeked);
-                reject(new Error('Seek operation timed out after 10 seconds'));
-            }, 10000);
-
-            function onSeeked() {
-                clearTimeout(timer);
-                player.removeEventListener('seeked', onSeeked);
-                resolve();
-            }
-
-            player.addEventListener('seeked', onSeeked);
-            player.currentTime = time;
-        });
-    }
-
+    let ws = $wsStore;
     
 
+    enum StateUpdateType {
+        PLAY = "PLAY",
+        PAUSE = "PAUSE",
+        SEEK = "SEEK",
+        USER = "USER",
+        WEBSOCKET = "WEBSOCKET",
+        STARTING_SEEKING = "START_SEEKING",
+        STOPING_SEEKING = "STOP_SEEKING",
+        WEbSOCKET_SEEKING = "WEBSOCKET_SEEKING",
+        
+    }
 
-    async function handleEvent(state: MediaState) {
-        const proposed_time = state.playing     ? (get_global_time(media.correction) - state.global_timestamp) / 1000 + state.video_timestamp  : state.video_timestamp;
+  
 
-        if (event_status.user != EventStatusEnum.NONE) {
-            if (Math.abs(proposed_time - player.currentTime) > CONST.PAUSED_THRESH && player.currentTime !== proposed_time) {
-                // STILL NEED TO DO SOMETHING HERE
-                event_status.websocket = EventStatusEnum.SEEKING;
-                await seekToTime(proposed_time); // ANY -> NONE
+
+    function handleEvent(state: MediaState): boolean {
+        if (player == null) return false;
+        if (state.interaction_id.id === ws.websocket_id.id) {
+            let proposed_time;
+            let isSeeking;
+            if (state.playing){
+                proposed_time = (get_global_time(media.correction) - state.global_timestamp) / 1000 + state.video_timestamp; // Video timestamp from global timestamp from the server 
+                isSeeking = Math.abs(proposed_time - player.currentTime) > CONST.PLAYING_THRESH;
             } else {
-                console.log("TEK HANDLE EVENT", event_status);
-                update_status(EventSource.USER); // ANY -> NONE
+                proposed_time =  state.video_timestamp; // Video timestamp from the video itself
+                isSeeking = (Math.abs(player.currentTime - proposed_time) > CONST.PAUSED_THRESH);
             }
-            return true;
+            if(isSeeking){
+                console.log("SEEKING", state);
+                return false;
+            }
+
+            return false;
         }
-        return false;
+        return true;
     }
 
 
     async function doMediaStateChange(state: MediaState) {
         try {
-            if (await handleEvent(state)) return;
-
-            if (state.playing) {
-                determinePlayAndSeekPlay(state);
-            } else {
-                determinePauseAndPauseSeek(state);
-            }
+            if (!player) return;
+                if (!handleEvent(state)) return;
+                if (state.playing) {
+                    determinePlayAndSeekPlay(state);
+                } else {
+                    determinePauseAndPauseSeek(state);
+                }
         } catch (error) {
             console.error('Error changing media state:', error);
         }
     }
     
-    let player: HTMLVideoElement;
 
 
-    function pause() {
-        console.log("TEK PAUSE EVENT TRIGGERED", event_status);
-        if (event_status.user == EventStatusEnum.PAUSE || event_status.user == EventStatusEnum.PAUSE_SEEKING) {
-            update_status(EventSource.USER);
-            console.log("TEK IGNORE PAUSE USER", event_status);
-            return;
-        }
-        if (event_status.websocket == EventStatusEnum.PAUSE || event_status.websocket == EventStatusEnum.PAUSE_SEEKING) {
-            update_status(EventSource.WEBSOCKET);
-            console.log("TEK Pause triggered by WebSocket", event_status);
-            return;
-        }
-
-        // STATE: USER: NONE | WEBSOCKET: NONE
-
-        // STATE: USER: NONE | WEBSOCKET: NONE
-        // print if USER != NONE && WEBSOCKET != PAUSE
-
-        if (event_status.user != EventStatusEnum.NONE) {
-            console.log("TEK Pause OWN STATUS NOT NONE!", event_status);
-        }
-
-        event_status.user = EventStatusEnum.PAUSE;
-        const state: MediaState = {
-            video_timestamp: player.currentTime,
-            last_updated: get_global_time(media.correction),
-            global_timestamp: get_global_time(media.correction),
-            playing : false,
-        }
-        console.log("TEK SENDING PAUSE TO WS", event_status);
-        boardCtx.changeMediaState(state);
-    }
-
-    function play(){
+    async function pause() {
         if (!player)
             return;
-        console.log("TEK PLAY EVENT TRIGGERED", event_status);
-        if (event_status.user == EventStatusEnum.PLAY) {
-            update_status(EventSource.USER);
-            console.log("TEK IGNORE PLAY USER", event_status);
+        if (status == EventStatusEnum.PAUSE || status == EventStatusEnum.PAUSE_START_SEEKING) {
+            update_status(StateUpdateType.PAUSE)
+            return;
+        }
+        if(status != EventStatusEnum.NONE){
+            return;
+        }
+
+        const state = currentMediaState(false);
+        requestPlayerChangeState(state);
+    }
+
+    async function play(){
+        if (!player)
+            return;
+        if (status == EventStatusEnum.PLAY) {
+            update_status(StateUpdateType.PLAY)
+            return;
+        }
+        if(status != EventStatusEnum.NONE){
             return;
         }
         
-        if (event_status.websocket == EventStatusEnum.PLAY) {
-            update_status(EventSource.WEBSOCKET);
-            console.log("TEK Play triggered by WebSocket", event_status);
-            return;
-        }
-
-        if (event_status.user != EventStatusEnum.NONE) {
-            console.log("TEK play OWN STATUS NOT NONE!", event_status);
-        }
-
-        event_status.user = EventStatusEnum.PLAY;
-        const state: MediaState = {
-            video_timestamp: player.currentTime,
-            last_updated: get_global_time(media.correction),
-            global_timestamp: get_global_time(media.correction),
-            playing : true,
-        }
-        console.log("TEK SENDING PLAY TO WS!!!!!", event_status,player.currentTime);
-        boardCtx.changeMediaState(state);
+        const state = currentMediaState(true);
+        requestPlayerChangeState(state);
     }
 
-    function seek() {
-        console.log("_SEEEK!!",  player.currentTime, event_status);
-
-
-        console.log("TEK SEEK EVENT TRIGGERED", event_status, player);
+    async function seek() {
         if (!player)
             return;
-        if (event_status.user == EventStatusEnum.PAUSE_SEEKING || event_status.user == EventStatusEnum.SEEKING_PLAY ) { // || event_status.user == EventStatusEnum.SEEKING
-            update_status(EventSource.USER);
-            console.log("TEK IGNORE SEEK USER", event_status);
+        if (status == EventStatusEnum.START_SEEKING || status == EventStatusEnum.START_SEEKING_PLAY) {
+            update_status(StateUpdateType.STARTING_SEEKING);
             return;
         }
-        if (event_status.websocket == EventStatusEnum.PAUSE_SEEKING || event_status.websocket == EventStatusEnum.SEEKING_PLAY || event_status.websocket == EventStatusEnum.SEEKING) {
-            update_status(EventSource.WEBSOCKET);
-            console.log("TEK Seek triggered by WebSocket", event_status);
+        if (status == EventStatusEnum.SEEKING || status == EventStatusEnum.SEEKING_PLAY) {
+            return;
+        }
+        if (status != EventStatusEnum.NONE) {
             return;
         }
 
-        if (event_status.user != EventStatusEnum.NONE) {
-            console.log("TEK SEEK OWN STATUS NOT NONE!", event_status);
-        }
-
-            
-        let playing = !player.paused;
-
-        event_status.user = EventStatusEnum.SEEKING;
-
-        const state: MediaState = {
-            video_timestamp: player.currentTime,
-            last_updated: get_global_time(media.correction),
-            global_timestamp: get_global_time(media.correction),
-            playing,
-        }
-
-        console.log("TEK SENDING SEEK TO WS", event_status);
-        boardCtx.changeMediaState(state);
     }
 
 
@@ -215,34 +176,32 @@
         [EventStatusEnum.PLAY]: EventStatusEnum.NONE,
         [EventStatusEnum.PAUSE]: EventStatusEnum.NONE,
         [EventStatusEnum.SEEKING]: EventStatusEnum.NONE,
+        [EventStatusEnum.PAUSE_START_SEEKING]: EventStatusEnum.START_SEEKING,
+        [EventStatusEnum.START_SEEKING_PLAY]: EventStatusEnum.SEEKING_PLAY,
+        [EventStatusEnum.START_SEEKING]: EventStatusEnum.SEEKING,
         [EventStatusEnum.SEEKING_PLAY]: EventStatusEnum.PLAY,
-        [EventStatusEnum.PAUSE_SEEKING]: EventStatusEnum.SEEKING,
         [EventStatusEnum.NONE]: EventStatusEnum.NONE,
     };
 
 
 
-    function update_status(event_source: EventSource) {
-        if (event_source === EventSource.USER) {
-            event_status.user = validStatuses[event_status.user] || EventStatusEnum.NONE;
-            console.log("TEK UPDATING STATUS USER", event_status);
-        } else if (event_source === EventSource.WEBSOCKET) {
-            event_status.websocket = validStatuses[event_status.websocket] || EventStatusEnum.NONE;
-            console.log("TEK UPDATING STATUS WS", event_status);
-        }
+    async function update_status(updae: StateUpdateType) {
+        let old_status = status;
+        let new_status = get_new_status(old_status);
+        set_status(new_status,updae);
     }
 
-    function new_status(old_status:EventStatusEnum): EventStatusEnum {
-        return validStatuses[old_status] || EventStatusEnum.NONE;
+    function get_new_status(old_status:EventStatusEnum): EventStatusEnum {
+        let test =  validStatuses[old_status] || EventStatusEnum.NONE;
+        return test
     }
 
-    function reset_status(event_source: EventSource) {
-        if (event_source === EventSource.USER) {
-            event_status.user = EventStatusEnum.NONE;
-        } else if (event_source === EventSource.WEBSOCKET) {
-            event_status.websocket = EventStatusEnum.NONE;
-        }
-    }
+
+    function set_status(new_status: EventStatusEnum, update: StateUpdateType) {
+        console.log("UPDATE STATUS FROM", status, "TO", new_status , "WITH", update);
+        status = new_status;
+        eventSourceLog.push(new_status);
+    }   
         
 
 
@@ -255,83 +214,113 @@
         } catch (error) {
             console.error('Error resetting video:', error);
         }
-        const state: MediaState = {
-            video_timestamp: player.currentTime,
-            last_updated: get_global_time(media.correction),
-            global_timestamp: get_global_time(media.correction),
-            playing : false,
-            
-        }
-        boardCtx.changeMediaState(state);
+        const state = currentMediaState(false);
+        requestPlayerChangeState(state);
     }
+
+
+
+    function seekToTime(time: number) {
+        return new Promise<void>((resolve, reject) => {
+            if (!player) return;
+            const timer = setTimeout(() => {
+                if (!player) return;
+                player.removeEventListener('seeked', onSeeked);
+                reject(new Error('Seek operation timed out after 5 seconds'));
+            }, 1000);
+            function onSeeked() {
+                if (!player) return;
+                clearTimeout(timer);
+                player.removeEventListener('seeked', onSeeked);
+                resolve();
+            }
+            player.addEventListener('seeked', onSeeked);
+            player.currentTime = time;
+        });
+    }
+
 
     
     async function determinePlayAndSeekPlay(mediaState: MediaState) {
         if (!player) return;
+
         let proposed_time = (get_global_time(media.correction) - mediaState.global_timestamp) / 1000 + mediaState.video_timestamp; // Video timestamp from global timestamp from the server 
-        let isSeeking = Math.abs(proposed_time - player.currentTime) > CONST.PAUSED_THRESH;
-        if (event_status.websocket != EventStatusEnum.NONE) {
-                    console.log("TEK WS NOT NONE", event_status); //WEBSOCKET NEED TO BE NONE
-        }
-
+        let isSeeking = Math.abs(proposed_time - player.currentTime) > CONST.PLAYING_THRESH;
         let isPlaying = !player.paused;
-
-        //  144.274977 -  144.32711999999998 
-
-        if (isSeeking && player.currentTime != proposed_time) {
-            if (isPlaying) event_status.websocket = EventStatusEnum.SEEKING;
-            else event_status.websocket = EventStatusEnum.SEEKING_PLAY;
-            console.log("TEK DETERMINE PLAY SEEKING", event_status, proposed_time, player.currentTime, isSeeking);
-            await seekToTime(proposed_time);
-        } else {
-            if (isPlaying) event_status.websocket = EventStatusEnum.NONE;
-            else event_status.websocket = EventStatusEnum.PLAY;
-            console.log("TEK DETERMINE PLAY", event_status);
-        }
-
-        console.log("TEK DETERMINE PLAY!", event_status);
+        if(status != EventStatusEnum.SEEKING){
+            if(isSeeking ){
+                set_status(isPlaying ? EventStatusEnum.START_SEEKING : EventStatusEnum.START_SEEKING_PLAY, StateUpdateType.WEbSOCKET_SEEKING); // SEEKING# SEEKING_PLAY
+                await seekToTime(proposed_time);
+            } else {
+                set_status(isPlaying ? EventStatusEnum.NONE : EventStatusEnum.PLAY,StateUpdateType.WEBSOCKET); // PLAY# NONE
+            }
+        }   
         if (!isPlaying) player.play()
     }
 
 
-    async function determinePauseAndPauseSeek(mediaState: MediaState) {
-        if (!player) return;
 
+
+    async function determinePauseAndPauseSeek(mediaState: MediaState) {
+        if (!player) return;    
         let isPause = player.paused;
         let proposed_time =  mediaState.video_timestamp; // Video timestamp from the video itself
         let isSeeking = (Math.abs(player.currentTime - proposed_time) > CONST.PAUSED_THRESH);  
-
-        if (isSeeking) {
-            if (isPause) event_status.websocket = EventStatusEnum.SEEKING; // SEEKING -> NONE
-            else event_status.websocket = EventStatusEnum.PAUSE_SEEKING; // PAUSE_SEEKING -> SEEKING -> NONE
-        } else {
-            if (isPause) event_status.websocket = EventStatusEnum.NONE; // NONE 
-            else event_status.websocket = EventStatusEnum.PAUSE; // PAUSE -> NONE
+        if(status != EventStatusEnum.SEEKING){
+            if (isSeeking) {
+                set_status(isPause ? EventStatusEnum.START_SEEKING : EventStatusEnum.PAUSE_START_SEEKING, StateUpdateType.WEbSOCKET_SEEKING); // SEEKING# PAUSE_SEEKING
+            } else {
+                set_status(isPause ? EventStatusEnum.NONE : EventStatusEnum.PAUSE,StateUpdateType.WEBSOCKET); // NONE# PAUSE
+            }
         }
-        console.log("TEK DETERMINE PAUSE", event_status);
         if (!isPause) player.pause()
-
-        if (isSeeking) {
-            await seekToTime(proposed_time);
-        }
+        if (isSeeking) await seekToTime(proposed_time);
+        
     }
 
 
 
-    onMount(async () => {
-        player = document.getElementById("player") as HTMLVideoElement;
-        if (player == null) return;
-        
-        match(JeopardyBoardStore.getActionState())
-        .with({MediaPlayer: P.select()}, (data) => {
-            if (!player) return
-            if (data.playing) determinePlayAndSeekPlay(data);
-            else determinePauseAndPauseSeek(data);
-            mediaStateStore.setMediaState(data);
-        })
+    
+    function currentMediaState(playing:boolean):MediaState{
+        return {
+            video_timestamp: player?.currentTime || 0,
+            last_updated: get_global_time(media.correction),
+            global_timestamp: get_global_time(media.correction),
+            playing,
+            interaction_id: {
+                id: ws.websocket_id.id
+            },
+        }
+    }
 
 
-    })
+    function endSeeking() {
+        if (!player)
+            return;
+        if (status == EventStatusEnum.SEEKING || status == EventStatusEnum.SEEKING_PLAY || status == EventStatusEnum.START_SEEKING) {
+            update_status(StateUpdateType.STOPING_SEEKING);
+            return;
+        }
+
+
+        let playing = !player.paused;
+        const state = currentMediaState(playing);
+        requestPlayerChangeState(state);
+
+
+
+    }
+
+
+    function requestPlayerChangeState(state: MediaState): boolean {
+        if (ws == null) {
+            return false;
+        }
+        let changeStateEvent: WebsocketSessionEvent = { VideoEvent: {ChangeState: state} };
+        ws.webSocketSubject.next(changeStateEvent);
+        return true;
+    }
+
 
 
 </script>
@@ -339,21 +328,16 @@
 
 
 
+
 <div>
-    <h1>WS: {event_status.websocket} | USER: {event_status.user}</h1>
+    <h1>status: {status}</h1>
+
 </div>
 <video 
 bind:this={player}
-on:play={(event) => {
-    console.log("VBTTT play EVENT", event_status)
-    play();
-}} on:pause={(event) => {
-    console.log("VBTTT pause EVENT ", event_status)
-    pause();
-}} on:ended={onEnded} 
-on:seeked={(event) => {
-    console.log("VBTTT seeked EVENT", event_status)
-    seek()
-}} id="player" src={URL.createObjectURL(video)} controls={currUserIsAdmin} muted>
+on:play={play} on:pause={pause} on:ended={onEnded} 
+on:seeking={seek}
+on:seeked={endSeeking}
+id="player" src={URL.createObjectURL(video)} controls={currUserIsAdmin} muted>
     <track kind="captions" />
 </video>

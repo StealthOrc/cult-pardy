@@ -1,6 +1,6 @@
 
 import { dev } from "$app/environment";
-import type { UserSessionId, WebsocketSessionEvent } from "cult-common";
+import type { UserSessionId, WebsocketSessionEvent, WebsocketSessionId } from "cult-common";
 import { webSocket, WebSocketSubject } from "rxjs/webSocket";
 import { writable, type Subscriber, type Unsubscriber, type Writable} from "svelte/store"; 
 import type { SessionCookies } from "./cookies";
@@ -8,10 +8,10 @@ import { deflateSync } from "fflate";
 
 
 // eslint-disable-next-line no-var
-export var WebsocketStore : ReturnType<typeof createWebsocketStore> | null = null;
+var WebsocketStore : WebsocketStore;
 
 
-export function newWebSocketStore(lobbyId: string, cookies:SessionCookies): ReturnType<typeof createWebsocketStore> {
+export function newWebSocketStore(lobbyId: string, cookies:SessionCookies): WebsocketStore {
     if (WebsocketStore != null) {
         return WebsocketStore;
     }
@@ -19,6 +19,11 @@ export function newWebSocketStore(lobbyId: string, cookies:SessionCookies): Retu
     const ws = createWebsocketStore(lobbyId, cookies.userSessionId, cookies.sessionToken);
     WebsocketStore = ws;
     return ws;
+}
+
+
+export function get_websocketStore() {
+    return WebsocketStore;
 }
 
 
@@ -34,7 +39,7 @@ if(dev) {
 
 
 
-function get_ws(lobbyId: string, userSessionId: UserSessionId, sessionToken: string) : WebSocketSubject<WebsocketSessionEvent> {
+function get_ws(lobbyId: string, userSessionId: UserSessionId, sessionToken: string) : WebsocketStoreType {
     const host = location.host
     console.log("HOST", host)
     const ws = webSocket({
@@ -54,16 +59,22 @@ function get_ws(lobbyId: string, userSessionId: UserSessionId, sessionToken: str
             return deflated;
         }
     });
-    return ws;
+    return {webSocketSubject: ws, websocket_id: {id: ""}};
+}
+
+export type WebsocketStoreType = {
+    webSocketSubject: WebSocketSubject<WebsocketSessionEvent>;
+    websocket_id: WebsocketSessionId;
 }
 
 
 
 export type WebsocketStore = {
-    store: Writable<WebSocketSubject<WebsocketSessionEvent>>;
+    store: Writable<WebsocketStoreType>;
     stop: () => void;
     new_ws: () => void;
-    subscribe: (this: void, run: Subscriber<WebSocketSubject<WebsocketSessionEvent>>) => Unsubscriber;
+    update_websocket_id: (id: WebsocketSessionId) => void;
+    subscribe: (this: void, run: Subscriber<WebsocketStoreType>) => Unsubscriber;
 }
 
 function createWebsocketStore(lobbyId: string, userSessionId: UserSessionId, sessionToken: string): WebsocketStore {
@@ -71,19 +82,29 @@ function createWebsocketStore(lobbyId: string, userSessionId: UserSessionId, ses
     const user_session_id = userSessionId;
     const session_token = sessionToken;
 
-    const store = writable<WebSocketSubject<WebsocketSessionEvent>>(get_ws(lobby_id, user_session_id, session_token));
+    const store = writable<WebsocketStoreType>(get_ws(lobby_id, user_session_id, session_token));
 
     function new_ws() {
         store.set(get_ws(lobby_id, user_session_id, session_token));
     }
 
-    function subscribe(this: void, run: Subscriber<WebSocketSubject<WebsocketSessionEvent>>): Unsubscriber {
+    function update_websocket_id(id: WebsocketSessionId) {
+        store.update((ws) => {
+            ws.websocket_id = id;
+            return ws;
+        });
+    }
+
+    function subscribe(this: void, run: Subscriber<WebsocketStoreType>): Unsubscriber {
         return store.subscribe(run);
     }
 
+
     function stop() {
         store.update((ws) => {
-            ws.complete();
+            ws.webSocketSubject.unsubscribe();
+            ws.webSocketSubject.complete();
+            ws.websocket_id = {id: ""};
             return ws;
         });
     }
@@ -92,6 +113,7 @@ function createWebsocketStore(lobbyId: string, userSessionId: UserSessionId, ses
 
     return {
         store,
+        update_websocket_id,
         stop,
         new_ws,
         subscribe,

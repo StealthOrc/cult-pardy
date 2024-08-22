@@ -56,21 +56,7 @@ function createMediaStateStore() {
     }
 
 
-    function getCurrentMediaState(video_time_stamp:number): MediaState {
-        const mediaState: MediaState = {
-            video_timestamp: video_time_stamp,
-            last_updated: get_global_time(0),
-            playing: false,
-            global_timestamp: get_global_time(0),
-        }
-        store.update((data) => {
-           if (data.mediaState != null) {
-               mediaState.playing = data.mediaState.playing;
-           }
-           return data;
-        });
-        return mediaState;
-    }
+
 
 
 
@@ -155,7 +141,6 @@ function createMediaStateStore() {
         clearEstimates,
         clearOverEstimates,
         clearUnderEstimates,
-        getCurrentMediaState,
             
     }
 }

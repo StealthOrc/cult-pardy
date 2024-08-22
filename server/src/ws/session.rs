@@ -12,7 +12,7 @@ use chrono::{DateTime, Local};
 use cult_common::wasm_lib::ids::lobby::LobbyId;
 use cult_common::wasm_lib::ids::usersession::UserSessionId;
 use cult_common::wasm_lib::ids::websocketsession::WebsocketSessionId;
-use cult_common::wasm_lib::websocket_events::{WebsocketServerEvents, WebsocketSessionEvent};
+use cult_common::wasm_lib::websocket_events::{WebsocketEvent, WebsocketServerEvents, WebsocketSessionEvent};
 
 /// How often heartbeat pings are sent
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
@@ -116,8 +116,11 @@ impl WsSession {
                     None => {
                         println!("Something happens 2");
                         ctx.stop()
-                    }
+                    },
                     Some(websocket_session_id) => {
+                      if let Ok(bytes) = compress(&serde_json::to_vec(&WebsocketServerEvents::Websocket(WebsocketEvent::WebsocketID(websocket_session_id.clone()))).expect("Can´t convert to vec")) {
+                            ctx.binary(bytes)
+                     }
                       act.player.websocket_session_id = Some(websocket_session_id);
                     }
                 },
@@ -234,6 +237,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                                             Some(data) => data,
                                             None => return,
                                         };
+                               
                                         self.lobby_addr.do_send(ReciveVideoEvent{
                                         user_session_id: self.player.user_session_id.clone(),
                                         websocket_session_id: id,

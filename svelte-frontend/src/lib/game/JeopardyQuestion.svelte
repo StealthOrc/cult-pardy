@@ -1,7 +1,6 @@
 <script lang="ts">
-	import { WebsocketStore } from '$lib/stores/WebsocketStore';
+
 	import type { DtoQuestion, DTOSession, WebsocketSessionEvent } from 'cult-common';
-	import type { WebSocketSubject } from 'rxjs/webSocket';
 	import { match, P } from 'ts-pattern';
     import YouTubePlayerPlus from 'youtube-player-plus';
 	import type { YTPP_Options } from 'youtube-player-plus/types';
@@ -14,6 +13,7 @@
 	import { CurrentSessionsStore } from '$lib/stores/SessionStore';
 	import { CookieStore, type SessionCookies } from '$lib/stores/cookies';
 	import { VideoPlayerType } from '$lib/types';
+	import { get_websocketStore } from '$lib/stores/WebsocketStore';
     
     export let question: DtoQuestion;
 
@@ -22,12 +22,12 @@
        cookies = value; 
     })
     let open_request = false;
-    let ws : WebSocketSubject<WebsocketSessionEvent> | null = null;
-    if (WebsocketStore != null) {
-        WebsocketStore.subscribe(value => {
-            ws = value;
-        })
+    let wsStore = get_websocketStore();
+    if (wsStore == null) {
+        throw new Error("Websocket store is null");
     }
+    let ws = $wsStore.webSocketSubject;
+    
     let download_request = false;
 
     let blob: Blob | null = null;

@@ -14,7 +14,8 @@ const CONST ={
         BOARDCTX: 'board',
         num_time_sync_cycles: 10,
         PLAYING_THRESH: 1,
-        PAUSED_THRESH: 0.05,
+        THRESH: 0.05,
+        PAUSED_THRESH: 0.01,
     }
 
  export { CONST };

@@ -4,6 +4,8 @@ import { writable, type Subscriber, type Unsubscriber} from "svelte/store";
 
 export const JeopardyBoardStore = createJeopardyBoardStore();
 
+
+
 if(dev) {
     if (import.meta.hot) {
         import.meta.hot.accept((newModule ) => {

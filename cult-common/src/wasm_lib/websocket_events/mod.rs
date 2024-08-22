@@ -62,10 +62,10 @@ pub struct MediaState {
     pub last_updated: f64,
     pub playing: bool,
     pub global_timestamp: f64,
-    //Skip
-    #[serde(skip)]
     pub interaction_id: WebsocketSessionId,
 }
+
+
 
 impl MediaState {
     pub fn new(websocketsession:&WebsocketSessionId) -> Self {
@@ -94,6 +94,7 @@ pub enum BoardEvent {
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, Display)]
 pub enum WebsocketEvent {
     WebsocketJoined(WebsocketSessionId),
+    WebsocketID(WebsocketSessionId),
     WebsocketDisconnected(WebsocketSessionId),
 }
 
@@ -102,6 +103,7 @@ pub enum SessionEvent {
     CurrentSessions(Vec<DTOSession>),
     SessionJoined(DTOSession),
     SessionsPing(Vec<WebsocketPing>),
+    SessionPing(WebsocketPing),
     SessionDisconnected(UserSessionId),
 }
 

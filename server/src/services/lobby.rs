@@ -45,8 +45,50 @@ pub struct WebsocketSession {
     pub user_session_id: UserSessionId,
     #[serde(skip_serializing)]
     pub addr:Recipient<SendSessionMessageType>,
-    pub ping: i64,
+    pings: Vec<i64>,
 }
+
+
+
+impl WebsocketSession {
+
+    pub fn new(websocket_session_id: WebsocketSessionId, user_session_id: UserSessionId, addr: Recipient<SendSessionMessageType>, ping: i64) -> Self {
+        let mut pings = Vec::new();
+        pings.push(ping);
+        WebsocketSession {
+            websocket_session_id,
+            user_session_id,
+            addr,
+            pings,
+        }
+    }
+
+
+    pub fn update_pings(&mut self, ping: i64) {
+        if self.pings.len() > 5 {
+            self.pings.remove(0);
+        }
+        self.pings.push(ping);
+    }
+
+    pub fn get_ping(&self) -> i64 {
+        let mut ping = 0;
+        let mut count = 0;
+        for ws_ping in &self.pings {
+            ping += ws_ping;
+            if *ws_ping > 0 {
+                count += 1;
+            }
+        }
+        if count > 0 {
+            ping = ping / count;
+        } 
+        ping
+    }
+
+
+}
+
 
 #[derive(Debug, Clone, Serialize, Hash, Eq, PartialEq)]
 pub struct UserSessionData {
@@ -90,7 +132,7 @@ impl Actor for Lobby {
 
     fn started(&mut self, ctx: &mut Self::Context) {
         println!("Lobby started");
-        self.send_pings(ctx);
+        //self.send_pings(ctx);
     }
 
 }
@@ -116,22 +158,20 @@ impl Lobby {
         }
     }
 
+
+
+
     fn send_pings(&self, ctx: &mut Context<Self>) {
-        ctx.run_interval(Duration::from_secs(5), |act: &mut Lobby, _| {
+        /*ctx.run_interval(Duration::from_secs(1), |act: &mut Lobby, _| {
             if act.websocket_connections.is_empty() {
                 return;
             }
-
             let session_pings = act.get_sessions_pings();
             for websocket_session in act.websocket_connections.values() {
-                if websocket_session.ping <= 1 || !websocket_session.addr.connected() {
-                    continue;
-                }
-                println!("Sending pings to session {:?} in lobby={:?}", websocket_session.user_session_id.id, &act.lobby_id.id);
                 let event = SessionEvent::SessionsPing(session_pings.clone());
                 websocket_session.addr.do_send(SendSessionMessageType::Data(WebsocketServerEvents::Session(event)));
             }
-        });
+        });*/ 
     }
 
 
@@ -180,6 +220,7 @@ impl Lobby {
                 user_session_id: user_session_id.clone(),
                 ping: self.get_session_ping(user_session_id),
             });
+            
         }
         pings
     }
@@ -190,7 +231,7 @@ impl Lobby {
         let mut count = 0;
         for websocket_session in self.get_session_websockets(user_session_id){
             if let Some(websocket_session) = self.websocket_connections.get(&websocket_session){
-                let ws_ping = websocket_session.ping;
+                let ws_ping = websocket_session.get_ping();
                 ping += ws_ping;
                 if ws_ping > 0 {
                     count += 1;
@@ -244,14 +285,11 @@ impl Lobby {
 
     pub fn add_new_websocket(&mut self, websocket_connect: &WebsocketConnect ) -> WebsocketSessionId {
         let websocket_session_id = WebsocketSessionId::random();
-        self.websocket_connections.insert(websocket_session_id.clone(), WebsocketSession {
-            websocket_session_id:websocket_session_id.clone(),
-            user_session_id: websocket_connect.user_session_id.clone(),
-            addr: websocket_connect.addr.clone(),
-            ping: websocket_connect.ping,
-        });
+        self.websocket_connections.insert(websocket_session_id.clone(), WebsocketSession::new(websocket_session_id.clone(), websocket_connect.user_session_id.clone(), websocket_connect.addr.clone(), websocket_connect.ping));
         websocket_session_id
     }
+
+
 
     pub fn add_new_session(&mut self, user_session_id: &UserSessionId, user_session_data: &UserSessionData){
         self.connected_user_session.insert(user_session_id.clone()); 
@@ -588,7 +626,15 @@ impl Handler<UpdateWebsocketPing> for Lobby {
 
    fn handle(&mut self, msg: UpdateWebsocketPing, _: &mut Self::Context) -> Self::Result {
         if let Some(websocket_session) = self.websocket_connections.get_mut(&msg.websocket_session_id) {
-            websocket_session.ping = msg.ping;
+            websocket_session.update_pings(msg.ping);
+            let user_session_id = websocket_session.user_session_id.clone();
+            let ping = self.get_session_ping(&user_session_id);
+            let web_socket_ping = WebsocketPing {
+                user_session_id,
+                ping,
+            };
+            let event = SessionEvent::SessionPing(web_socket_ping);
+            self.send_lobby_message(&WebsocketServerEvents::Session(event))
         }
     }
 }

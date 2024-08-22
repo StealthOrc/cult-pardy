@@ -3,7 +3,7 @@
 	import { JeopardyBoardStore } from "$lib/stores/JeopardyBoardStore";
 	import { SessionPingsStore } from "$lib/stores/SessionPings";
 	import { CurrentSessionsStore } from "$lib/stores/SessionStore";
-	import { WebsocketStore } from "$lib/stores/WebsocketStore";
+	import { get_websocketStore } from "$lib/stores/WebsocketStore";
 	import type { DtoQuestion, DTOSession, Vector2D, WebsocketSessionEvent } from "cult-common";
 	import { WebSocketSubject } from "rxjs/webSocket";
 
@@ -22,12 +22,11 @@
         }
     })
 
-    let ws: WebSocketSubject<WebsocketSessionEvent>;
-    if (WebsocketStore != null) {
-        WebsocketStore.subscribe(value => {
-        ws = value;
-        })
+    let wsStore = get_websocketStore();
+    if (wsStore == null) {
+        throw new Error("Websocket store is null");
     }
+    let ws = $wsStore.webSocketSubject
     
     function getAvatar() {
         if (!session || session.discord_user === null) {

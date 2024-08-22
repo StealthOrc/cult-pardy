@@ -37,6 +37,19 @@ function createCurrentPingsStore() {
             return curr;
         });
     }
+    function updateWebsocketPing(websocketPing: WebsocketPing) {
+        store.update((curr) => {
+            const index = curr.findIndex((s) => s.user_session_id.id === websocketPing.user_session_id.id);
+    
+            if (index === -1) {
+                curr.push(websocketPing);
+            } else {
+                curr[index] = { ...curr[index], ping: websocketPing.ping };
+            }
+    
+            return curr;
+        });
+    }
 
 
     function subscribe(this: void, run: Subscriber<WebsocketPing[]>): Unsubscriber {    
@@ -58,6 +71,7 @@ function createCurrentPingsStore() {
         removeBySessionId,
         updateSessionsPing,
         subscribe,
+        updateWebsocketPing,
         get_ping_update_by_session_id,
     }
 }

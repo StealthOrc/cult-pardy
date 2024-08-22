@@ -9,7 +9,7 @@
 	import Players from './Players.svelte';
 	import {CurrentSessionsStore } from '$lib/stores/SessionStore';
 	import { SessionPingsStore } from '$lib/stores/SessionPings';
-	import { newWebSocketStore, WebsocketStore} from '$lib/stores/WebsocketStore';
+	import { newWebSocketStore, type WebsocketStoreType} from '$lib/stores/WebsocketStore';
 	import { JeopardyBoardStore } from '$lib/stores/JeopardyBoardStore';
 	import { inflate } from 'fflate';
 	import { CONST } from '$lib/const';
@@ -25,31 +25,13 @@
 
     let { lobbyId = "main" }: Props = $props();	
 
-    let playerCtx: MediaPlayerContext = $state(getContext(CONST.MEDIAPLAYERCTX));
-    mediaPlayerContextStore.subscribe(value => {
-        if (!value) {
-            return;
-        }
-        playerCtx = value
-    })
-    setContext(CONST.BOARDCTX,{
-         requestPlay: () => requestPlayerPlay(), 
-         requestPause: (value: number) => requestPlayerPause(value),
-         changeMediaState: (state: MediaState) => requestPlayerChangeState(state),
-         requestSyncBackward: () => requestPlayerSyncBackward(),
-         requestSyncForward: (calculated_diff: number) => requestPlayerSyncForward(calculated_diff),
-    });
+ 
+;
 
-    var cookies : SessionCookies;
-    let wsStore: WebsocketStore
-    let ws : WebSocketSubject<WebsocketSessionEvent> | null = null;
-    CookieStore.subscribe(value => {
-        cookies = value;
-        wsStore = newWebSocketStore(lobbyId, cookies);
-        wsStore.subscribe(value => {
-            ws = value;
-        })
-    })
+    let wsStore = newWebSocketStore(lobbyId, $CookieStore);	
+    let ws = $wsStore;
+
+
     let loc= location.host;
 
     let gameData: DtoJeopardyBoard | null = $state(null);
@@ -84,13 +66,12 @@
         //WebsocketEvents
         .with({ Websocket: P.select() }, (websocketEvent) => handleWebsocketEvent(websocketEvent))
         .with({ ActionState: P.select()}, (data) => {
-            console.log("ActionState: ", data);
             // { Media: ActionMediaEvent } | { SyncForward: number } | { SyncBackward: number };
             match(data)
             .with({ Media: P.select()}, (data) => {
                 match(data)
                 .with({ChangeState: P.select()}, (data) => {
-                    playerCtx.changeState(data);
+                    mediaStateStore.setMediaState(data);
                 })
                 .otherwise((data) => {
                 console.error("undhandled ActionStateEvent: ",data) 
@@ -150,7 +131,12 @@
             return true;
         })
         .with({ SessionsPing : P.select() }, (data) => {
+            console.log("SHOUT NOT BE TRIGGERT!!!")
             SessionPingsStore.updateSessionsPing(data);
+            return true;
+        })  
+        .with({SessionPing: P.select()}, (data) => {
+            SessionPingsStore.updateWebsocketPing(data);
             return true;
         })  
         .exhaustive();
@@ -169,6 +155,11 @@
             console.log("Someone disconnected: ", data);
             return true;
         })
+        .with({ WebsocketID: P.select() }, (data) => {
+            console.log("WebsocketPing: ", data);
+            wsStore.update_websocket_id(data);
+            return true;
+        })
         .exhaustive();
         return true;
     }
@@ -179,7 +170,7 @@
             return false;
         }
         let playEvent: WebsocketSessionEvent = { VideoEvent: "Play" };
-        ws.next(playEvent);
+        ws.webSocketSubject.next(playEvent);
         return true;
     }
 
@@ -189,7 +180,7 @@
            return false; 
         }
         let pauseEvent: WebsocketSessionEvent = { VideoEvent: {Pause: currPlayTime} };
-        ws.next(pauseEvent);
+        ws.webSocketSubject.next(pauseEvent);
         return true;
     }
 
@@ -198,9 +189,8 @@
         if (ws == null) {
            return false; 
         }
-        console.log("STATE", state)
         let pauseEvent: WebsocketSessionEvent = { VideoEvent: {ChangeState: state} };
-        ws.next(pauseEvent);
+        ws.webSocketSubject.next(pauseEvent);
         return true;
     }
 
@@ -210,7 +200,7 @@
             return false;
         }
         let syncEvent: WebsocketSessionEvent = { SyncForwardRequest: value} ;
-        ws.next(syncEvent);
+        ws.webSocketSubject.next(syncEvent);
         return true;
     }
 
@@ -221,7 +211,7 @@
         }
         
         let syncEvent: WebsocketSessionEvent =  "SyncBackwardRequest" ;
-        ws.next(syncEvent);
+        ws.webSocketSubject.next(syncEvent);
         return true;
     }
 
@@ -231,14 +221,14 @@
             return false;
         }
         let changeStateEvent: WebsocketSessionEvent = { VideoEvent: {ChangeState: state} };
-        ws.next(changeStateEvent);
+        ws.webSocketSubject.next(changeStateEvent);
         return true;
     }
 
 
     onMount(async () => {
         if (ws != null) {
-            ws.subscribe({
+            ws.webSocketSubject.subscribe({
                 next: (message) => {
                     if (message instanceof ArrayBuffer) {
                         let u8 = new Uint8Array(message);
@@ -274,11 +264,13 @@
             //print all $mediaStateStore
             console.log($mediaStateStore)
         }
+    
     });
 </script>
 
 {#if gameData != null && gameData.categories != null}
     <div class="jeopardy-container">
+        <div class=" text-center ">ID : {ws.websocket_id.id}</div>
         <div class="jeopardy-board">
                 {#each gameData.categories as category}
                     <JeopardyCategory {category}/>
