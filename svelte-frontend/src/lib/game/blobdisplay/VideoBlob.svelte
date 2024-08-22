@@ -236,6 +236,7 @@
             }
             player.addEventListener('seeked', onSeeked);
             player.currentTime = time;
+            console.log("SEEKING TO", time);
         });
     }
 

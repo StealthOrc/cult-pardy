@@ -255,10 +255,10 @@
             });
 
             for (let i = 0; i < CONST.num_time_sync_cycles; i++) {
-		        //await timeout(500);
-		        //ws.next( "SyncBackwardRequest" );
-                //await timeout(500);
-                //ws.next({SyncForwardRequest: get_global_time(0)});
+		        await timeout(500);
+		        ws.webSocketSubject.next( "SyncBackwardRequest" );
+                await timeout(500);
+                ws.webSocketSubject.next({SyncForwardRequest: get_global_time(0)});
 	        }
             console.log("JeopardyBoard: Websocket connected");
             //print all $mediaStateStore
