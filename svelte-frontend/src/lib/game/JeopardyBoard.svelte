@@ -131,7 +131,6 @@
             return true;
         })
         .with({ SessionsPing : P.select() }, (data) => {
-            console.log("SHOUT NOT BE TRIGGERT!!!")
             SessionPingsStore.updateSessionsPing(data);
             return true;
         })  

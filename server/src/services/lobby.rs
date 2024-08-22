@@ -46,6 +46,7 @@ pub struct WebsocketSession {
     #[serde(skip_serializing)]
     pub addr:Recipient<SendSessionMessageType>,
     pings: Vec<i64>,
+    pub last_ping: i64,
 }
 
 
@@ -60,6 +61,7 @@ impl WebsocketSession {
             user_session_id,
             addr,
             pings,
+            last_ping : ping,
         }
     }
 
@@ -83,7 +85,6 @@ impl WebsocketSession {
         if count > 0 {
             ping = ping / count;
         } 
-        println!("Ping is {:?} {:#?}", ping, self.pings);
         ping
     }
 
@@ -244,6 +245,25 @@ impl Lobby {
         } 
         ping
     }
+
+    pub fn get_session_last_ping(&self, user_session_id: &UserSessionId) -> i64 {
+        let mut ping = 0;
+        let mut count = 0;
+        for websocket_session in self.get_session_websockets(user_session_id){
+            if let Some(websocket_session) = self.websocket_connections.get(&websocket_session){
+                let ws_ping = websocket_session.last_ping;
+                ping += ws_ping;
+                if ws_ping > 0 {
+                    count += 1;
+                }
+            }
+        }
+        if count > 0 {
+            ping = ping / count;
+        } 
+        ping
+    }
+
     
     pub fn is_creator(&self, user_session_id: &UserSessionId) -> bool {
         self.creator.eq(user_session_id)
@@ -629,13 +649,15 @@ impl Handler<UpdateWebsocketPing> for Lobby {
         if let Some(websocket_session) = self.websocket_connections.get_mut(&msg.websocket_session_id) {
             websocket_session.update_pings(msg.ping);
             let user_session_id = websocket_session.user_session_id.clone();
-            let ping = self.get_session_ping(&user_session_id);
-            let web_socket_ping = WebsocketPing {
+            let ping: i64 = self.get_session_ping(&user_session_id);
+            if ping == self.get_session_last_ping(&user_session_id) {
+                return;
+            }
+            let web_socket_ping: WebsocketPing = WebsocketPing {
                 user_session_id,
                 ping,
             };
             let event = SessionEvent::SessionPing(web_socket_ping);
-            println!("Setting ping to {:?} session ping {:?}", msg.ping, ping);
             self.send_lobby_message(&WebsocketServerEvents::Session(event))
         }
     }
@@ -797,6 +819,11 @@ impl Handler<WebsocketConnect> for Lobby {
         ctx.address().do_send(SendWSCurrentDTOBoard{websocket_session_id: websocket_session_id.clone()});
         ctx.address().do_send(SendDTOSessionJoined{user_session_id: msg.user_session_id.clone()});
         ctx.address().do_send(SendCurrentDTOSessions{}); 
+
+        let session_pings = self.get_sessions_pings();
+
+        let event = WebsocketServerEvents::Session(SessionEvent::SessionsPing(session_pings));
+        self.send_websocket_session_message(&websocket_session_id, event);
         return  Some(websocket_session_id);
         
 
