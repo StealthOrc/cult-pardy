@@ -5,22 +5,13 @@
 	import { CurrentSessionsStore } from "$lib/stores/SessionStore";
 	import { WebsocketStore } from "$lib/stores/WebsocketStore";
 	import type { DtoQuestion, DTOSession, Vector2D, WebsocketSessionEvent } from "cult-common";
-	import { WebSocketSubject } from "rxjs/webSocket";
-
     export let session: DTOSession;
 
     const default_avatar: string = "https://cdn-icons-png.flaticon.com/512/149/149071.png"
-    let ping: number = 0; 
-    SessionPingsStore.get_ping_update_by_session_id(session.user_session_id,value => {
-        ping = value.ping;
-    })
 
-    let current: DtoQuestion | undefined = undefined;
-    JeopardyBoardStore.subscribe(value => {
-        if (value != null) {
-            current = value.current;
-        }
-    })
+    let ping: number = ($SessionPingsStore.find(value => value.user_session_id.id === session.user_session_id.id)|| {ping: 0}).ping;
+     
+    let current : DtoQuestion | undefined = ($JeopardyBoardStore)?.current;
 
     let ws = $WebsocketStore.webSocketSubject
     
