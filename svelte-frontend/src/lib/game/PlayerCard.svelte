@@ -9,7 +9,10 @@
 
     const default_avatar: string = "https://cdn-icons-png.flaticon.com/512/149/149071.png"
 
-    let ping: number = ($SessionPingsStore.find(value => value.user_session_id.id === session.user_session_id.id)|| {ping: 0}).ping;
+    let ping: number = 0;
+    SessionPingsStore.subscribe(value => {
+        ping = value.find(ping => ping.user_session_id.id === session.user_session_id.id)?.ping || 0;
+    });
      
     let current : DtoQuestion | undefined = ($JeopardyBoardStore)?.current;
 
