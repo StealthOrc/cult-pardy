@@ -830,7 +830,7 @@ impl Handler<WebsocketConnect> for Lobby {
 
         let event = WebsocketServerEvents::Session(SessionEvent::SessionsPing(session_pings));
         self.send_websocket_session_message(&websocket_session_id, event);
-        return  Some(websocket_session_id);
+        return Some(websocket_session_id);
         
 
     }

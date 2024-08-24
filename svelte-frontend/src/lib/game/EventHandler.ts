@@ -85,6 +85,7 @@ function handleSessionEvent(sessionEvent: SessionEvent): boolean {
         return true;
     })
     .with({ SessionsPing : P.select() }, (data) => {
+        console.log("SessionsPing: ", data);
         SessionPingsStore.updateSessionsPing(data);
         return true;
     })  

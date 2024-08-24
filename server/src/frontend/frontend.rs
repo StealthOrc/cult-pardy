@@ -120,10 +120,11 @@ async fn index(
     db : web::Data<Arc<MongoServer>>,
     settings: web::Data<Arc<settings::Settings>>,
 ) -> actix_web::Result<HttpResponse> {
+    println!("Index");  
     let user_session = get_session_with_token_update_or_create_new(&req, &db).await;
     let mut response = index_response(&req);
     remove_cookie(&mut response, &req, "token");
-    println!("Session: {:#?}", user_session);
+    println!("Session: {:#?}", user_session);   
     set_session_token_cookie(&mut response,&settings, &user_session);
     Ok(response)
 }
