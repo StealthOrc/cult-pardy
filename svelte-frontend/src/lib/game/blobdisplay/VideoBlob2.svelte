@@ -1,29 +1,26 @@
 <script lang="ts">
-
 	import { CONST } from "$lib/const";
 	import { get_global_time } from "$lib/lib";
 	import { mediaPlayerContextStore } from "$lib/stores/MediaPlayerStore";
 	import { mediaStateStore, type MediaPlayerSessionType } from "$lib/stores/MediaStateStore";
 	import type { BoardContext, MediaPlayerContext } from "$lib/types";
-	import { type MediaState, type WebsocketSessionEvent, type NumberScope} from "cult-common";
+	import type { MediaState, WebsocketSessionEvent } from "cult-common";
 	import { getContext, onMount, setContext } from "svelte";
 	import JeopardyBoard from "../JeopardyBoard.svelte";
 	import { JeopardyBoardStore } from "$lib/stores/JeopardyBoardStore";
 	import JeopardyCategory from "../JeopardyCategory.svelte";
 	import { match, P } from "ts-pattern";
 	import type { EventHandler } from "svelte/elements";
+	import { downloadBlob2 } from "./blodUtils";
 	import { WebsocketStore } from "$lib/stores/WebsocketStore";
 
-    export let video: Blob
+    export let name = "world";
     export let currUserIsAdmin: boolean = false;
-    export let ranges: NumberScope[] = [];
     let player: HTMLVideoElement | null = null;
     
 
-    let ov : HTMLElement | null = null;
     onMount(() => {
-        ov = document.getElementById("ov") as HTMLElement;
-        console.log("OV", ov);
+        loadVideo();
         player = document.getElementById("player") as HTMLVideoElement;
         if (player == null) return;
         console.log("TEK ONLOADING!!!!!", player);
@@ -68,10 +65,8 @@
 
     let status = EventStatusEnum.NONE;
     let eventSourceLog = Array<EventStatusEnum>();
-
-
+        
     let store = $WebsocketStore;
-    
 
     enum StateUpdateType {
         PLAY = "PLAY",
@@ -145,8 +140,6 @@
     async function play(){
         if (!player)
             return;
-
-
         if (status == EventStatusEnum.PLAY) {
             update_status(StateUpdateType.PLAY)
             return;
@@ -160,15 +153,8 @@
     }
 
     async function seek() {
-        console.log("START SEEKING", status);
         if (!player)
             return;
-        if(player.paused){
-            update_status(StateUpdateType.SEEK);
-            return;
-        }
-
-
         if (status == EventStatusEnum.START_SEEKING || status == EventStatusEnum.START_SEEKING_PLAY) {
             update_status(StateUpdateType.STARTING_SEEKING);
             return;
@@ -307,7 +293,6 @@
 
 
     function endSeeking() {
-        console.log("SEEKED");
         if (!player)
             return;
         if (status == EventStatusEnum.SEEKING || status == EventStatusEnum.SEEKING_PLAY || status == EventStatusEnum.START_SEEKING) {
@@ -331,47 +316,20 @@
         return true;
     }
 
-    function containsTime(time: number): boolean {
-        if (ranges.length == 0) return true;
-        return ranges.some((range) => range.start <= time && time <= range.end);
-    }
-    
-    function closesTimeStart(time: number): number {
-    if (ranges.length === 0) return 0;
-
-    return ranges.reduce((prev, curr) => {
-        const prevDistance = Math.abs(prev.start - time);
-        const currDistance = Math.abs(curr.start - time);
-        return currDistance < prevDistance ? curr : prev;
-    }).start; 
-    }
-
-    function closesTimeEnd(time: number): number {
-    if (player == null) return 0;
-    if (ranges.length === 0) return player.duration;
-
-    return ranges.reduce((prev, curr) => {
-        const prevDistance = Math.abs(prev.start - time);
-        const currDistance = Math.abs(curr.start - time);
-        return currDistance < prevDistance ? curr : prev;
-    }).end; 
-    }
-
-    function closesTimeRange(time: number): NumberScope {
-    if (player == null) return {start: 0, end: 0};
-    if (ranges.length === 0) return {start: 0, end: player.duration};
-    return ranges.reduce((prev, curr) => {
-        const prevDistance = Math.abs(prev.start - time);
-        const currDistance = Math.abs(curr.start - time);
-        return currDistance < prevDistance ? curr : prev;
-        });
-    }
 
 
-    function moveTime(time: number): void {
+    async function loadVideo(start = 0) {
         if (!player) return;
-        player.currentTime = time;
+        let headers = {};
+        
+        // If end is not specified, assume you want to load 10 MB chunks
+     
+        const end  = start + (10 * 1024 * 1024) - 1;  // 10 MB range
+        let range = {start, end};
+        //let blob = await downloadBlob2(name, range); 
+        //player.src = URL.createObjectURL(blob);
     }
+
 
 
 </script>
@@ -389,40 +347,6 @@ bind:this={player}
 on:play={play} on:pause={pause} on:ended={onEnded} 
 on:seeking={seek}
 on:seeked={endSeeking}
-on:timeupdate={async () => {
-    if (!player) return;
-    if (!containsTime(player.currentTime)) {
-        if(player.paused){
-            status = EventStatusEnum.START_SEEKING;
-        } else {        
-            status = EventStatusEnum.PAUSE_START_SEEKING;
-            player.pause();
-        }
-        await seekToTime(closesTimeStart(player.currentTime));
-        }
-    }
-}
-
-
-
-
-id="player" src={URL.createObjectURL(video)} controls={currUserIsAdmin} muted style="width: 640px; height: 360px;" disablepictureinpicture controlslist="nodownload noplaybackrate">
+id="player" controls={currUserIsAdmin} muted>
     <track kind="captions" />
 </video>
-
-
-
-{#if currUserIsAdmin && player != null && ov != null}
-    {#if  ranges.length > 0}
-        <div class="fixed left-0 top-1/2 transform -translate-y-1/2 p-4 bg-white shadow-lg rounded-lg" id="ov" bind:this={ov}>
-            {#each ranges as range, i}
-                <!-- svelte-ignore a11y_click_events_have_key_events -->
-                <!-- svelte-ignore a11y_no_static_element_interactions -->
-                <div on:click={(e) => {moveTime(range.start)}}>
-                    <p>| Range {i + 1} : {range.start} - {range.end} | </p>
-                </div>
-            {/each}
-        </div>
-    {/if}
-{/if}
-

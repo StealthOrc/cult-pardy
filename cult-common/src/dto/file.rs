@@ -9,15 +9,20 @@ use wasm_bindgen::prelude::*;
 
 use crate::wasm_lib::hashs::validate::ValidateHash;
 use crate::wasm_lib::ids::discord::DiscordID;
+use crate::wasm_lib::NumberScope;
 
 
 #[derive(Tsify,Debug, Serialize, Deserialize, Default, ToSchema)]
 pub struct FileMultiPart {
+    #[tsify(optional)]
     pub file_name: Option<String>,
+    #[tsify(optional)]
     pub file_type: Option<String>,
+    #[tsify(optional)]
     pub validate_hash: Option<ValidateHash>,
-    
+    #[tsify(optional)]
     pub data: Option<Vec<u8>>,
+    #[tsify(optional)]
     pub uploader_id: Option<DiscordID>,
 }
 
@@ -27,14 +32,6 @@ impl FileMultiPart {
    }
 }
 
-#[derive(Tsify,Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
-pub struct FileChunk {
-    pub files_id: String,
-    pub file_type: String,
-    pub n: usize,
-    pub data: Bytes,
-}
-
 
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct DTOCFile{
@@ -42,3 +39,5 @@ pub struct DTOCFile{
     pub file_type: String,
     pub data: Bytes,
 }
+
+

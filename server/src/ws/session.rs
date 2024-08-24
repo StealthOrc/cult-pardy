@@ -199,6 +199,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
 
                         let ping = time.signed_duration_since(pong).num_milliseconds();
                         self.player.ping = ping;
+                        println!("Setting ping to for user {:?} to {}", self.player.user_session_id, ping);
                         self.set_ping(ctx);
                     }
                 }

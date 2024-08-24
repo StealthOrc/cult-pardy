@@ -58,7 +58,6 @@ function createCurrentSessionsStore() {
                     id: "unknown" 
                 },
                 score: 0,
-                discord_user: null,
                 is_admin: false
             };
         }

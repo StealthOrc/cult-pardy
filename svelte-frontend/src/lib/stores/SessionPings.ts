@@ -31,22 +31,32 @@ function createCurrentPingsStore() {
 
     function removeBySessionId(user_session_id: UserSessionId) {
         store.update((curr) => {
-            const found: WebsocketPing | undefined = curr.find((s) => s.user_session_id.id === user_session_id.id);
-            if (found == undefined) return curr;
-            curr.splice(curr.indexOf(found), 1);
+            for (let i = 0; i < curr.length; i++) {
+                if (curr[i].user_session_id.id === user_session_id.id) {
+                    curr.splice(i, 1);
+                    break;
+                }
+            }
             return curr;
         });
     }
+    
+
+
     function updateWebsocketPing(websocketPing: WebsocketPing) {
+        console.log("updateWebsocketPing", websocketPing);
         store.update((curr) => {
-            const index = curr.findIndex((s) => s.user_session_id.id === websocketPing.user_session_id.id);
-    
-            if (index === -1) {
+            let updated = false;
+            for (let i = 0; i < curr.length; i++) {
+                if (curr[i].user_session_id.id === websocketPing.user_session_id.id) {
+                    curr[i] = websocketPing;
+                    updated = true;
+                    break;
+                }
+            }  
+            if (!updated) {
                 curr.push(websocketPing);
-            } else {
-                curr[index] = { ...curr[index], ping: websocketPing.ping };
             }
-    
             return curr;
         });
     }

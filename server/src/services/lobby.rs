@@ -68,8 +68,9 @@ impl WebsocketSession {
 
     pub fn update_pings(&mut self, ping: i64) {
         if self.pings.len() > 5 {
-            self.pings.remove(0);
+            self.pings.remove(0);                           
         }
+        self.last_ping = self.get_ping();
         self.pings.push(ping);
     }
 
@@ -650,6 +651,8 @@ impl Handler<UpdateWebsocketPing> for Lobby {
             websocket_session.update_pings(msg.ping);
             let user_session_id = websocket_session.user_session_id.clone();
             let ping: i64 = self.get_session_ping(&user_session_id);
+
+
             if ping == self.get_session_last_ping(&user_session_id) {
                 return;
             }
@@ -657,6 +660,9 @@ impl Handler<UpdateWebsocketPing> for Lobby {
                 user_session_id,
                 ping,
             };
+            
+            
+
             let event = SessionEvent::SessionPing(web_socket_ping);
             self.send_lobby_message(&WebsocketServerEvents::Session(event))
         }

@@ -15,6 +15,7 @@ use crate::wasm_lib::{DiscordUser, QuestionType, Vector2D};
 pub struct DTOSession {
     pub user_session_id: UserSessionId,
     pub score: i32,
+    #[tsify(optional)]
     pub discord_user: Option<DiscordUser>,
     pub is_admin: bool,
 }
@@ -33,6 +34,7 @@ impl DTOSession {
 pub struct DtoJeopardyBoard {
     pub creator: UserSessionId,
     pub categories: Vec<DtoCategory>,
+    #[tsify(optional)]
     pub current: Option<DtoQuestion>,
     pub action_state: ActionState,
 }
@@ -91,9 +93,12 @@ impl DtoCategory {
 #[derive(Tsify,PartialEq, Eq, Debug, Clone, Serialize, Deserialize, Default)]
 pub struct DtoQuestion {
     pub question_type: QuestionType,
+    #[tsify(optional)]
     pub question_text: Option<String>,
     pub value: i32,
+    #[tsify(optional)]
     pub answer: Option<String>,
+    #[tsify(optional)]
     pub won_user_id: Option<UserSessionId>,
     pub vector2d: Vector2D,
 }

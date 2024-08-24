@@ -10,7 +10,7 @@ use crate::dto::board::{DtoCategory, DtoJeopardyBoard, DtoQuestion};
 use crate::wasm_lib::ids::lobby::LobbyId;
 use crate::wasm_lib::ids::usersession::UserSessionId;
 use crate::wasm_lib::websocket_events::MediaState;
-use crate::wasm_lib::{JeopardyMode, QuestionType, Vector2D};
+use crate::wasm_lib::{Blob, JeopardyMode, NumberScope, QuestionType, Vector2D};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, ToSchema)]
 pub enum LobbyCreateResponse {
@@ -23,6 +23,7 @@ pub struct JeopardyBoard {
     pub title: String,
     pub categories: Vec<Category>,
     #[serde(skip_serializing)]
+    #[tsify(optional)]
     pub current: Option<Vector2D>,
     #[serde(skip_serializing)]
     pub create: DateTime<Local>,
@@ -45,7 +46,13 @@ impl JeopardyBoard {
                     question_type = QuestionType::Youtube("dQw4w9WgXcQ".to_string());
                 }
                 if question == 1 && category == 0 {
-                    question_type = QuestionType::Video("FlyHigh.mp4".to_string());
+                    question_type = QuestionType::Video(Blob::new_empty("FlyHigh.mp4".to_string()));
+                }
+                if question == 2 && category == 0 {
+                    let first_time_slot = NumberScope::new(0, 10);
+                    let second_time_slot = NumberScope::new(60, 70);
+                    let vec = vec![first_time_slot, second_time_slot];
+                    question_type = QuestionType::Video(Blob::new("FlyHigh.mp4".to_string(),vec));
                 }
                 let question_name = format!("question_{}", question);
                 let answer_name = format!("answer{}", question);
@@ -191,6 +198,7 @@ impl<'de> Deserialize<'de> for JeopardyBoard {
     }
 }
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize)]
+#[tsify(namespace)] 
 pub enum ActionState {
     None,
     MediaPlayer(MediaState),
@@ -265,6 +273,7 @@ pub struct Question {
     #[serde(skip_serializing)]
     pub open: bool,
     #[serde(skip_serializing)]
+    #[tsify(optional)]
     pub won_user_id: Option<UserSessionId>,
 }
 impl Question {

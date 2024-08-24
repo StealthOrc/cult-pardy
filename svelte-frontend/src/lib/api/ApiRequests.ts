@@ -3,11 +3,12 @@ import {
     type ApiResponse,
     type DiscordUser,
     type JeopardyBoard,
-    type UserSessionId
+    type UserSessionId,
+    type  Range ,
 } from "cult-common";
 import { CookieStore, type SessionCookies } from "$lib/stores/cookies";
 import {CONST} from "$lib/const"
-
+import { DateTime } from 'ts-luxon';
 /*
 /api/info
 /api/session
@@ -94,6 +95,14 @@ export async function get_file(filename: string): Promise<Response> {
     headers.append("file-name", filename);
     return await api_get_request(CONST.GETFILE_URL, RequestContentType.OCTET_STREAM, headers);
 }
+
+export async function get_file2(filename: string, range: Range): Promise<Response> {
+    const headers = new Headers();
+    headers.append("file-name", filename);
+    headers.append("Range", `bytes=${range.start}-${range.end}`);
+    return await api_get_request(CONST.GETFILE_URL + "2", RequestContentType.OCTET_STREAM, headers);
+}
+
 
 
 export async function upload_file_part(file:FormData): Promise<Response> {
@@ -214,8 +223,6 @@ export class SessionData {
 }
 
 
-
-import { DateTime } from 'ts-luxon';
 
 export class SessionToken {
     public token: string;

@@ -4,7 +4,7 @@ use actix::{Addr};
 use actix_web::{HttpRequest, HttpResponse, web};
 use actix_web_actors::ws;
 use serde_json::json;
-use crate::apis::data::{find_session, get_internal_server_error_json, get_lobby_id_from_value};
+use crate::rest::data::{find_session, get_internal_server_error_json, get_lobby_id_from_value};
 use crate::services::db::MongoServer;
 use crate::services::game::{self, GameServer};
 use crate::ws::session::WsSession;

@@ -1,4 +1,4 @@
-import { get_file } from "$lib/api/ApiRequests";
+import { get_file, get_file2 } from "$lib/api/ApiRequests";
 import { buildUint8ArrayFromChunks } from "$lib/BinaryConversion";
 import { decompressData, formatSpeed } from "$lib/create/fileUploadUtils";
 import { XXH64 } from "xxh3-ts";
@@ -44,6 +44,41 @@ export type FileDownloadProgress = {
 
 
 
+export async function downloadBlob2(filename: string, range: Range): Promise<Blob> {
+    console.log("filename", filename);
+    const response: Response = await get_file2(filename, range);
+    if (!response.ok || !response.body || !(response.body instanceof ReadableStream)) {
+        throw new Error("Failed to download file");
+    }
+    const file_type = response.headers.get('file-type') || 'video/mp4';
+
+
+    const reader = response.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let done = false;
+
+    const startTime = performance.now();
+    while (!done) {
+        const { value, done: isDone } = await reader.read();
+        if (value) {
+            chunks.push(value);
+        }
+        if (isDone) {
+            console.log("Download complete");
+            done = true;
+        }
+    }
+    console.log("Downloaded in", (performance.now() - startTime) / 1000, "seconds");
+    const fileData = buildUint8ArrayFromChunks(chunks);
+    console.log("fileData", fileData);
+    const decompressedData = await decompressData(fileData);
+    console.log("decompressedData", decompressedData);
+    const blob = new Blob([decompressedData], { type: file_type });
+    return blob
+}
+
+
+
 export async function downloadBlob(filename: string, onProgress: (progress: FileDownloadProgress) => void): Promise<void> {
         console.log("filename", filename);
         const response: Response = await get_file(filename);
@@ -67,7 +102,6 @@ export async function downloadBlob(filename: string, onProgress: (progress: File
         let downloadPercentage = 0;
         let done = false;
         let end_speed = "0 B/s";
-
         const startTime = performance.now();
         while (!done) {
             const { value, done: isDone } = await reader.read();
@@ -82,6 +116,7 @@ export async function downloadBlob(filename: string, onProgress: (progress: File
                 console.log("Download complete");
                 done = true;
                 end_speed = formatSpeed(downloadedSize, (performance.now() - startTime) / 1000);
+                onProgress({ current: 100, speed: end_speed, name: file_name, size: file_size, upload_date: file_upload_date, uploader_id: uploader_id});
                 if (downloadedSize != file_size) {
                     console.error("downloadedSize != totalSize", downloadedSize, file_size);
                     throw new Error("downloadedSize != totalSize");

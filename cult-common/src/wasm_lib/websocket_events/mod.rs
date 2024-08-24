@@ -16,6 +16,7 @@ use super::Vector2D;
 
 
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, Display)]
+#[tsify(namespace)] 
 pub enum WebsocketServerEvents {
     Board(BoardEvent),
     Websocket(WebsocketEvent),
@@ -42,6 +43,7 @@ impl WebsocketServerEvents {
 }
 
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, Display)]
+#[tsify(namespace)] 
 pub enum ActionStateEvent {
     Media(ActionMediaEvent),
     SyncForward(f64),
@@ -49,6 +51,7 @@ pub enum ActionStateEvent {
 
 }
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, Display)]
+#[tsify(namespace)] 
 pub enum ActionMediaEvent {
     Play,
     Pause,
@@ -84,6 +87,7 @@ impl MediaState {
 
 
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, Display)]
+#[tsify(namespace)] 
 pub enum BoardEvent {
     CurrentBoard(DtoJeopardyBoard),
     CurrentQuestion(DtoQuestion, ActionState),
@@ -92,6 +96,7 @@ pub enum BoardEvent {
 }
 
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, Display)]
+#[tsify(namespace)] 
 pub enum WebsocketEvent {
     WebsocketJoined(WebsocketSessionId),
     WebsocketID(WebsocketSessionId),
@@ -99,6 +104,7 @@ pub enum WebsocketEvent {
 }
 
 #[derive(Tsify, Debug, Clone, Serialize, Deserialize, Display, Hash)]
+#[tsify(namespace)] 
 pub enum SessionEvent {
     CurrentSessions(Vec<DTOSession>),
     SessionJoined(DTOSession),
@@ -108,6 +114,7 @@ pub enum SessionEvent {
 }
 
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, Display)]
+#[tsify(namespace)] 
 pub enum WebsocketSessionEvent {
     Click(Vector2D),
     Back,
@@ -118,6 +125,7 @@ pub enum WebsocketSessionEvent {
     
 }
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, Display)]
+#[tsify(namespace)] 
 pub enum VideoEvent {
     Play,
     Pause(f64),
@@ -132,6 +140,7 @@ pub enum VideoEvent {
 
 
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, Display)]
+#[tsify(namespace)] 
 pub enum WebsocketError {
     LobbyNotFound(LobbyId),
     SessionNotFound(UserSessionId),

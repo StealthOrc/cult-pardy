@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
 use utoipa::ToSchema;
 use websocket_events::MediaState;
-use std::hash::Hash;
+use std::{cmp::min, hash::Hash};
 use std::string::ToString;
 use wasm_bindgen::prelude::*;
 
@@ -15,7 +15,7 @@ pub mod hashs;
 
 
 #[derive(Tsify,Clone, Copy,Serialize,Deserialize)]
-#[tsify(into_wasm_abi, from_wasm_abi)]
+#[tsify(namespace)] 
 pub enum JeopardyMode {
     //3x3
     SHORT,
@@ -26,7 +26,6 @@ pub enum JeopardyMode {
 }
 
 #[derive(Tsify,Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq, Default)]
-#[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct Vector2D {
     pub x: usize,
     pub y: usize,
@@ -34,9 +33,7 @@ pub struct Vector2D {
 
 
 
-#[wasm_bindgen]
 impl JeopardyMode {
-    #[wasm_bindgen]
     pub fn field_size(self: JeopardyMode) -> usize {
         match self {
             JeopardyMode::SHORT => 3,
@@ -92,23 +89,13 @@ impl DiscordUser {
 
 
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Default,ToSchema)]
+#[tsify(namespace)]
 pub enum QuestionType {
-    Video(String),
+    Video(Blob),
     Youtube(String),
     #[default]
-    Question,
+    Question
 }
-
-#[derive(Tsify,Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Default)]
-pub enum MediaType {
-    Yotube(String),
-    #[default]
-    Video,
-    Media()
-}
-
-
-
 
 
 
@@ -122,4 +109,72 @@ impl QuestionType {
     
 }
 
+#[derive(Tsify,Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Default,ToSchema)]
+pub struct Blob {
+    pub name: String,
+    pub range: Vec<NumberScope>,
+}
 
+impl Blob {
+
+    pub fn new(name: String, range: Vec<NumberScope>) -> Self {
+        Blob { name, range }
+    }
+
+    pub fn new_empty(name: String) -> Self {
+        Blob { name, range: vec![] }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.range.is_empty()
+    }
+
+    pub fn is_valid(&self) -> bool {
+        self.range.iter().all(|range| !range.is_empty())
+    }
+
+    pub fn is_valid_range(&self, range: &NumberScope) -> bool {
+        self.range.iter().any(|r| r.overlaps(range))
+    }
+
+    pub fn intersection(&self, range: &NumberScope) -> Option<NumberScope> {
+        self.range.iter().filter_map(|r| r.intersection(range)).next()
+    }
+
+
+
+    
+}
+
+
+
+#[derive(Tsify, Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+pub struct NumberScope {
+    pub start: usize,
+    pub end: usize,
+}
+
+impl NumberScope {
+    pub fn new(start: usize, end: usize) -> Self {
+        NumberScope { start, end }
+    }
+
+    pub fn overlaps(&self, other: &NumberScope) -> bool {
+        self.start <= other.end && self.end >= other.start
+    }
+
+    pub fn intersection(&self, other: &NumberScope) -> Option<NumberScope> {
+        if self.overlaps(other) {
+            Some(NumberScope::new(
+                usize::max(self.start, other.start),
+                usize::min(self.end, other.end),
+            ))
+        } else {
+            None
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        self.start >= self.end
+    }
+}

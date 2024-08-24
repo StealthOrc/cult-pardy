@@ -35,15 +35,26 @@ function getCookies(): SessionCookies {
 
 
 
-export const CookieStore = createCookieStore();
+export const CookieStore : CookieStoreType = createCookieStore();
 
 export const dev_loaded : Writable<boolean> = writable(dev ? false : true);
 export const is_loading : Writable<boolean> = writable(false);
 
 
-function createCookieStore() {
+export type CookieStoreType = {
+    store: Writable<SessionCookies>;
+    update: (newCookies: SessionCookies) => void;
+    update_with_sessionData: (sessionData: SessionData) => void;
+    setCookies: (newCookies: SessionCookies) => void;
+    update_userSessionId: (userSessionId: UserSessionId) => void;
+    update_sessionToken: (sessionToken: string) => void;
+    subscribe: (run: Subscriber<SessionCookies>) => Unsubscriber;
+}
 
-    const store = writable<SessionCookies>(getCookies());
+
+function createCookieStore() : CookieStoreType {
+
+    const store : Writable<SessionCookies> = writable<SessionCookies>(getCookies());
 
 
     function setCookies(newCookies: SessionCookies) {

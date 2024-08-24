@@ -1,30 +1,13 @@
 
 import { dev } from "$app/environment";
-import type { UserSessionId, WebsocketSessionEvent, WebsocketSessionId } from "cult-common";
+import type {  UserSessionId, WebsocketSessionEvent, WebsocketSessionId } from "cult-common";
 import { webSocket, WebSocketSubject } from "rxjs/webSocket";
 import { writable, type Subscriber, type Unsubscriber, type Writable} from "svelte/store"; 
-import type { SessionCookies } from "./cookies";
 import { deflateSync } from "fflate";
 
 
 // eslint-disable-next-line no-var
-var WebsocketStore : WebsocketStore;
-
-
-export function newWebSocketStore(lobbyId: string, cookies:SessionCookies): WebsocketStore {
-    if (WebsocketStore != null) {
-        return WebsocketStore;
-    }
-    console.log("Creating new websocket store");
-    const ws = createWebsocketStore(lobbyId, cookies.userSessionId, cookies.sessionToken);
-    WebsocketStore = ws;
-    return ws;
-}
-
-
-export function get_websocketStore() {
-    return WebsocketStore;
-}
+export var WebsocketStore : WebsocketStore = createWebsocketStore();
 
 
 if(dev) {
@@ -39,7 +22,7 @@ if(dev) {
 
 
 
-function get_ws(lobbyId: string, userSessionId: UserSessionId, sessionToken: string) : WebsocketStoreType {
+function get_ws(lobbyId: string, userSessionId:UserSessionId, sessionToken:string) : WebsocketStoreType {
     const host = location.host
     console.log("HOST", host)
     const ws = webSocket({
@@ -63,7 +46,7 @@ function get_ws(lobbyId: string, userSessionId: UserSessionId, sessionToken: str
 }
 
 export type WebsocketStoreType = {
-    webSocketSubject: WebSocketSubject<WebsocketSessionEvent>;
+    webSocketSubject: WebSocketSubject<WebsocketSessionEvent>
     websocket_id: WebsocketSessionId;
 }
 
@@ -72,20 +55,27 @@ export type WebsocketStoreType = {
 export type WebsocketStore = {
     store: Writable<WebsocketStoreType>;
     stop: () => void;
-    new_ws: () => void;
+    new_ws: (lobbyId: string, userSessionId:UserSessionId, sessionToken:string) => WebsocketStoreType;
     update_websocket_id: (id: WebsocketSessionId) => void;
     subscribe: (this: void, run: Subscriber<WebsocketStoreType>) => Unsubscriber;
 }
 
-function createWebsocketStore(lobbyId: string, userSessionId: UserSessionId, sessionToken: string): WebsocketStore {
-    const lobby_id = lobbyId;
-    const user_session_id = userSessionId;
-    const session_token = sessionToken;
+function createWebsocketStore(): WebsocketStore {
 
-    const store = writable<WebsocketStoreType>(get_ws(lobby_id, user_session_id, session_token));
+    const store = writable<WebsocketStoreType>();
 
-    function new_ws() {
-        store.set(get_ws(lobby_id, user_session_id, session_token));
+    function new_ws(lobbyId: string, userSessionId:UserSessionId, sessionToken:string) : WebsocketStoreType {
+        store.update((ws) => {
+            if (ws != undefined && ws.webSocketSubject != undefined) {
+                ws.webSocketSubject.unsubscribe();
+                ws.webSocketSubject.complete();
+            }
+            return ws;
+        });
+
+        const ws = get_ws(lobbyId, userSessionId, sessionToken);
+        store.set(ws);
+        return ws;
     }
 
     function update_websocket_id(id: WebsocketSessionId) {

@@ -3,7 +3,7 @@
 	import { JeopardyBoardStore } from "$lib/stores/JeopardyBoardStore";
 	import { SessionPingsStore } from "$lib/stores/SessionPings";
 	import { CurrentSessionsStore } from "$lib/stores/SessionStore";
-	import { get_websocketStore } from "$lib/stores/WebsocketStore";
+	import { WebsocketStore } from "$lib/stores/WebsocketStore";
 	import type { DtoQuestion, DTOSession, Vector2D, WebsocketSessionEvent } from "cult-common";
 	import { WebSocketSubject } from "rxjs/webSocket";
 
@@ -15,39 +15,37 @@
         ping = value.ping;
     })
 
-    let current: DtoQuestion | null = null;
+    let current: DtoQuestion | undefined = undefined;
     JeopardyBoardStore.subscribe(value => {
         if (value != null) {
             current = value.current;
         }
     })
 
-    let wsStore = get_websocketStore();
-    if (wsStore == null) {
-        throw new Error("Websocket store is null");
-    }
-    let ws = $wsStore.webSocketSubject
+    let ws = $WebsocketStore.webSocketSubject
     
     function getAvatar() {
         if (!session || session.discord_user === null) {
             return default_avatar
         }
         const discord_user = session.discord_user;
-        let avatar_id = discord_user.avatar_id
-        let discord_id = discord_user.discord_id
-        return `https://cdn.discordapp.com/avatars/${discord_id.id}/${avatar_id}.png?size=64*10`;
+        if (discord_user != null) {
+            let avatar_id = discord_user.avatar_id
+            let discord_id = discord_user.discord_id
+            return `https://cdn.discordapp.com/avatars/${discord_id.id}/${avatar_id}.png?size=64*10`;
+        }
     }
     
 
     function getUserName(DTOSession: DTOSession) {
-        if (DTOSession.discord_user === null) {
-            return DTOSession.user_session_id.id
+        if (DTOSession.discord_user != null) {
+            return DTOSession.discord_user.username
         }
-        return DTOSession.discord_user.username
+        return DTOSession.user_session_id.id
     }
 
     function addStore() {
-        if (ws == null || session == null || current == null) {
+        if (ws == null || session == null || current == undefined) {
             return;
         }
         let store: WebsocketSessionEvent = {AddUserSessionScore : [session.user_session_id, current.vector2d]};

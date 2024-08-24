@@ -1,4 +1,4 @@
-mod apis;
+mod rest;
 mod frontend;
 mod ws;
 mod authentication;
@@ -7,18 +7,19 @@ mod data;
 mod settings;
 
 
+use std::any::Any;
 use std::sync::Arc;
 
-use crate::apis::api::{board, create_game_lobby, discord_session, has_authorization, join_game};
-use crate::apis::api::api_session_request;
+use crate::rest::api::{board, create_game_lobby, discord_session, has_authorization, join_game};
+use crate::rest::api::api_session_request;
 
 use actix_web::error::ErrorBadRequest;
 use actix_web::{get, web, App, HttpRequest, HttpResponse, HttpServer};
 use anyhow::Result;
 
-use apis::api::{game_info, session_data_request, upload_file_part, DiscordSessionResponse, UserSessionWithAdmin};
-use apis::data::{extract_header_string, get_session, set_session_token_cookie};
-use apis::error::{ApiError, ApiGameError, ApiRequestError, ApiSessionError, ApiFileError };
+use rest::api::{game_info, session_data_request, DiscordSessionResponse, UserSessionWithAdmin};
+use rest::data::{extract_header_string, get_range_from_header, get_session, set_session_token_cookie};
+use rest::error::{ApiError, ApiGameError, ApiRequestError, ApiSessionError, ApiFileError };
 use attohttpc::Session;
 use authentication::discord::is_admin;
 use backend::{Category, JeopardyBoard, LobbyCreateResponse, Question};
@@ -29,6 +30,7 @@ use dto::api::ApiResponse;
 use dto::file::FileMultiPart;
 use futures::stream::once;
 use futures::AsyncReadExt;
+use rest::file::{get_file_from_name, upload_file_part};
 use services::db::MongoServer;
 use services::game::{DiscordData, SessionToken, UserSession};
 use settings::Settings;
@@ -41,7 +43,7 @@ use wasm_lib::hashs::validate::ValidateHash;
 use wasm_lib::ids::discord::DiscordID;
 use wasm_lib::ids::lobby::LobbyId;
 use wasm_lib::ids::usersession::UserSessionId;
-use wasm_lib::{DiscordUser, QuestionType};
+use wasm_lib::{DiscordUser, QuestionType, NumberScope};
 use crate::authentication::discord;
 use crate::frontend::frontend::{assets, find_game, grant_admin_access, index};
 use crate::services::input::InputServer;
@@ -74,14 +76,14 @@ async fn main() -> Result<()> {
             (url = "http://10.100.20.3:8000", description = "Remote server")
         ),
         paths(
-            apis::api::api_session_request,
-            apis::api::game_info,
-            apis::api::upload_file_part,
-            apis::api::session_data_request,
-            apis::api::has_authorization,
-            apis::api::discord_session,
-            apis::api::create_game_lobby,
-            apis::api::join_game,
+            rest::api::api_session_request,
+            rest::api::game_info,
+            rest::file::upload_file_part,
+            rest::api::session_data_request,
+            rest::api::has_authorization,
+            rest::api::discord_session,
+            rest::api::create_game_lobby,
+            rest::api::join_game,
         ),
         components(
             schemas(
@@ -109,6 +111,7 @@ async fn main() -> Result<()> {
                 QuestionType,
                 LobbyCreateResponse,
                 LobbyId,
+
             ))
     )]
     struct ApiDoc;
@@ -195,17 +198,15 @@ async fn not_found(settings:web::Data<Arc<Settings>>) -> std::result::Result<Htt
 
 
 
-pub struct CFile {
-    pub file_name: String,
-    pub file_type: String,
-    pub data: Bytes,
-}
 
 
 
 
-#[get("/api/file")]
-async fn get_file_from_name(req: HttpRequest,  db: web::Data<Arc<MongoServer>>, settings:web::Data<Arc<Settings>>) -> Result<HttpResponse, actix_web::Error> {
+
+
+/* Maybe using sometimes streamd with range
+#[get("/api/file2")]
+async fn get_file_from_name2(req: HttpRequest,  db: web::Data<Arc<MongoServer>>, settings:web::Data<Arc<Settings>>) -> Result<HttpResponse, actix_web::Error> {
     let user_session = match get_session(&req, &db).await {
         Some(data) => data,
         None => return Ok(HttpResponse::Unauthorized().json("You are not authorized to access this file")),
@@ -213,10 +214,17 @@ async fn get_file_from_name(req: HttpRequest,  db: web::Data<Arc<MongoServer>>, 
 
     let file_name = match extract_header_string(&req, "file-name") {
         Ok(data) => data,
-        Err(_) => return Ok(HttpResponse::BadRequest().json("No file name provided")),
+        Err(e) => return Ok(e)
     };
+
+    let byte_range = match get_range_from_header(&req) {
+        Ok(data) => data,
+        Err(e) => return Ok(e),
+    };
+
+
         
-    let file_data = match db.collections.file_bucket_files.find_one(doc!{"filename":Some(file_name.clone())}).await {
+    let file_data: data::FileData = match db.collections.file_bucket_files.find_one(doc!{"filename":Some(file_name.clone())}).await {
         Ok(data) => {
             if let Some(data) = data {
                   data
@@ -231,11 +239,14 @@ async fn get_file_from_name(req: HttpRequest,  db: web::Data<Arc<MongoServer>>, 
         }
     };
 
-    let mut test = match db.collections.file_bucket.open_download_stream_by_name(file_name.clone()).await {
-        Ok(data) => data,
-        Err(_) => return Ok(HttpResponse::InternalServerError().json("Error while downloading file")),
+    let file_chunk_range = file_data.get_chunk_range(byte_range.clone());
+
+    let id = match file_data.id {
+        Some(data) => data,
+        None => return Ok(HttpResponse::InternalServerError().json("Error while downloading file2")),
     };
-    println!("Downloading file: {}", file_name);
+
+
 
     let file_meta = match file_data.metadata{
         Some(data) => data,
@@ -244,15 +255,40 @@ async fn get_file_from_name(req: HttpRequest,  db: web::Data<Arc<MongoServer>>, 
 
 
 
+    let file_chunk = match db.get_file_chunks_in_range(id, file_chunk_range).await {
+        None => return Ok(HttpResponse::InternalServerError().json("Error while downloading file3")),
+        Some(data) => data,
+    };
+
+    let chunk_size = file_data.chunk_size;
     let mut buf = Vec::new();
-    if let Err(_) = test.read_to_end(&mut buf).await {
-        return Ok(HttpResponse::InternalServerError().json("Error while downloading file3"));
+    for chunk in file_chunk {
+        let chunk_start = chunk.n * chunk_size;
+        let chunk_end = chunk_start + chunk.data.len();
+        let chunk_range = Range::new(chunk_start, chunk_end);
+
+        if let Some(intersection) = byte_range.intersection(&chunk_range) {
+            let start_offset = (intersection.start - chunk_start) as usize;
+            let end_offset = (intersection.end - chunk_start) as usize;
+
+            if start_offset < chunk.data.len() && end_offset <= chunk.data.len() {
+                buf.extend_from_slice(&chunk.data[start_offset..end_offset]);
+            }
+        }
     }
-    
-    let mut response =  HttpResponse::Ok()
+
+    let start = byte_range.start;
+    let end = byte_range.end;
+
+    println!("Getting bytes: {:?}-{:?} from and the buf {:?}", start, end, buf.len());
+
+    let mut response =   HttpResponse::PartialContent()
+                                        .insert_header(("Content-Range", format!("bytes {}-{}/{}", start, end, file_data.length)))
                                         .insert_header(("file-name", file_name))
                                         .insert_header(("file-type", file_meta.file_type))
                                         .insert_header(("file-size", file_data.length))
+                                        .insert_header(("Accept-Ranges", "bytes"))
+                                        .insert_header(("Content-Length", buf.len() as u64))
                                         .insert_header(("file-upload-date", file_data.upload_date.to_string()))
                                         .insert_header(("uploader-id", file_meta.uploader.id))
                                         .insert_header(("validate-hash", file_meta.validate_hash.get_hash()))
@@ -264,7 +300,4 @@ async fn get_file_from_name(req: HttpRequest,  db: web::Data<Arc<MongoServer>>, 
     set_session_token_cookie(&mut response, &settings,&user_session);
     Ok(response)
 }
-
-
-
-    
+ */

@@ -2,15 +2,16 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
 
-use cult_common::dto::file::FileChunk;
+use bson::oid::ObjectId;
 use cult_common::wasm_lib::ids::discord::DiscordID;
+use cult_common::wasm_lib::NumberScope;
 use futures::StreamExt;
 use mongodb::bson::doc;
 use mongodb::gridfs::GridFsBucket;
 use mongodb::options::{GridFsBucketOptions, WriteConcern};
 use mongodb::{Client, Collection, IndexModel};
 use cult_common::wasm_lib::ids::usersession::UserSessionId;
-use crate::data::FileData;
+use crate::data::{FileChunk, FileData};
 use crate::services::game::UserSession;
 use crate::settings::Settings;
 
@@ -127,7 +128,29 @@ impl MongoServer {
     }
 
 
-
+    pub async fn get_file_chunks_in_range(&self, id:ObjectId, range:NumberScope) -> Option<Vec<FileChunk>> {
+        let mut chunks = match self.collections.file_bucket_chunks.find(doc!{"files_id": id, "n": { "$gte": range.start as i64, "$lte": range.end as i64}}).await {
+            Ok(mut cursor) => {
+                let mut vec = Vec::new();
+                while let Some(chunk) = cursor.next().await {
+                    match chunk {
+                        Ok(chunk) => vec.push(chunk),
+                        Err(err) => {
+                            println!("Error getting chunks {:?}", err);
+                            return None;
+                        }
+                    }
+                }
+                vec
+            },
+            Err(err) => {
+                println!("Error getting chunks {:?}", err);
+                return None;
+            }
+        };
+    chunks.sort_by(|a, b| a.n.cmp(&b.n));
+    Some(chunks)
+    }
 
 
 

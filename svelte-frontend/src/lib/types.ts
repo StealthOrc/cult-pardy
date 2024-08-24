@@ -6,6 +6,16 @@ export enum FileUploadType {
     MEDIA,
 }
 
+
+export enum QuestionTypes  {
+    BLOB,
+    YOUTUBE,
+    QUESTION,
+    NONE,
+}
+
+
+
 export enum VideoPlayerType {
     NONE,
     VIDEO,

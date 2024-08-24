@@ -9,6 +9,7 @@ use actix_web::cookie::Cookie;
 use actix_web::{HttpRequest, HttpResponse, web};
 use chrono::Local;
 use cult_common::wasm_lib::hashs::validate::ValidateHash;
+use cult_common::wasm_lib::NumberScope;
 use oauth2::http::header::COOKIE;
 use oauth2::http::HeaderValue;
 use serde::{Deserialize, Serialize};
@@ -62,6 +63,36 @@ pub fn extract_header_string(req: &HttpRequest, header_name: &str) -> Result<Str
             }
         }
     }
+}
+
+
+
+
+pub fn get_range_from_header(req: &HttpRequest) -> Result<NumberScope, HttpResponse> {
+    match extract_header_string(req, "range") {
+        Ok(range) => {
+            let mut parts = range.split('=');
+            if let Some(_) = parts.next() {
+                if let Some(range) = parts.next() {
+                    let mut range_parts = range.split('-');
+                    if let Some(start) = range_parts.next() {
+                        if let Some(end) = range_parts.next() {
+                            if let Ok(start) = start.parse::<usize>() {
+                                if let Ok(end) = end.parse::<usize>() {
+                                    return Ok(NumberScope {
+                                        start,
+                                        end,
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Err(err) => return Err(err),
+    }
+    Err(ApiRequestError::Error("range".to_string(), ErrorType::StringConversion).to_api_error().to_response())
 }
 
 pub fn get_lobby_id_from_header(req: &HttpRequest) -> Option<LobbyId> {
