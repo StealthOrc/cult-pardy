@@ -1,8 +1,7 @@
 <script lang="ts">
-
-	import type { DtoQuestion, Media, NumberScope } from 'cult-common';
+	import type { DtoQuestion, Media, MediaType, NumberScope, WebsocketSessionEvent } from 'cult-common';
 	import { onMount } from 'svelte';
-	import { BlobType, downloadBlob, getBlobType, type FileDownloadProgress } from './blodUtils';
+	import { BlobType, downloadBlob, getBlobType, test, test2, type FileDownloadProgress } from './blodUtils';
 	import ImageBlob from './ImageBlob.svelte';
 	import VideoBlob from './VideoBlob.svelte';
 	import AudioBlob from './AudioBlob.svelte';
@@ -10,7 +9,8 @@
 	import { match, P } from 'ts-pattern';
 	import { CurrentSessionsStore } from '$lib/stores/SessionStore';
 	import { CookieStore, lobby_store } from '$lib/stores/cookies';
-
+	import { WebsocketSessionStore } from '$lib/stores/WebsocketSessionStore';
+	import { WebsocketStore } from '$lib/stores/WebsocketStore';
 	export let media: Media;
 
 	let blob: Blob | null = null;
@@ -22,6 +22,8 @@
 		if (progress.blob) {
             blobType = getBlobType(progress.blob);
 			blob = progress.blob;
+			$WebsocketStore.webSocketSubject.next("MediaDownloadComplete");
+
 		} else {
 			fileDownloadProgress = progress;
 		}
@@ -29,12 +31,10 @@
 
 	async function loadBlob() {
 		if (!blob) {
-			
-
 			await downloadBlob(media.name, $lobby_store, media.media_token,onProgress);	
 		}
 		if (typeof media.media_type === "object" && "Video" in media.media_type) {
-        return media.media_type.Video; // Access the VideoType
+        	return media.media_type.Video; // Access the VideoType
     	}
 	}
 
@@ -43,11 +43,42 @@
             .getSessionById({ id: $CookieStore.userSessionId.id})
             .is_admin;
     }
-
 	onMount(loadBlob);
+
+
+	function allSessionLoaded() : boolean {
+		console.log("media", !media.media_loaded);
+		console.log("media", media.media_loaded.length);
+		console.log("media", $CurrentSessionsStore.size);
+
+
+		
+		if (!media.media_loaded) {
+        	return false;
+    	}
+		if (media.media_loaded.length === 0) {
+			return false;
+		}
+
+		for (let session of $CurrentSessionsStore.values()) {
+			console.log("session", session);
+			console.log("session", session.user_session_id);
+			console.log("session", media.media_loaded);
+			console.log("session", media.media_loaded.includes(session.user_session_id));
+			let found = media.media_loaded.find((element) => element.id === session.user_session_id.id);
+			if (!found) {
+				return false;
+			}
+		}
+		return true;
+	}
+
 </script>
 
-{#if blob && typeof media.media_type === "object"}
+
+
+
+{#if blob && typeof media.media_type === "object" && allSessionLoaded()}
 	{#if blobType === BlobType.IMAGE}
 		<ImageBlob image={blob} />
 	{:else if blobType === BlobType.VIDEO && "Video" in media.media_type}

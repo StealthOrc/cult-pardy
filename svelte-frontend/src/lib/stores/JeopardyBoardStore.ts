@@ -1,6 +1,7 @@
 import { dev } from "$app/environment";
-import type { ActionState, ActionStateType, DtoJeopardyBoard, DtoQuestion } from "cult-common";
+import type { ActionState, ActionStateType, DtoJeopardyBoard, DtoQuestion, UserSessionId } from "cult-common";
 import { writable, type Subscriber, type Unsubscriber} from "svelte/store"; 
+
 
 export const JeopardyBoardStore = createJeopardyBoardStore();
 
@@ -21,10 +22,12 @@ function createJeopardyBoardStore() {
     const store = writable<DtoJeopardyBoard|null>(null);
 
     function setBoard(board: DtoJeopardyBoard) {
+        console.log("Setting board");
         store.set(board);        
     }
 
     function setCurrent(current: DtoQuestion) {
+        console.log("Setting current");
         store.update((board) => {
             if (board == null) {
                 return board;
@@ -68,6 +71,25 @@ function createJeopardyBoardStore() {
         return state;
     } 
 
+
+    function addMediaDownloadComplete(UserSessionId: UserSessionId) {
+        store.update((board) => {
+            if (board == null) {
+                return board;
+            }
+            if (board.action_state != undefined) {
+                if (board.action_state.current_type != undefined) {
+                    if (typeof board.action_state.current_type === "object" && "Media" in board.action_state.current_type) {
+                        board.action_state.current_type.Media.media_loaded.push(UserSessionId);
+                    }
+                }
+            }   
+            return board;
+        });       
+    }   
+
+
+
     function subscribeActionState(this: void, run: Subscriber<ActionState>): Unsubscriber {
         return store.subscribe((data) => {
             if (data != null) {
@@ -89,6 +111,7 @@ function createJeopardyBoardStore() {
         setActionState,
         setBoard,
         subscribe,
+        addMediaDownloadComplete,
         setActionStateType,
         getActionState,
         subscribeActionState,

@@ -44,7 +44,7 @@
             return;
         };
         if (player == null) {
-            JeopardyBoardStore.setActionState({MediaPlayer: value.mediaState});
+            JeopardyBoardStore.setActionStateType({MediaPlayer: value.mediaState});
         } else {
             doMediaStateChange(value.mediaState);
         }

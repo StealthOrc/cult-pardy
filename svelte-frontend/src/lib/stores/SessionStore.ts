@@ -1,6 +1,6 @@
 import { dev } from "$app/environment";
 import type { DTOSession, UserSessionId } from "cult-common";
-import { writable, type Subscriber, type Unsubscriber} from "svelte/store"; 
+import { writable, type Subscriber, type Unsubscriber, type Writable} from "svelte/store"; 
 
 
 
@@ -18,70 +18,80 @@ if(dev) {
     }
 }
 
+export type CurrentSessionsStoreType = {
+    store: Writable<Map<UserSessionIDRef, DTOSession>>;
+    addSession: (dtoSession: DTOSession) => void;
+    removeSessionById: (sessionId: UserSessionId) => void;
+    getSessionById: (sessionId: UserSessionId) => DTOSession;
+    setSessions: (sessions: DTOSession[]) => void;
+    subscribe: (this: void, run: Subscriber<DTOSession[]>) => Unsubscriber;
+}
+
+export  function sortSessions(a: DTOSession, b: DTOSession) {
+    if (a.user_session_id.id < b.user_session_id.id) {
+        return -1;
+    }
+    if (a.user_session_id.id > b.user_session_id.id) {
+        return 1;
+    }
+    return 0;
+}
+
+export type UserSessionIDRef = string;
+
+
 function createCurrentSessionsStore() {
 
-    const store = writable<DTOSession[]>([]);
+
+    const store = writable<Map<UserSessionIDRef, DTOSession>>(new Map());
 
     function addSession(dtoSession: DTOSession) {
+        console.log(`Adding session: ${dtoSession.user_session_id}`);
         store.update((curr) => {
-            if (curr.find((s) => s.user_session_id.id === dtoSession.user_session_id.id) != undefined){
-                return curr.sort(doSort);
-            }
-            curr.push(dtoSession);
-            return curr.sort(doSort);
+            console.log(`Current Map size before update: ${curr.size}`);
+            const updated = new Map(curr);
+            updated.set(dtoSession.user_session_id.id, dtoSession);
+            console.log(`Current Map size after update: ${updated.size}`);
+            return updated;
         });
     }
 
-
-
     function removeSessionById(sessionId: UserSessionId) {
         store.update((curr) => {
-            const found: DTOSession | undefined = curr.find((s) => s.user_session_id.id === sessionId.id);
-            if (found == undefined) 
-                return curr.sort(doSort);
-            curr.splice(curr.indexOf(found), 1);
-            return curr.sort(doSort);
+            curr.delete(sessionId.id);
+            return curr;
         });
     }
 
     function getSessionById(sessionId: UserSessionId) : DTOSession {
-        let found: DTOSession | undefined = undefined;
+        let found: DTOSession = {
+            user_session_id: {id: ""},
+            score: 0,
+            is_admin: false,
+
+        }
         store.update((curr) => {
-            found = curr.find((s) => s.user_session_id.id === sessionId.id);
+            const temp = curr.get(sessionId.id);
+            if (temp != undefined) {
+                found = temp;
+            }
             return curr;
         });
-        if (found == undefined) {
-            console.error(`SessionStore: Session with id ${sessionId.id} not found`);
-            //TODO: throw error to handle with toast
-            return {
-                user_session_id: {
-                    id: "unknown" 
-                },
-                score: 0,
-                is_admin: false
-            };
-        }
+    
         return found;
     }
     
     function setSessions(sessions: DTOSession[]) {
-        store.set(sessions.sort(doSort));
+        for (const session of sessions) {
+            addSession(session);
+        }
     }
 
-    function subscribe(this: void, run: Subscriber<DTOSession[]>): Unsubscriber {
+    function subscribe(this: void, run: Subscriber<Map<UserSessionIDRef, DTOSession>>): Unsubscriber {
         return store.subscribe(run);
     }
 
-    function doSort(a: DTOSession, b: DTOSession) {
-        if (a.user_session_id.id < b.user_session_id.id) {
-            return -1;
-        }
-        if (a.user_session_id.id > b.user_session_id.id) {
-            return 1;
-        }
-        return 0;
-    }
-    
+
     return {
         store,
         addSession,

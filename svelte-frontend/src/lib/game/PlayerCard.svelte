@@ -4,7 +4,7 @@
 	import { SessionPingsStore } from "$lib/stores/SessionPings";
 	import { CurrentSessionsStore } from "$lib/stores/SessionStore";
 	import { WebsocketStore } from "$lib/stores/WebsocketStore";
-	import type { DtoQuestion, DTOSession, Vector2D, WebsocketSessionEvent } from "cult-common";
+	import type { DtoQuestion, DTOSession, QuestionType, Vector2D, WebsocketSessionEvent } from "cult-common";
     export let session: DTOSession;
 
     const default_avatar: string = "https://cdn-icons-png.flaticon.com/512/149/149071.png"
@@ -15,6 +15,17 @@
     });
      
     let current : DtoQuestion | undefined = ($JeopardyBoardStore)?.current;
+    let type : QuestionType | undefined = undefined;
+    JeopardyBoardStore.subscribe(value => {
+        console.log("Setting ??ß", value);
+        if (value == null) {
+            type = undefined;
+        } else if (value.action_state.current_type) {
+            type = value.action_state.current_type;
+        } else {
+            type = undefined;
+        }
+    })
 
     let ws = $WebsocketStore.webSocketSubject
     
@@ -38,6 +49,35 @@
         return DTOSession.user_session_id.id
     }
 
+    function is_media() : boolean {
+        console.log("Test", type,current);
+        if (type == null) {
+            return false;
+        }
+        if (typeof type === "object" && "Media" in type) {
+            return true;
+        }
+        return false;
+    }
+
+    function is_media_loaded() : boolean {
+        if (type == null) {
+            return false;
+        }
+        if (typeof type === "object" && "Media" in type) {
+            console.log("Test", type.Media.media_loaded);
+            let found = type.Media.media_loaded.find((element) => element.id === session.user_session_id.id);
+            if (found != undefined) {
+                return true;
+            }
+            return false;
+        }
+        return false;
+
+    }
+
+
+
     function addStore() {
         if (ws == null || session == null || current == undefined) {
             return;
@@ -45,6 +85,7 @@
         let store: WebsocketSessionEvent = {AddUserSessionScore : [session.user_session_id, current.vector2d]};
         ws.next(store);
     }
+
 
     function get_ping_class() {
         if (ping <= 50) {
@@ -63,6 +104,21 @@
 <div class={`player-card hover:border-blue-500 border border-neutral-300 border-2 flex items-center border-rounded rounded radius-10 p-2 m-2 gap-2 w-full max-w-48 overflow-hidden box-border bg-neutral-200 shadow hover:shadow-lg hover:-translate-y-2 duration-200 relative ${$$props.class || ''}`} on:click={addStore}>
     {#key session.score}
         <img src="{getAvatar()}" alt="Avatar" class="h-14 w-14 rounded-full">
+        {#key type}
+        {console.log("Setting Type", is_media())}
+        {#if is_media()}
+            {#if is_media_loaded()}
+                <div class="absolute top-0 left-0 w-full h-full bg-black bg-opacity-50 flex items-center justify-center">
+                    <p class="text-white
+                    text-2xl font-bold">🔒</p>
+                </div>
+            {:else}
+                <div class="absolute top-0 left-0 w-full h-full bg-black bg-opacity-50 flex items-center justify-center">
+                    <p class="text-white  text-2xl font-bold">🔓</p>
+                </div>
+            {/if}
+        {/if}
+        {/key}
         <div class="flex flex-col w-full overflow-hidden">
             <div class="flex flex-row items-center">
                 {#if session.is_admin}

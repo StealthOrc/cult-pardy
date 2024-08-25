@@ -5,7 +5,7 @@ use cult_common::{compress, decompress};
 use serde::{Deserialize, Serialize};
 
 use crate::services::game::{self};
-use crate::services::lobby::{AddLobbySessionScore, Lobby, LobbyBackClick, LobbyClick, ReciveVideoEvent, SyncBackwardRequest, SyncForwardRequest, UpdateWebsocketPing, WebsocketConnect, WebsocketDisconnect};
+use crate::services::lobby::{AddLobbySessionScore, Lobby, LobbyBackClick, LobbyClick, ReciveVideoEvent, SessionMediaDownloadComplete, SyncBackwardRequest, SyncForwardRequest, UpdateWebsocketPing, WebsocketConnect, WebsocketDisconnect};
 use actix_web::web;
 use actix_web_actors::ws;
 use chrono::{DateTime, Local};
@@ -261,6 +261,11 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                                         self.lobby_addr.do_send(SyncForwardRequest{
                                             websocket_session_id: id,
                                             current_time: time,
+                                        });
+                                    }
+                                    WebsocketSessionEvent::MediaDownloadComplete => {
+                                        self.lobby_addr.do_send(SessionMediaDownloadComplete{
+                                            user_session_id: self.player.user_session_id.clone(),
                                         });
                                     }
                                 }

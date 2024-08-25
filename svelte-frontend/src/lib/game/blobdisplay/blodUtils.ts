@@ -43,7 +43,15 @@ export type FileDownloadProgress = {
     hash?: string;
 };
 
-
+export function test<T>(ob:T, s:string): boolean {
+    return typeof ob === "object" && ob != null &&s in ob
+}
+export function test2<T extends object | string, K extends keyof T>(ob: T, s: string): T[K] | null {
+    if (typeof ob === "object" && ob !== null && s in ob) {
+        return ob[s as K];
+    }
+    return null;
+}
 
 export async function downloadBlob2(filename: string, range: NumberScope): Promise<Blob> {
     console.log("filename", filename);

@@ -275,7 +275,7 @@ impl Lobby {
         if let Some(value) = qeuestion.clone() {
             self.jeopardy_board.current = Some(vector2d);
             let mut state = self.jeopardy_board.action_state.lock().expect("Failed to lock action state");
-            if value.question_types.len() == 1 {
+            if value.question_types.len() > 0 {
                 state.update(value.question_types[0].get_action_state(websocket_session_id));
             } 
         }
@@ -530,6 +530,10 @@ impl Handler<LobbyBackClick> for Lobby {
         }.into_actor(self).map(move |allowed, lobby, _|  {
             if allowed.clone() {
                 lobby.jeopardy_board.current = None;
+                lobby.jeopardy_board.action_state.lock().expect("Failed to lock action state").update(ActionState{
+                    state: ActionStateType::None,
+                    current_type: None,
+                });
                 let board = lobby.jeopardy_board.clone();
                 let event = WebsocketServerEvents::Board(BoardEvent::CurrentBoard(board.dto(lobby.creator.clone())));
                 lobby.send_lobby_message(&event);
@@ -773,9 +777,47 @@ impl Handler<SyncForwardRequest> for Lobby {
     }
 }
 
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct SessionMediaDownloadComplete{
+    pub user_session_id: UserSessionId,
+}
 
+impl Handler<SessionMediaDownloadComplete> for Lobby {
+    type Result = ();
 
+    fn handle(&mut self, msg: SessionMediaDownloadComplete, _: &mut Self::Context) -> Self::Result {
+        // Lock the action state and handle potential locking errors
+        let mut state = match self.jeopardy_board.action_state.lock() {
+            Ok(state) => state,
+            Err(_) => {
+                eprintln!("Failed to lock action state");
+                return;
+            },
+        };
 
+        // Ensure current_type is handled properly
+        let current_type = match &mut state.current_type {
+            None => return,
+            Some(data) => data,
+        };
+
+        // Process the media type and update the media_loaded vector
+        match current_type {
+            QuestionType::Media(ref mut e) => {
+                if e.media_loaded.contains(&msg.user_session_id) {
+                    return;
+                }
+                e.media_loaded.push(msg.user_session_id.clone()); // Ensure `media_loaded` is a Vec
+            },
+            _ => return,
+        }
+
+        // Create and send the event
+        let event = WebsocketServerEvents::Session(SessionEvent::SessionMediaDownloadComplete(msg.user_session_id.clone()));
+        self.send_lobby_message(&event);
+    }
+}
 
 
 
@@ -900,6 +942,36 @@ impl Handler<WebsocketDisconnect> for Lobby {
                 println!("Session {:?} has been disconnected from the lobby={:?}.", msg.user_data.user_session_id.id, &self.lobby_id.id);
             }
         }
+
+        let state = self.jeopardy_board.action_state.lock().expect("Failed to lock action state");
+
+
+        let mut state = match self.jeopardy_board.action_state.lock() {
+            Ok(state) => state,
+            Err(_) => {
+                eprintln!("Failed to lock action state");
+                return;
+            },
+        };
+
+        // Ensure current_type is handled properly
+        let current_type = match &mut state.current_type {
+            None => return,
+            Some(data) => data,
+        };
+
+        // Process the media type and update the media_loaded vector
+        match current_type {
+            QuestionType::Media(ref mut e) => {
+                if e.media_loaded.contains(&msg.user_data.user_session_id) {
+                    e.media_loaded.retain(|id| !id.eq(&msg.user_data.user_session_id));
+                }
+                
+            },
+            _ => return,
+        }
+
+        
         self.send_lobby_message( &WebsocketServerEvents::Websocket(WebsocketEvent::WebsocketDisconnected(websocket_session_id.clone())));
         if !multi_sessions {
             self.send_lobby_message( &WebsocketServerEvents::Session(SessionEvent::SessionDisconnected(msg.user_data.user_session_id.clone())));

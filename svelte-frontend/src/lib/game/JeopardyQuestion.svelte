@@ -20,8 +20,10 @@
         if (value != null) {
             current = value.current;
             if ((current != null) && (current.vector2d.x === question.vector2d.x && current.vector2d.y === question.vector2d.y)) {
+                console.log("Current!!!!", value.action_state.current_type);
                 let current = value.action_state.current_type;
                 if (current != null) {
+                    console.log("Current!!!!", current);
                     match(current)
                     .with({ Media: P.select() }, async (data) => {
                         type = QuestionTypes.MEDIA;

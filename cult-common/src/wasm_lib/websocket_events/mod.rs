@@ -47,7 +47,7 @@ impl WebsocketServerEvents {
 pub enum ActionStateEvent {
     Media(ActionMediaEvent),
     SyncForward(f64),
-    SyncBackward(i64),
+    SyncBackward(i64)
 
 }
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, Display)]
@@ -111,6 +111,7 @@ pub enum SessionEvent {
     SessionsPing(Vec<WebsocketPing>),
     SessionPing(WebsocketPing),
     SessionDisconnected(UserSessionId),
+    SessionMediaDownloadComplete(UserSessionId),
 }
 
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, Display)]
@@ -120,6 +121,7 @@ pub enum WebsocketSessionEvent {
     Back,
     AddUserSessionScore(UserSessionId, Vector2D),
     VideoEvent(VideoEvent),
+    MediaDownloadComplete,
     SyncBackwardRequest,
     SyncForwardRequest(f64)
     

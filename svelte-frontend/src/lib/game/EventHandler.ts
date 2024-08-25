@@ -94,6 +94,10 @@ function handleSessionEvent(sessionEvent: SessionEvent): boolean {
         SessionPingsStore.updateWebsocketPing(data);
         return true;
     }) 
+    .with({SessionMediaDownloadComplete: P.select()}, (data) => {
+        JeopardyBoardStore.addMediaDownloadComplete(data);
+        return true;
+    })
     .exhaustive();
     return true;
 }

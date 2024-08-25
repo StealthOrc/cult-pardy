@@ -69,7 +69,7 @@
                     console.log(error);
                     JeopardyBoardStore.store.set(null);
                     SessionPingsStore.store.set([]);
-                    CurrentSessionsStore.store.set([]);
+                    CurrentSessionsStore.store.set(new Map());
                     console.log("Websocket error");
                     WebsocketStore.stop();
                     
@@ -77,7 +77,7 @@
                 complete: () => {
                     JeopardyBoardStore.store.set(null);
                     SessionPingsStore.store.set([]);
-                    CurrentSessionsStore.store.set([]);
+                    CurrentSessionsStore.store.set(new Map());
                     console.log("Websocket completed");
                     WebsocketStore.stop();
                 }

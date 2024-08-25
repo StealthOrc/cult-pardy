@@ -1,11 +1,18 @@
 <script lang="ts">
     import type { DTOSession } from 'cult-common';
     import PlayerCard from './PlayerCard.svelte';
-	import { CurrentSessionsStore } from '$lib/stores/SessionStore';
+	import { CurrentSessionsStore, sortSessions } from '$lib/stores/SessionStore';
 
     let current_session : DTOSession[] = [];
     CurrentSessionsStore.subscribe(value => {
-        current_session = value;
+        let temp : DTOSession[] = [];
+        value.forEach(session => {
+            console.log("Session2", session);
+            temp.push(session);
+        });
+        console.log("Current Sessions", temp);
+        temp.sort(sortSessions);
+        current_session = temp;
     })
 </script>
 

@@ -34,7 +34,7 @@
                 relatedVideos: false,
                 playsInline: false,
         }
-
+		console.log("Creating YouTube Player youtube_id", youtube_id);
         player = new YouTubePlayerPlus(playerElement, options)
         player.load(youtube_id)
         player.setVolume(100)

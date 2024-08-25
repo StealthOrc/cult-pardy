@@ -1,10 +1,11 @@
 use ids::{discord::DiscordID, usersession::UserSessionId, websocketsession::{self, WebsocketSessionId}};
 use rand::random;
 use serde::{Deserialize, Serialize};
+use serde_json::Map;
 use tsify_next::Tsify;
 use utoipa::ToSchema;
 use websocket_events::MediaState;
-use std::{cmp::min, hash::Hash};
+use std::{cmp::min, collections::HashMap, hash::Hash};
 use std::string::ToString;
 use wasm_bindgen::prelude::*;
 
@@ -107,9 +108,13 @@ impl QuestionType {
                 state: ActionStateType::MediaPlayer(MediaState::new(websocketsession)),
                 current_type: Some(self.clone()),
             },
+            QuestionType::Youtube(_) => ActionState {
+                state: ActionStateType::MediaPlayer(MediaState::new(websocketsession)),
+                current_type: Some(self.clone()),
+            },
             _ => ActionState {
                 state: ActionStateType::None,
-                current_type: Some(self.clone()),
+                current_type: None,
             }
         }
     }
@@ -119,6 +124,7 @@ pub struct Media {
     pub media_type: MediaType,
     pub name: String,
     pub media_token: MediaToken,
+    pub media_loaded: Vec<UserSessionId>
 }
 
 impl Media {
@@ -128,6 +134,7 @@ impl Media {
             media_type,
             name,
             media_token: MediaToken::random(),
+            media_loaded: Vec::new(),
         }
     }
     
@@ -148,6 +155,7 @@ impl<'de> Deserialize<'de> for Media {
             media_type: media.media_type,
             name: media.name,
             media_token: MediaToken::random(),
+            media_loaded: Vec::new(),
         })
     }
 }
