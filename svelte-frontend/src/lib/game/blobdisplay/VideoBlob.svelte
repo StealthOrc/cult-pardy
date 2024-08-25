@@ -17,7 +17,7 @@
 
     export let video: Blob
     export let currUserIsAdmin: boolean = false;
-    export let video_media_type: VideoType;
+    export let videoTypes: VideoType[] = [];
     let player: HTMLVideoElement | null = null;
     let ranges : NumberScope[] = [];
     let muted = false;
@@ -29,26 +29,20 @@
         console.log("OV", ov);
         player = document.getElementById("player") as HTMLVideoElement;
         if (player == null) return;
-
-        
-        /*declare namespace VideoType {
-    export type None = "None";
-    export type TimeSlots = { TimeSlots: __VideoTypeNumberScope[] };
-    export type Mute = "Mute";
-    export type Slowmotion = { Slowmotion: number };
-    */
-        match(video_media_type)
-        .with({ TimeSlots: P.select() }, (data) => {
-            ranges = data;
-        })
-        .with("Mute", () => {
-             if (player) player.muted = true;
-             muted = true;
-        })
-        .with({ Slowmotion: P.select() }, (data) => {
-            play_rate = data / 100;
-            if (player) player.playbackRate = play_rate;
-        })
+        for (let type of videoTypes) {
+            match(type)
+            .with({ TimeSlots: P.select() }, (data) => {
+                ranges = data;
+            })
+            .with("Mute", () => {
+                if (player) player.muted = true;
+                muted = true;
+            })
+            .with({ Slowmotion: P.select() }, (data) => {
+                play_rate = data / 100;
+                if (player) player.playbackRate = play_rate;
+            })
+        }
 
 
 
@@ -73,7 +67,7 @@
             return;
         };
         if (player == null) {
-            JeopardyBoardStore.setActionState({MediaPlayer: value.mediaState});
+            JeopardyBoardStore.setActionStateType({MediaPlayer: value.mediaState});
         } else {
             doMediaStateChange(value.mediaState);
         }

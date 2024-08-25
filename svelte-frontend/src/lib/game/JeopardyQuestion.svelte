@@ -14,25 +14,28 @@
     let current : DtoQuestion | undefined = undefined;
     let type : QuestionTypes = QuestionTypes.NONE
     let media : Media | undefined = undefined;
+    let youtube_id : string;
 
     JeopardyBoardStore.subscribe(value => {
         if (value != null) {
             current = value.current;
             if ((current != null) && (current.vector2d.x === question.vector2d.x && current.vector2d.y === question.vector2d.y)) {
-                match(question.question_type)
-                .with({ Media: P.select() }, async (data) => {
-                    type = QuestionTypes.MEDIA;
-                    media = data;
+                let current = value.action_state.current_type;
+                if (current != null) {
+                    match(current)
+                    .with({ Media: P.select() }, async (data) => {
+                        type = QuestionTypes.MEDIA;
+                        media = data;
+                    })
+                    .with({ Youtube: P.select() }, async (aud) => {
+                        type = QuestionTypes.YOUTUBE;
+                        youtube_id = aud;
+                    })
+                    .otherwise(() => {
 
-                })
-                .with({ Youtube: P.select() }, async (aud) => {
-                    type = QuestionTypes.YOUTUBE;
-                })
-                .otherwise(() => {
-
-                    console.log("Unsupported file type");
-                });
-          
+                        console.log("Unsupported file type");
+                    });
+                }
             }
         }
     })
@@ -63,7 +66,7 @@
                     {#if type == QuestionTypes.MEDIA && media != undefined}
                         <BlobDisplay media={media}/>
                     {:else if type == QuestionTypes.YOUTUBE}
-                        <YoutubeDisplay current={current}/>
+                        <YoutubeDisplay current={current} youtube_id={youtube_id}/>
                     {:else}
                         <h1>${current.value}</h1>
                         <p>{current.question_text}</p>

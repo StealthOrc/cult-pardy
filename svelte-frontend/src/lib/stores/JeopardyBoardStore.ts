@@ -1,5 +1,5 @@
 import { dev } from "$app/environment";
-import type { ActionState, DtoJeopardyBoard, DtoQuestion } from "cult-common";
+import type { ActionState, ActionStateType, DtoJeopardyBoard, DtoQuestion } from "cult-common";
 import { writable, type Subscriber, type Unsubscriber} from "svelte/store"; 
 
 export const JeopardyBoardStore = createJeopardyBoardStore();
@@ -44,13 +44,25 @@ function createJeopardyBoardStore() {
         });       
     }
 
-    function getActionState() : ActionState {
-        let state: ActionState = "None";
+
+    function setActionStateType(state: ActionStateType) {
         store.update((board) => {
             if (board == null) {
                 return board;
             }
-            state = board.action_state;
+            board.action_state.state = state;
+            return board;
+        });       
+    }
+
+
+    function getActionState() : ActionStateType {
+        let state: ActionStateType = "None";
+        store.update((board) => {
+            if (board == null) {
+                return board;
+            }
+            state = board.action_state.state;
             return board;
         });
         return state;
@@ -77,6 +89,7 @@ function createJeopardyBoardStore() {
         setActionState,
         setBoard,
         subscribe,
+        setActionStateType,
         getActionState,
         subscribeActionState,
     }

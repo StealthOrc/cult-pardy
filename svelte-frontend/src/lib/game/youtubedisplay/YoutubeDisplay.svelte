@@ -9,6 +9,7 @@
 	import type { YTPP_Options } from 'youtube-player-plus/types';
     
 	export let current : DtoQuestion;
+    export let youtube_id : string;
 
 	let playerElement : HTMLElement | null = null;
 	let player : YouTubePlayerPlus | null = null;
@@ -20,13 +21,10 @@
         }
 		console.log("Creating YouTube Player");
         let result = false;
-        match(current.question_type)
-        .with({ Youtube: P.select() }, (data) => {
-            //if element #player is not found, return false
-			if (playerElement == null) {
+		if (playerElement == null) {
 				return false;
-			}
-            let options : YTPP_Options = {
+		}
+        let options : YTPP_Options = {
                 autoplay: true,
                 controls: false,
                 keyboard: false,
@@ -35,16 +33,12 @@
                 modestBranding: false,
                 relatedVideos: false,
                 playsInline: false,
-            }
+        }
 
-            player = new YouTubePlayerPlus(playerElement, options)
-            player.load(data)
-            player.setVolume(100)
-            result = true;
-        })
-        .otherwise(() => {
-            result = false;
-        });
+        player = new YouTubePlayerPlus(playerElement, options)
+        player.load(youtube_id)
+        player.setVolume(100)
+        result = true;
         return result;
     }
 

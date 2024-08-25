@@ -51,7 +51,7 @@
 	{#if blobType === BlobType.IMAGE}
 		<ImageBlob image={blob} />
 	{:else if blobType === BlobType.VIDEO && "Video" in media.media_type}
-		<VideoBlob video={blob} video_media_type={media.media_type.Video} currUserIsAdmin = {isAdmin()} />
+		<VideoBlob video={blob} videoTypes={media.media_type.Video} currUserIsAdmin = {isAdmin()} />
 	{:else if blobType === BlobType.AUDIO}
 		<AudioBlob audio={blob} />
 	{:else if blobType === BlobType.TEXT}

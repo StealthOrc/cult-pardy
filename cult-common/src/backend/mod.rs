@@ -57,7 +57,14 @@ impl JeopardyBoard {
                     question_type = QuestionType::Media(media);
                 }
                 if question == 3 && category == 0 {
-                    let media = Media::new(MediaType::Video(vec![VideoType::Slowmotion(30)]), "FlyHigh.mp4".to_string());
+
+                    let slow = VideoType::Slowmotion(30);
+                    let first_time_slot = NumberScope::new(0, 10);
+                    let second_time_slot = NumberScope::new(60, 70);
+                    let vec: Vec<NumberScope> = vec![first_time_slot, second_time_slot];
+                    let time = VideoType::time_slots(vec);
+                    let media = Media::new(MediaType::Video(vec![slow,time]), "FlyHigh.mp4".to_string());
+
                     question_type = QuestionType::Media(media);
                 }
 
