@@ -92,7 +92,7 @@ impl DtoCategory {
 
 #[derive(Tsify,PartialEq, Eq, Debug, Clone, Serialize, Deserialize, Default)]
 pub struct DtoQuestion {
-    pub question_type: QuestionType,
+    pub question_types: Vec<QuestionType>,
     #[tsify(optional)]
     pub question_text: Option<String>,
     pub value: i32,

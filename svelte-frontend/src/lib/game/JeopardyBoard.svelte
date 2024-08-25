@@ -3,9 +3,9 @@
     import JeopardyCategory from './JeopardyCategory.svelte';
     import { getContext, onMount, setContext } from 'svelte';
     import {WebSocketSubject} from "rxjs/webSocket";
-    import { CookieStore, type SessionCookies} from "$lib/stores/cookies.js";
+    import { CookieStore, lobby_store, type SessionCookies} from "$lib/stores/cookies.js";
     import { match, P } from 'ts-pattern';
-	import type { BoardEvent, DtoJeopardyBoard, DTOSession, MediaState, SessionEvent, WebsocketEvent, WebsocketServerEvents, WebsocketSessionEvent } from 'cult-common';
+	import type { BoardEvent, DtoJeopardyBoard, DTOSession, LobbyId, MediaState, SessionEvent, WebsocketEvent, WebsocketServerEvents, WebsocketSessionEvent } from 'cult-common';
 	import Players from './Players.svelte';
 	import {CurrentSessionsStore } from '$lib/stores/SessionStore';
 	import { SessionPingsStore } from '$lib/stores/SessionPings';
@@ -21,6 +21,9 @@
     }
 
     let { lobbyId = "main" }: Props = $props();	
+
+    let lobby_id :LobbyId = {id: lobbyId};
+    lobby_store.set(lobby_id);
 
  
     const wsType : WebsocketStoreType = WebsocketStore.new_ws(lobbyId, $CookieStore.userSessionId, $CookieStore.sessionToken);

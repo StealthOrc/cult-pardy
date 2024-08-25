@@ -1,4 +1,5 @@
 use ids::{discord::DiscordID, usersession::UserSessionId, websocketsession::{self, WebsocketSessionId}};
+use rand::random;
 use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
 use utoipa::ToSchema;
@@ -7,7 +8,7 @@ use std::{cmp::min, hash::Hash};
 use std::string::ToString;
 use wasm_bindgen::prelude::*;
 
-use crate::backend::{ActionState};
+use crate::backend::{ActionState, ActionStateType};
 
 pub mod ids;
 pub mod websocket_events;
@@ -91,7 +92,7 @@ impl DiscordUser {
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Default,ToSchema)]
 #[tsify(namespace)]
 pub enum QuestionType {
-    Video(Blob),
+    Media(Media),
     Youtube(String),
     #[default]
     Question
@@ -100,51 +101,122 @@ pub enum QuestionType {
 
 
 impl QuestionType {
-    pub fn get_action_state(self: &QuestionType, user_session_id:&UserSessionId, websocketsession:&WebsocketSessionId) -> ActionState {
+    pub fn get_action_state(self: &QuestionType,websocketsession:&WebsocketSessionId) -> ActionState {
         match self {
-            QuestionType::Video(_) =>  ActionState::MediaPlayer(MediaState::new(websocketsession)),
-            _ => ActionState::None,
+            QuestionType::Media(_) =>  ActionState {
+                state: ActionStateType::MediaPlayer(MediaState::new(websocketsession)),
+                current_type: Some(self.clone()),
+            },
+            _ => ActionState {
+                state: ActionStateType::None,
+                current_type: Some(self.clone()),
+            }
+        }
+    }
+}
+#[derive(Tsify,Debug, Clone, Serialize, Eq, PartialEq, Default,ToSchema)]
+pub struct Media {
+    pub media_type: MediaType,
+    pub name: String,
+    pub media_token: MediaToken,
+}
+
+impl Media {
+
+    pub fn new(media_type: MediaType, name: String) -> Self {
+        Media {
+            media_type,
+            name,
+            media_token: MediaToken::random(),
         }
     }
     
 }
 
-#[derive(Tsify,Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Default,ToSchema)]
-pub struct Blob {
-    pub name: String,
-    pub range: Vec<NumberScope>,
+impl<'de> Deserialize<'de> for Media {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,{
+
+        #[derive(Deserialize)]
+        struct MediaVisitor{
+            pub media_type: MediaType,
+            pub name: String,
+        }
+        let media = MediaVisitor::deserialize(deserializer)?;
+        Ok(Media {
+            media_type: media.media_type,
+            name: media.name,
+            media_token: MediaToken::random(),
+        })
+    }
 }
 
-impl Blob {
 
-    pub fn new(name: String, range: Vec<NumberScope>) -> Self {
-        Blob { name, range }
+
+
+
+#[derive(Tsify,Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Default,ToSchema)]
+pub struct MediaToken {
+    pub token: String,
+}
+
+impl MediaToken {
+    pub fn new(token: String) -> Self {
+        MediaToken { token }
     }
 
-    pub fn new_empty(name: String) -> Self {
-        Blob { name, range: vec![] }
+    pub fn random() -> Self {
+        MediaToken { token: random::<usize>().to_string() }
     }
-
-    pub fn is_empty(&self) -> bool {
-        self.range.is_empty()
-    }
-
-    pub fn is_valid(&self) -> bool {
-        self.range.iter().all(|range| !range.is_empty())
-    }
-
-    pub fn is_valid_range(&self, range: &NumberScope) -> bool {
-        self.range.iter().any(|r| r.overlaps(range))
-    }
-
-    pub fn intersection(&self, range: &NumberScope) -> Option<NumberScope> {
-        self.range.iter().filter_map(|r| r.intersection(range)).next()
-    }
+}
 
 
 
+
+
+
+#[derive(Tsify,Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Default,ToSchema)]
+#[tsify(namespace)]
+pub enum MediaType {
+    Image,
+    Video(Vec<VideoType>),
+    Audio,
+    Text,
+    Pdf,
+    #[default]
+    Unknown,
+}
+
+#[derive(Tsify,Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Default,ToSchema)]
+#[tsify(namespace)]
+pub enum VideoType {
+    #[default]
+    None,
+    TimeSlots(Vec<NumberScope>),
+    Mute,
+    Slowmotion(usize),
     
 }
+
+impl VideoType {
+    
+    pub fn time_slots(vec: Vec<NumberScope>) -> VideoType {
+       if vec.len() == 0 {
+           VideoType::None
+       } else {
+           VideoType::TimeSlots(vec)
+       }
+    }
+
+}
+
+
+
+
+
+
+
 
 
 

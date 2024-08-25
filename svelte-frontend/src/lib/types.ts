@@ -8,7 +8,7 @@ export enum FileUploadType {
 
 
 export enum QuestionTypes  {
-    BLOB,
+    MEDIA,
     YOUTUBE,
     QUESTION,
     NONE,

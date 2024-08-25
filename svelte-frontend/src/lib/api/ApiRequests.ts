@@ -3,8 +3,10 @@ import {
     type ApiResponse,
     type DiscordUser,
     type JeopardyBoard,
+    type LobbyId,
+    type MediaToken,
+    type NumberScope,
     type UserSessionId,
-    type  Range ,
 } from "cult-common";
 import { CookieStore, type SessionCookies } from "$lib/stores/cookies";
 import {CONST} from "$lib/const"
@@ -90,13 +92,15 @@ export async function UserInfo() {
 
 }
 
-export async function get_file(filename: string): Promise<Response> {
+export async function get_file(filename: string, lobby_id:LobbyId,media_token:MediaToken): Promise<Response> {
     const headers = new Headers();
     headers.append("file-name", filename);
+    headers.append("media-token", media_token.token);
+    headers.append("lobby-id", lobby_id.id);
     return await api_get_request(CONST.GETFILE_URL, RequestContentType.OCTET_STREAM, headers);
 }
 
-export async function get_file2(filename: string, range: Range): Promise<Response> {
+export async function get_file2(filename: string, range: NumberScope): Promise<Response> {
     const headers = new Headers();
     headers.append("file-name", filename);
     headers.append("Range", `bytes=${range.start}-${range.end}`);

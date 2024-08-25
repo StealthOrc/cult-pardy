@@ -1,6 +1,7 @@
 import { get_file, get_file2 } from "$lib/api/ApiRequests";
 import { buildUint8ArrayFromChunks } from "$lib/BinaryConversion";
 import { decompressData, formatSpeed } from "$lib/create/fileUploadUtils";
+import type { LobbyId, MediaToken, NumberScope } from "cult-common";
 import { XXH64 } from "xxh3-ts";
 
 export enum BlobType {
@@ -44,7 +45,7 @@ export type FileDownloadProgress = {
 
 
 
-export async function downloadBlob2(filename: string, range: Range): Promise<Blob> {
+export async function downloadBlob2(filename: string, range: NumberScope): Promise<Blob> {
     console.log("filename", filename);
     const response: Response = await get_file2(filename, range);
     if (!response.ok || !response.body || !(response.body instanceof ReadableStream)) {
@@ -79,9 +80,9 @@ export async function downloadBlob2(filename: string, range: Range): Promise<Blo
 
 
 
-export async function downloadBlob(filename: string, onProgress: (progress: FileDownloadProgress) => void): Promise<void> {
+export async function downloadBlob(filename: string, lobby_id:LobbyId, media_token:MediaToken, onProgress: (progress: FileDownloadProgress) => void): Promise<void> {
         console.log("filename", filename);
-        const response: Response = await get_file(filename);
+        const response: Response = await get_file(filename, lobby_id,media_token);
         if (!response.ok || !response.body || !(response.body instanceof ReadableStream)) {
             throw new Error("Failed to download file");
         }

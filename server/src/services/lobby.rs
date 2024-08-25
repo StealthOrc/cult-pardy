@@ -3,17 +3,17 @@ use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 use std::sync::Arc;
 use std::time::Duration;
-use actix::{Actor, ActorFutureExt, Addr, AsyncContext, Context, Handler, Message, Recipient, ResponseActFuture, WrapFuture};
+use actix::{Actor, ActorFutureExt, Addr, AsyncContext, Context, Handler, Message, MessageResult, Recipient, ResponseActFuture, WrapFuture};
 
 use chrono::{Local, Utc};
-use cult_common::backend::{ActionState, JeopardyBoard, Question};
+use cult_common::backend::{ActionState, ActionStateType, JeopardyBoard, Question};
 use cult_common::dto::board::DTOSession;
 use cult_common::wasm_lib::ids::discord::DiscordID;
 use cult_common::wasm_lib::ids::lobby::LobbyId;
 use cult_common::wasm_lib::ids::usersession::UserSessionId;
 use cult_common::wasm_lib::ids::websocketsession::WebsocketSessionId;
 use cult_common::wasm_lib::websocket_events::{ActionMediaEvent, ActionStateEvent, BoardEvent, MediaState, SessionEvent, VideoEvent, WebsocketEvent, WebsocketPing, WebsocketServerEvents};
-use cult_common::wasm_lib::Vector2D;
+use cult_common::wasm_lib::{MediaToken, QuestionType, Vector2D};
 use mongodb::bson::doc;
 use ritelinked::{LinkedHashMap, LinkedHashSet};
 use serde::{Deserialize, Serialize};
@@ -275,7 +275,9 @@ impl Lobby {
         if let Some(value) = qeuestion.clone() {
             self.jeopardy_board.current = Some(vector2d);
             let mut state = self.jeopardy_board.action_state.lock().expect("Failed to lock action state");
-            state.update(value.question_type.get_action_state(user_session_id, websocket_session_id));
+            if value.question_types.len() == 1 {
+                state.update(value.question_types[0].get_action_state(websocket_session_id));
+            } 
         }
          qeuestion
     }
@@ -497,7 +499,7 @@ impl Handler<LobbyClick> for Lobby {
                 };
                 let vec = msg.vector_2d.clone();
                 if let Some(question) = lobby.set_current_question(vec, &msg.user_data.user_session_id, &ws_id) {
-                    let action_state = question.question_type.get_action_state(&msg.user_data.user_session_id, &ws_id);
+                    let action_state = lobby.jeopardy_board.action_state.lock().expect("Failed to lock action state").clone();
                     let event = WebsocketServerEvents::Board(BoardEvent::CurrentQuestion(question.dto(true, vec.clone()), action_state));
                     lobby.send_lobby_message(&event);
                 }
@@ -693,10 +695,13 @@ impl Handler<ReciveVideoEvent> for Lobby {
                 is_editor(&user_session_id, &creator, db).await
         }.into_actor(self).map(move |allowed, lobby: &mut Lobby, _|  {
             let mut state = lobby.jeopardy_board.action_state.lock().expect("Failed to lock action state");
-            let current_state = match state.clone() {
-                cult_common::backend::ActionState::None => MediaState::new(&msg.websocket_session_id),
-                cult_common::backend::ActionState::MediaPlayer(media) => media,
+            let current_state = match state.state.clone() {
+                ActionStateType::None => MediaState::new(&msg.websocket_session_id.clone()),
+                ActionStateType::MediaPlayer(data) =>  data,
             };
+
+
+            
             if allowed.clone() {
                 match msg.event {
                     VideoEvent::ChangeState(mut new_state) => {
@@ -707,7 +712,7 @@ impl Handler<ReciveVideoEvent> for Lobby {
 
                         if !stale && !(to_soon && other_ws) {
                             println!("Changing state to {:?}", new_state.clone());
-                            state.update(ActionState::MediaPlayer(new_state.clone()));
+                            state.update_action_state_type(ActionStateType::MediaPlayer(new_state.clone()));
                             let event = WebsocketServerEvents::ActionState(ActionStateEvent::Media(ActionMediaEvent::ChangeState(new_state)));
                             lobby.send_lobby_message(&event);
                         }
@@ -925,6 +930,32 @@ impl Handler<CanJoinLobby> for Lobby {
         self.allowed_user_session.contains(&msg.user_session_id)
     }
 }
+
+
+#[derive(Message)]
+#[rtype(result = "Option<MediaToken>")]
+pub struct GetMediaToken;
+
+
+impl Handler<GetMediaToken> for Lobby {
+    type Result = MessageResult<GetMediaToken>;
+
+    fn handle(&mut self, _: GetMediaToken, _: &mut Self::Context) -> Self::Result {
+        let state: std::sync::MutexGuard<ActionState> = self.jeopardy_board.action_state.lock().expect("Failed to lock action state");
+         if let Some(media) = state.current_type.clone() {
+            match media {
+                QuestionType::Media(data) => {
+                    return MessageResult(Some(data.media_token.clone()));
+                }
+                _ => return MessageResult(None),
+            }
+        }
+        MessageResult(None)
+    }
+}
+
+
+
 
 
 pub async fn get_session(db: &Arc<MongoServer>, user_session_id: &UserSessionId) -> Option<UserSession> {

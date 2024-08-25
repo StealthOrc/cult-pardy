@@ -8,21 +8,17 @@ use wasm_bindgen::prelude::wasm_bindgen;
 
 
 #[derive(Tsify, Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
-#[wasm_bindgen]
 pub struct LobbyId {
-    #[wasm_bindgen(skip)]
     pub id: String,
 }
 
-#[wasm_bindgen]
 impl LobbyId {
 
-    #[wasm_bindgen(getter)]
+
     pub fn id(&self) -> String {
         self.id.clone()
     }
 
-    #[wasm_bindgen(constructor)]
     pub fn of(id: String) -> Self {
         LobbyId { id }
     }

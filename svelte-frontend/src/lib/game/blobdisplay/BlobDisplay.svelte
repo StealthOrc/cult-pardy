@@ -1,6 +1,6 @@
 <script lang="ts">
 
-	import type { DtoQuestion, NumberScope } from 'cult-common';
+	import type { DtoQuestion, Media, NumberScope } from 'cult-common';
 	import { onMount } from 'svelte';
 	import { BlobType, downloadBlob, getBlobType, type FileDownloadProgress } from './blodUtils';
 	import ImageBlob from './ImageBlob.svelte';
@@ -9,14 +9,13 @@
 	import TextBlob from './TextBlob.svelte';
 	import { match, P } from 'ts-pattern';
 	import { CurrentSessionsStore } from '$lib/stores/SessionStore';
-	import { CookieStore } from '$lib/stores/cookies';
+	import { CookieStore, lobby_store } from '$lib/stores/cookies';
 
-	export let current: DtoQuestion;
+	export let media: Media;
 
 	let blob: Blob | null = null;
 	let fileDownloadProgress: FileDownloadProgress | null = null;
 	let blobType: BlobType = BlobType.UNKNOWN;
-	let ranges : NumberScope[] = []
 
 	const onProgress = (progress: FileDownloadProgress) => {
         if (blob != undefined)  return;
@@ -30,15 +29,13 @@
 
 	async function loadBlob() {
 		if (!blob) {
-            match(current.question_type)
-            .with({ Video: P.select() }, async (vid) => {
-				ranges = vid.range;
-                  await downloadBlob(vid.name, onProgress);
-            })
-            .otherwise(() => {
-                console.log("Unsupported file type");
-            });
+			
+
+			await downloadBlob(media.name, $lobby_store, media.media_token,onProgress);	
 		}
+		if (typeof media.media_type === "object" && "Video" in media.media_type) {
+        return media.media_type.Video; // Access the VideoType
+    	}
 	}
 
     function isAdmin(): boolean {
@@ -50,11 +47,11 @@
 	onMount(loadBlob);
 </script>
 
-{#if blob}
+{#if blob && typeof media.media_type === "object"}
 	{#if blobType === BlobType.IMAGE}
 		<ImageBlob image={blob} />
-	{:else if blobType === BlobType.VIDEO}
-		<VideoBlob video={blob} ranges={ranges} currUserIsAdmin = {isAdmin()} />
+	{:else if blobType === BlobType.VIDEO && "Video" in media.media_type}
+		<VideoBlob video={blob} video_media_type={media.media_type.Video} currUserIsAdmin = {isAdmin()} />
 	{:else if blobType === BlobType.AUDIO}
 		<AudioBlob audio={blob} />
 	{:else if blobType === BlobType.TEXT}

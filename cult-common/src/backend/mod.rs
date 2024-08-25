@@ -10,7 +10,7 @@ use crate::dto::board::{DtoCategory, DtoJeopardyBoard, DtoQuestion};
 use crate::wasm_lib::ids::lobby::LobbyId;
 use crate::wasm_lib::ids::usersession::UserSessionId;
 use crate::wasm_lib::websocket_events::MediaState;
-use crate::wasm_lib::{Blob, JeopardyMode, NumberScope, QuestionType, Vector2D};
+use crate::wasm_lib::{JeopardyMode, Media, MediaType, NumberScope, QuestionType, Vector2D, VideoType};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, ToSchema)]
 pub enum LobbyCreateResponse {
@@ -46,20 +46,27 @@ impl JeopardyBoard {
                     question_type = QuestionType::Youtube("dQw4w9WgXcQ".to_string());
                 }
                 if question == 1 && category == 0 {
-                    question_type = QuestionType::Video(Blob::new_empty("FlyHigh.mp4".to_string()));
+                    let media = Media::new(MediaType::Video(vec![VideoType::default()]), "FlyHigh.mp4".to_string());
+                    question_type = QuestionType::Media(media);
                 }
                 if question == 2 && category == 0 {
                     let first_time_slot = NumberScope::new(0, 10);
                     let second_time_slot = NumberScope::new(60, 70);
-                    let vec = vec![first_time_slot, second_time_slot];
-                    question_type = QuestionType::Video(Blob::new("FlyHigh.mp4".to_string(),vec));
+                    let vec: Vec<NumberScope> = vec![first_time_slot, second_time_slot];
+                    let media = Media::new(MediaType::Video(vec![VideoType::time_slots(vec)]), "FlyHigh.mp4".to_string());
+                    question_type = QuestionType::Media(media);
                 }
+                if question == 3 && category == 0 {
+                    let media = Media::new(MediaType::Video(vec![VideoType::Slowmotion(30)]), "FlyHigh.mp4".to_string());
+                    question_type = QuestionType::Media(media);
+                }
+
                 let question_name = format!("question_{}", question);
                 let answer_name = format!("answer{}", question);
                 let question = Question {
                     value,
                     question: question_name,
-                    question_type,
+                    question_types: vec![question_type],
                     answer: answer_name,
                     open: false,
                     won_user_id: None,
@@ -75,7 +82,7 @@ impl JeopardyBoard {
             categories,
             current: None,
             create: Local::now(),
-            action_state: Arc::new(Mutex::new(ActionState::None)),
+            action_state: Arc::new(Mutex::new(ActionState{state: ActionStateType::None, current_type: None})),
         }
     }
 
@@ -140,7 +147,7 @@ impl JeopardyBoard {
         None
     }
 
-    pub fn get_current(self) -> Option<Question> {
+    pub fn get_current(&self) -> Option<Question> {
         if let Some(current) = self.current {
             if let Some(question) = self.get_question(current) {
                 return Some(question.clone());
@@ -191,18 +198,35 @@ impl<'de> Deserialize<'de> for JeopardyBoard {
             categories: partial_board.categories,
             current: None,
             create: Local::now(),
-            action_state:   Arc::new(Mutex::new(ActionState::None)),
+            action_state:   Arc::new(Mutex::new(ActionState{state: ActionStateType::None, current_type: None})),
         };
 
         Ok(board)
     }
 }
+
+
+#[derive(Tsify,Debug, Clone, Serialize, Deserialize)]
+pub struct ActionState {
+    pub state: ActionStateType,
+    pub current_type: Option<QuestionType>,
+}
+
+
+
+
+
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize)]
 #[tsify(namespace)] 
-pub enum ActionState {
+pub enum ActionStateType {
     None,
     MediaPlayer(MediaState),
 }
+
+
+
+
+
 
 
 
@@ -210,6 +234,10 @@ impl ActionState {
 
     pub fn update(&mut self, action: ActionState) {
         *self = action;
+    }
+
+    pub fn update_action_state_type(&mut self, action_state_type: ActionStateType) {
+        self.state = action_state_type;
     }
     
 }
@@ -266,7 +294,7 @@ impl Category {
 
 #[derive(Tsify, Debug, Clone, Serialize, Eq, PartialEq, ToSchema)]
 pub struct Question {
-    pub question_type: QuestionType,
+    pub question_types: Vec<QuestionType>,
     pub question: String,
     pub value: i32,
     pub answer: String,
@@ -276,6 +304,9 @@ pub struct Question {
     #[tsify(optional)]
     pub won_user_id: Option<UserSessionId>,
 }
+
+
+
 impl Question {
 
     pub fn dto(self, current: bool, vector2d: Vector2D) -> DtoQuestion {
@@ -288,7 +319,7 @@ impl Question {
             false => None,
         };
         DtoQuestion {
-            question_type: self.question_type,
+            question_types: self.question_types,
             value: self.value,
             question_text,
             answer,
@@ -305,14 +336,14 @@ impl<'de> Deserialize<'de> for Question {
     {
         #[derive(Deserialize)]
         struct PartialQuestion {
-            question_type: QuestionType,
+            question_types: Vec<QuestionType>,
             question: String,
             value: i32,
             answer: String,
         }
         let partial_question = PartialQuestion::deserialize(deserializer)?;
         let question = Question {
-            question_type: partial_question.question_type,
+            question_types: partial_question.question_types,
             question: partial_question.question,
             value: partial_question.value,
             answer: partial_question.answer,

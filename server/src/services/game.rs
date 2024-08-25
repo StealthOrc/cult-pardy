@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use std::sync::Arc;
-use actix::{Actor, Addr, Context, Handler, Message, MessageResult};
+use actix::{Actor, ActorFutureExt, Addr, Context, Handler, Message, MessageResult, ResponseActFuture, WrapFuture};
 use chrono::{DateTime, Duration, Local, Utc};
 
 use cult_common::backend::{JeopardyBoard, LobbyCreateResponse};
@@ -11,7 +11,7 @@ use cult_common::wasm_lib::ids::discord::DiscordID;
 use cult_common::wasm_lib::ids::lobby::LobbyId;
 use cult_common::wasm_lib::ids::usersession::UserSessionId;
 use cult_common::wasm_lib::ids::websocketsession::WebsocketSessionId;
-use cult_common::wasm_lib::{DiscordUser, JeopardyMode};
+use cult_common::wasm_lib::{DiscordUser, JeopardyMode, MediaToken};
 use mongodb::bson::{doc, Bson, Document};
 use oauth2::basic::{BasicClient, BasicTokenResponse};
 use oauth2::reqwest::async_http_client;
@@ -26,7 +26,7 @@ use crate::services::authentication::RedeemAdminAccessToken;
 use crate::services::StartingServices;
 use crate::services::db::MongoServer;
 use serde::{Deserializer, Serializer};
-use super::lobby::Lobby;
+use super::lobby::{GetMediaToken, Lobby};
 
 
 
@@ -509,6 +509,36 @@ impl Handler<MessageLobbies> for GameServer {
         for lobby in self.lobbies.values() {
            // lobby.addr.do_send(session::SendSessionMessageType(msg.msg.clone()));
         }
+    }
+}
+
+
+pub struct GetLobbyMediaToken {
+    pub lobby_id: LobbyId,
+}
+
+impl Message for GetLobbyMediaToken {
+    type Result = Option<MediaToken>;
+}
+
+
+impl Handler<GetLobbyMediaToken> for GameServer {
+    type Result = ResponseActFuture<Self, Option<MediaToken>>;
+
+    fn handle(&mut self, msg: GetLobbyMediaToken, _ctx: &mut Self::Context) -> Self::Result {
+        let addr = match self.lobbies.get(&msg.lobby_id) {
+            None => return Box::pin(async {None}.into_actor(self)),
+            Some(lobby) => lobby.addr.clone(),
+        };
+        Box::pin(async move {
+            if let Some(token) = addr.send(GetMediaToken).await.unwrap() {
+                Some(token)
+            } else {
+                None
+            }
+        }.into_actor(self).map(move |token, _: &mut GameServer, _|  {
+            token
+        }))
     }
 }
 

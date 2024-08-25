@@ -1,6 +1,6 @@
 <script lang="ts">
 
-	import type { WebsocketSessionEvent, DtoQuestion } from 'cult-common';
+	import type { WebsocketSessionEvent, DtoQuestion, Media } from 'cult-common';
 	import { match, P } from 'ts-pattern';
 	import { JeopardyBoardStore } from '$lib/stores/JeopardyBoardStore';
 	import { CookieStore, type SessionCookies } from '$lib/stores/cookies';
@@ -13,20 +13,23 @@
     let ws = $WebsocketStore.webSocketSubject;
     let current : DtoQuestion | undefined = undefined;
     let type : QuestionTypes = QuestionTypes.NONE
+    let media : Media | undefined = undefined;
 
     JeopardyBoardStore.subscribe(value => {
         if (value != null) {
             current = value.current;
             if ((current != null) && (current.vector2d.x === question.vector2d.x && current.vector2d.y === question.vector2d.y)) {
                 match(question.question_type)
-                .with({ Video: P.select() }, async (vid) => {
-                    type = QuestionTypes.BLOB;
+                .with({ Media: P.select() }, async (data) => {
+                    type = QuestionTypes.MEDIA;
+                    media = data;
 
                 })
                 .with({ Youtube: P.select() }, async (aud) => {
                     type = QuestionTypes.YOUTUBE;
                 })
                 .otherwise(() => {
+
                     console.log("Unsupported file type");
                 });
           
@@ -57,8 +60,8 @@
     {#if current && current.vector2d.x === question.vector2d.x && current.vector2d.y === question.vector2d.y}
         <div class="overlay" role="dialog">
                 <div class="overlay-content">
-                    {#if type == QuestionTypes.BLOB}
-                        <BlobDisplay current={current}/>
+                    {#if type == QuestionTypes.MEDIA && media != undefined}
+                        <BlobDisplay media={media}/>
                     {:else if type == QuestionTypes.YOUTUBE}
                         <YoutubeDisplay current={current}/>
                     {:else}

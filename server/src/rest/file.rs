@@ -3,7 +3,7 @@ use crate::rest::api::file_part_error;
 use crate::rest::error::{ApiError, ApiGameError, ApiRequestError, ApiSessionError, ToApiError, ToResponse};
 use crate::data::{SessionRequest};
 use crate::services::db::MongoServer;
-use crate::services::game::{CreateLobby, FileMetadata};
+use crate::services::game::{CreateLobby, FileMetadata, GameServer, GetLobbyMediaToken};
 use crate::services::lobby::CanJoinLobby;
 use crate::settings::Settings;
 use actix::Addr;
@@ -30,7 +30,7 @@ use crate::authentication::discord::is_admin;
 use crate::services::game;
 use crate::services::game::UserSession;
 
-use super::data;
+use super::data::{self, get_media_token_from_header};
 use super::error::ApiFileError;
 
 #[utoipa::path(
@@ -40,6 +40,8 @@ use super::error::ApiFileError;
         ("user_session_id" = Option<String>, Query, description = "User session ID"),
         ("user_session_token" = Option<String>, Query, description = "User session token"),
         ("file-name" = String, Header, description = "File name"),
+        ("media-token" = MediaToken, Header, description = "Token do access media file"),
+        ("lobby-id" = LobbyId, Header, description = "Lobby ID"),
     ),
     request_body(content = FileMultiPart, description = "Fileupload", content_type = "multipart/form-data"),
     responses(
@@ -80,6 +82,8 @@ async fn upload_file_part(req: HttpRequest,db: web::Data<Arc<MongoServer>>,mut p
         Ok(data) => data,
         Err(_) => return Ok(file_part_error(None, ApiFileError::FileInvalid("No file name found".to_string()).to_api_error()).await),
     };
+
+
 
     println!("UPLOAD FILE Part");
     let start_time: chrono::DateTime<Local> = Local::now();
@@ -208,17 +212,47 @@ impl From<FileMetadata> for Bson {
 
 
 #[get("/api/file")]
-async fn get_file_from_name(req: HttpRequest,  db: web::Data<Arc<MongoServer>>, settings:web::Data<Arc<Settings>>) -> Result<HttpResponse, actix_web::Error> {
+async fn get_file_from_name(req: HttpRequest,  db: web::Data<Arc<MongoServer>>, settings:web::Data<Arc<Settings>>, game_server:web::Data<Addr<GameServer>>) -> Result<HttpResponse, actix_web::Error> {
     let user_session = match get_session(&req, &db).await {
         Some(data) => data,
-        None => return Ok(HttpResponse::Unauthorized().json("You are not authorized to access this file")),
+        None => return Ok(file_part_error(None, ApiSessionError::NotFound.to_api_error()).await),
     };
 
     let file_name = match extract_header_string(&req, "file-name") {
         Ok(data) => data,
-        Err(_) => return Ok(HttpResponse::BadRequest().json("No file name provided")),
+        Err(e) => return Ok(e),
     };
 
+
+    let media_token = match get_media_token_from_header(&req) {
+        Some(data) => data,
+        None => return Ok(file_part_error(None, ApiFileError::FileInvalid("No media token found".to_string()).to_api_error()).await),
+    }; 
+
+    let lobby_id = match extract_header_string(&req, "lobby-id") {
+        Ok(data) => LobbyId::of(data),
+        Err(e) => return Ok(e)
+    };
+
+
+    let opt_token =  match game_server.send(GetLobbyMediaToken{
+        lobby_id: lobby_id.clone()
+    }).await {
+        Ok(data) => data,
+        Err(_) => return Ok(file_part_error(None, ApiFileError::FileError("Can´t get token".to_string()).to_api_error()).await),
+    };
+
+    let token = match opt_token {
+        Some(data) => data,
+        None => return Ok(file_part_error(None, ApiFileError::FileError("No token found".to_string()).to_api_error()).await),
+    };
+
+
+    println!("{:#?} == {:#?}", token, media_token);
+
+    if token != media_token {
+        return Ok(file_part_error(None, ApiFileError::FileError("Token not valid".to_string()).to_api_error()).await);
+    }
 
         
     let file_data = match db.collections.file_bucket_files.find_one(doc!{"filename":Some(file_name.clone())}).await {
@@ -226,32 +260,32 @@ async fn get_file_from_name(req: HttpRequest,  db: web::Data<Arc<MongoServer>>, 
             if let Some(data) = data {
                   data
             } else {
-                return Ok(HttpResponse::NotFound().json("File not found"));
+                return Ok(file_part_error(None, ApiFileError::FileNotFound(file_name).to_api_error()).await);
             }
             
         }
         Err(err) => {
             println!("Error while downloading file: {:#?}", err);
-            return Ok(HttpResponse::InternalServerError().json("Error while downloading file1"));
+            return Ok(file_part_error(None, ApiFileError::FileError("Error while downloading file".to_string()).to_api_error()).await);
         }
     };
 
     let mut test = match db.collections.file_bucket.open_download_stream_by_name(file_name.clone()).await {
         Ok(data) => data,
-        Err(_) => return Ok(HttpResponse::InternalServerError().json("Error while downloading file")),
+        Err(_) => return Ok(file_part_error(None, ApiFileError::FileError("Error while downloading file1".to_string()).to_api_error()).await),
     };
     println!("Downloading file: {}", file_name);
 
     let file_meta = match file_data.metadata{
         Some(data) => data,
-        None => return Ok(HttpResponse::InternalServerError().json("Error while downloading file2")),
+        None => return Ok(file_part_error(None, ApiFileError::FileError("Error while downloading file2".to_string()).to_api_error()).await),
     };
 
 
 
     let mut buf = Vec::new();
     if let Err(_) = test.read_to_end(&mut buf).await {
-        return Ok(HttpResponse::InternalServerError().json("Error while downloading file3"));
+        return Ok(file_part_error(None, ApiFileError::FileError("Error while downloading file3".to_string()).to_api_error()).await);
     }
     
     let mut response =  HttpResponse::Ok()

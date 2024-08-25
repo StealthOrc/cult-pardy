@@ -9,7 +9,7 @@ use actix_web::cookie::Cookie;
 use actix_web::{HttpRequest, HttpResponse, web};
 use chrono::Local;
 use cult_common::wasm_lib::hashs::validate::ValidateHash;
-use cult_common::wasm_lib::NumberScope;
+use cult_common::wasm_lib::{MediaToken, NumberScope};
 use oauth2::http::header::COOKIE;
 use oauth2::http::HeaderValue;
 use serde::{Deserialize, Serialize};
@@ -173,6 +173,18 @@ pub fn get_validate_hash_from_value(req: &HttpRequest) -> Option<ValidateHash> {
     }
     None
 }
+
+
+pub fn get_media_token_from_header(req: &HttpRequest) -> Option<MediaToken> {
+    match extract_header_string(req, "media-token") {
+        Ok(media_token) => Some(MediaToken::new(media_token)),
+        Err(_) => None,
+    }
+}
+
+
+
+
 
 pub async fn get_session_with_token_update_or_create_new(req: &HttpRequest, db: &web::Data<Arc<MongoServer>>) -> UserSession {
     let user_session_id_cookie = get_user_id_from_cookie(&req);

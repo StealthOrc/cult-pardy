@@ -1,6 +1,6 @@
 
 import Cookies from "js-cookie";
-import type { UserSessionId} from 'cult-common';
+import type { LobbyId, UserSessionId} from 'cult-common';
 import { writable, type Subscriber, type Unsubscriber, type Writable } from 'svelte/store';
 import { dev } from "$app/environment";
 import { SessionData } from '../api/ApiRequests';
@@ -39,6 +39,7 @@ export const CookieStore : CookieStoreType = createCookieStore();
 
 export const dev_loaded : Writable<boolean> = writable(dev ? false : true);
 export const is_loading : Writable<boolean> = writable(false);
+export const lobby_store : Writable<LobbyId> = writable();
 
 
 export type CookieStoreType = {
