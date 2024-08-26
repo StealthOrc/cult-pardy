@@ -9,7 +9,8 @@ use wasm_bindgen::prelude::*;
 use crate::dto::board::{DtoCategory, DtoJeopardyBoard, DtoQuestion};
 use crate::wasm_lib::ids::lobby::LobbyId;
 use crate::wasm_lib::ids::usersession::UserSessionId;
-use crate::wasm_lib::websocket_events::MediaState;
+use crate::wasm_lib::ids::websocketsession::{self, WebsocketSessionId};
+use crate::wasm_lib::websocket_events::MediaStatus;
 use crate::wasm_lib::{JeopardyMode, Media, MediaType, NumberScope, QuestionType, Vector2D, VideoType};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, ToSchema)]
@@ -47,25 +48,23 @@ impl JeopardyBoard {
                 }
                 if question == 1 && category == 0 {
                     let media = Media::new(MediaType::Video(vec![VideoType::default()]), "FlyHigh.mp4".to_string());
-                    question_type = QuestionType::Media(media);
+                    question_type = QuestionType::Media(vec![media]);
                 }
                 if question == 2 && category == 0 {
                     let first_time_slot = NumberScope::new(0, 10);
                     let second_time_slot = NumberScope::new(60, 70);
                     let vec: Vec<NumberScope> = vec![first_time_slot, second_time_slot];
                     let media = Media::new(MediaType::Video(vec![VideoType::time_slots(vec)]), "FlyHigh.mp4".to_string());
-                    question_type = QuestionType::Media(media);
+                    question_type = QuestionType::Media(vec![media]);
                 }
                 if question == 3 && category == 0 {
-
                     let slow = VideoType::Slowmotion(30);
                     let first_time_slot = NumberScope::new(0, 10);
                     let second_time_slot = NumberScope::new(60, 70);
                     let vec: Vec<NumberScope> = vec![first_time_slot, second_time_slot];
                     let time = VideoType::time_slots(vec);
                     let media = Media::new(MediaType::Video(vec![slow,time]), "FlyHigh.mp4".to_string());
-
-                    question_type = QuestionType::Media(media);
+                    question_type = QuestionType::Media(vec![media]);
                 }
 
                 let question_name = format!("question_{}", question);
@@ -73,7 +72,7 @@ impl JeopardyBoard {
                 let question = Question {
                     value,
                     question: question_name,
-                    question_types: vec![question_type],
+                    question_type: question_type,
                     answer: answer_name,
                     open: false,
                     won_user_id: None,
@@ -89,7 +88,7 @@ impl JeopardyBoard {
             categories,
             current: None,
             create: Local::now(),
-            action_state: Arc::new(Mutex::new(ActionState{state: ActionStateType::None, current_type: None})),
+            action_state: Arc::new(Mutex::new(ActionState::None)),
         }
     }
 
@@ -200,23 +199,31 @@ impl<'de> Deserialize<'de> for JeopardyBoard {
 
         let partial_board = PartialJeopardyBoard::deserialize(deserializer)?;
 
+        for category in &partial_board.categories {
+            for question in &category.questions {
+                match question.question_type.clone() {
+                    QuestionType::Media(media) => {
+                        if media.len() == 0 {
+                            return Err(serde::de::Error::custom("Media must have at least one media type"));
+                        }
+                    },
+                    _ => {}
+                }
+            }
+        }
+
+
+
         let board = JeopardyBoard {
             title: partial_board.title,
             categories: partial_board.categories,
             current: None,
             create: Local::now(),
-            action_state:   Arc::new(Mutex::new(ActionState{state: ActionStateType::None, current_type: None})),
+            action_state:   Arc::new(Mutex::new(ActionState::None)),
         };
 
         Ok(board)
     }
-}
-
-
-#[derive(Tsify,Debug, Clone, Serialize, Deserialize)]
-pub struct ActionState {
-    pub state: ActionStateType,
-    pub current_type: Option<QuestionType>,
 }
 
 
@@ -225,12 +232,84 @@ pub struct ActionState {
 
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize)]
 #[tsify(namespace)] 
-pub enum ActionStateType {
+pub enum ActionState {
     None,
     MediaPlayer(MediaState),
 }
 
 
+
+impl ActionState {
+
+
+    pub fn get_media_player_or_default(&self,websocket_session_id:&WebsocketSessionId) -> MediaState {
+        match self {
+            ActionState::MediaPlayer(media) => media.clone(),
+            _ => MediaState::new(&websocket_session_id),
+        }
+    }
+
+
+    pub fn get_mut_media_player(&mut self) -> Option<&mut MediaState> {
+        match self {
+            ActionState::MediaPlayer(media) => Some(media),
+            _ => None,
+        }
+    }
+
+    pub fn get_media_player(&self) -> Option<&MediaState> {
+        match self {
+            ActionState::MediaPlayer(media) => Some(media),
+            _ => None,
+        }
+    }
+
+
+    pub fn get_media_status(&self) -> Option<&MediaStatus> {
+        match self {
+            ActionState::MediaPlayer(media) => Some(&media.status),
+            _ => None,
+        }
+    }
+
+
+    
+}
+
+
+#[derive(Tsify,Debug, Clone, Serialize, Deserialize)]
+pub struct MediaState {
+    pub current_media: usize,
+    pub status: MediaStatus,
+}
+
+impl MediaState {
+    pub fn new(websocketsession:&WebsocketSessionId) -> Self {
+        MediaState {
+            current_media: 0,
+            status: MediaStatus::new(&websocketsession),
+        }
+    }
+
+    pub fn next(&mut self, medias: &Vec<Media>, websocket_session_id: &WebsocketSessionId) -> bool{
+        if self.current_media < medias.len() {
+            self.current_media += 1;
+            self.status = MediaStatus::new(&websocket_session_id);
+            return true;
+        } 
+        false
+    }
+
+    pub fn before(&mut self,websocket_session_id: &WebsocketSessionId)  -> bool {
+        if self.current_media > 0 {
+            self.current_media -= 1;
+            self.status = MediaStatus::new(&websocket_session_id);
+            return true;
+        }
+        false
+    }
+    
+}
 
 
 
@@ -243,10 +322,16 @@ impl ActionState {
         *self = action;
     }
 
-    pub fn update_action_state_type(&mut self, action_state_type: ActionStateType) {
-        self.state = action_state_type;
+    pub fn next_media(&mut self, websocket_session_id: &WebsocketSessionId) {
+        match self {
+            ActionState::MediaPlayer(media) => {
+                media.current_media += 1;
+                media.status = MediaStatus::new(&websocket_session_id);
+            }
+            _ => {}
+        }
     }
-    
+
 }
 
 
@@ -301,7 +386,7 @@ impl Category {
 
 #[derive(Tsify, Debug, Clone, Serialize, Eq, PartialEq, ToSchema)]
 pub struct Question {
-    pub question_types: Vec<QuestionType>,
+    pub question_type: QuestionType,
     pub question: String,
     pub value: i32,
     pub answer: String,
@@ -326,7 +411,7 @@ impl Question {
             false => None,
         };
         DtoQuestion {
-            question_types: self.question_types,
+            question_type: self.question_type,
             value: self.value,
             question_text,
             answer,
@@ -343,14 +428,14 @@ impl<'de> Deserialize<'de> for Question {
     {
         #[derive(Deserialize)]
         struct PartialQuestion {
-            question_types: Vec<QuestionType>,
+            question_type: QuestionType,
             question: String,
             value: i32,
             answer: String,
         }
         let partial_question = PartialQuestion::deserialize(deserializer)?;
         let question = Question {
-            question_types: partial_question.question_types,
+            question_type: partial_question.question_type,
             question: partial_question.question,
             value: partial_question.value,
             answer: partial_question.answer,

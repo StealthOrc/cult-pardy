@@ -6,14 +6,14 @@ use std::time::Duration;
 use actix::{Actor, ActorFutureExt, Addr, AsyncContext, Context, Handler, Message, MessageResult, Recipient, ResponseActFuture, WrapFuture};
 
 use chrono::{Local, Utc};
-use cult_common::backend::{ActionState, ActionStateType, JeopardyBoard, Question};
+use cult_common::backend::{ActionState, JeopardyBoard, Question};
 use cult_common::dto::board::DTOSession;
 use cult_common::wasm_lib::ids::discord::DiscordID;
 use cult_common::wasm_lib::ids::lobby::LobbyId;
 use cult_common::wasm_lib::ids::usersession::UserSessionId;
 use cult_common::wasm_lib::ids::websocketsession::WebsocketSessionId;
-use cult_common::wasm_lib::websocket_events::{ActionMediaEvent, ActionStateEvent, BoardEvent, MediaState, SessionEvent, VideoEvent, WebsocketEvent, WebsocketPing, WebsocketServerEvents};
-use cult_common::wasm_lib::{MediaToken, QuestionType, Vector2D};
+use cult_common::wasm_lib::websocket_events::{ActionMediaEvent, ActionStateEvent, BoardEvent, MediaStatus, SessionEvent, VideoEvent, WebsocketEvent, WebsocketPing, WebsocketServerEvents};
+use cult_common::wasm_lib::{MediaToken, MediaType, QuestionType, Vector2D};
 use mongodb::bson::doc;
 use ritelinked::{LinkedHashMap, LinkedHashSet};
 use serde::{Deserialize, Serialize};
@@ -275,9 +275,8 @@ impl Lobby {
         if let Some(value) = qeuestion.clone() {
             self.jeopardy_board.current = Some(vector2d);
             let mut state = self.jeopardy_board.action_state.lock().expect("Failed to lock action state");
-            if value.question_types.len() == 1 {
-                state.update(value.question_types[0].get_action_state(websocket_session_id));
-            } 
+            let action: ActionState = value.question_type.get_default_actionstate(websocket_session_id);
+            state.update(action)
         }
          qeuestion
     }
@@ -695,10 +694,9 @@ impl Handler<ReciveVideoEvent> for Lobby {
                 is_editor(&user_session_id, &creator, db).await
         }.into_actor(self).map(move |allowed, lobby: &mut Lobby, _|  {
             let mut state = lobby.jeopardy_board.action_state.lock().expect("Failed to lock action state");
-            let current_state = match state.state.clone() {
-                ActionStateType::None => MediaState::new(&msg.websocket_session_id.clone()),
-                ActionStateType::MediaPlayer(data) =>  data,
-            };
+            
+            let current_media_state = &state.get_media_player_or_default(&msg.websocket_session_id);
+            let current_state = &current_media_state.status;
 
 
             
@@ -712,8 +710,8 @@ impl Handler<ReciveVideoEvent> for Lobby {
 
                         if !stale && !(to_soon && other_ws) {
                             println!("Changing state to {:?}", new_state.clone());
-                            state.update_action_state_type(ActionStateType::MediaPlayer(new_state.clone()));
-                            let event = WebsocketServerEvents::ActionState(ActionStateEvent::Media(ActionMediaEvent::ChangeState(new_state)));
+                            state.update(ActionState::MediaPlayer(current_media_state.clone()));
+                            let event: WebsocketServerEvents = WebsocketServerEvents::ActionState(ActionStateEvent::Media(ActionMediaEvent::ChangeState(new_state)));
                             lobby.send_lobby_message(&event);
                         }
                     }
@@ -941,21 +939,131 @@ impl Handler<GetMediaToken> for Lobby {
     type Result = MessageResult<GetMediaToken>;
 
     fn handle(&mut self, _: GetMediaToken, _: &mut Self::Context) -> Self::Result {
-        let state: std::sync::MutexGuard<ActionState> = self.jeopardy_board.action_state.lock().expect("Failed to lock action state");
-         if let Some(media) = state.current_type.clone() {
-            match media {
-                QuestionType::Media(data) => {
-                    return MessageResult(Some(data.media_token.clone()));
-                }
-                _ => return MessageResult(None),
+        let current = match self.jeopardy_board.current.clone() {
+            Some(c) => c,
+            None => return MessageResult(None),
+        };
+
+        let question = match self.jeopardy_board.get_question(current) {
+            Some(q) => q,
+            None => return MessageResult(None),
+        };
+
+        let state = match self.jeopardy_board.action_state.lock() {
+            Ok(s) => s,
+            Err(_) => return MessageResult(None), 
+        };
+
+        let media_player = match state.get_media_player() {
+            Some(mp) => mp,
+            None => return MessageResult(None),
+        };
+
+        if let QuestionType::Media(medias) = &question.question_type {
+            if let Some(media) = medias.get(media_player.current_media) {
+                return MessageResult(media.media_token.clone());
             }
         }
+
         MessageResult(None)
     }
 }
 
 
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct NextMedia{
+    pub websocket_session_id: WebsocketSessionId,
+}
 
+
+
+impl Handler<NextMedia> for Lobby {
+    type Result = MessageResult<NextMedia>;
+    
+    fn handle(&mut self, msg: NextMedia, _: &mut Self::Context) -> Self::Result {
+        let current = match self.jeopardy_board.current.clone() {
+            Some(c) => c,
+            None => return MessageResult(()),
+        };
+
+        let question = match self.jeopardy_board.get_question(current) {
+            Some(q) => q,
+            None => return MessageResult(()),
+        };
+
+        let mut state = match self.jeopardy_board.action_state.lock() {
+            Ok(s) => s,
+            Err(_) => return MessageResult(()), 
+        };
+
+        let media_state = match state.get_mut_media_player() {
+            Some(mp) => mp,
+            None => return MessageResult(()),
+        };
+
+        let medias = question.question_type.get_media();
+        if medias.len() <= 0 {
+            return MessageResult(());
+        }
+        if media_state.next(&medias, &msg.websocket_session_id){
+            let status = media_state.status.clone();
+            let event = WebsocketServerEvents::ActionState(ActionStateEvent::Media(ActionMediaEvent::ChangeState(status)));
+            self.send_lobby_message(&event);
+        } 
+        MessageResult(())
+
+    }
+
+}
+
+
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct BeforeMedia{
+    pub websocket_session_id: WebsocketSessionId,
+}
+
+
+
+impl Handler<BeforeMedia> for Lobby {
+    type Result = MessageResult<BeforeMedia>;
+    
+    fn handle(&mut self, msg: BeforeMedia, _: &mut Self::Context) -> Self::Result {
+        let current = match self.jeopardy_board.current.clone() {
+            Some(c) => c,
+            None => return MessageResult(()),
+        };
+
+        let question = match self.jeopardy_board.get_question(current) {
+            Some(q) => q,
+            None => return MessageResult(()),
+        };
+
+        let mut state = match self.jeopardy_board.action_state.lock() {
+            Ok(s) => s,
+            Err(_) => return MessageResult(()), 
+        };
+
+        let media_state = match state.get_mut_media_player() {
+            Some(mp) => mp,
+            None => return MessageResult(()),
+        };
+
+        let medias = question.question_type.get_media();
+        if medias.len() <= 0 {
+            return MessageResult(());
+        }
+        if media_state.before(&msg.websocket_session_id){
+            let status = media_state.status.clone();
+            let event = WebsocketServerEvents::ActionState(ActionStateEvent::Media(ActionMediaEvent::ChangeState(status)));
+            self.send_lobby_message(&event);
+        } 
+        MessageResult(())
+
+    }
+
+}
 
 
 pub async fn get_session(db: &Arc<MongoServer>, user_session_id: &UserSessionId) -> Option<UserSession> {

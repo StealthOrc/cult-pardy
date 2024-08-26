@@ -1,6 +1,7 @@
 import { dev } from "$app/environment";
-import type { ActionState, ActionStateType, DtoJeopardyBoard, DtoQuestion } from "cult-common";
+import type { ActionState, DtoJeopardyBoard, DtoQuestion } from "cult-common";
 import { writable, type Subscriber, type Unsubscriber} from "svelte/store"; 
+import { match, P } from "ts-pattern";
 
 export const JeopardyBoardStore = createJeopardyBoardStore();
 
@@ -45,28 +46,7 @@ function createJeopardyBoardStore() {
     }
 
 
-    function setActionStateType(state: ActionStateType) {
-        store.update((board) => {
-            if (board == null) {
-                return board;
-            }
-            board.action_state.state = state;
-            return board;
-        });       
-    }
 
-
-    function getActionState() : ActionStateType {
-        let state: ActionStateType = "None";
-        store.update((board) => {
-            if (board == null) {
-                return board;
-            }
-            state = board.action_state.state;
-            return board;
-        });
-        return state;
-    } 
 
     function subscribeActionState(this: void, run: Subscriber<ActionState>): Unsubscriber {
         return store.subscribe((data) => {
@@ -74,6 +54,26 @@ function createJeopardyBoardStore() {
                 run(data.action_state);
             }   
         });
+    }
+
+
+    function getCurrentMediaID(this: void) : number {
+        let media: number = 0;
+        store.update((board) => {
+            if (board == null) {
+                return board;
+            }
+            if (board.current == null) {
+                return board;
+            }
+            match(board.action_state)
+                .with({MediaPlayer: P.select()}, (player) => {
+                    media = player.current_media;
+                }
+            )
+            return board;
+        });
+        return media;
     }
     
 
@@ -89,8 +89,7 @@ function createJeopardyBoardStore() {
         setActionState,
         setBoard,
         subscribe,
-        setActionStateType,
-        getActionState,
+        getCurrentMediaID,
         subscribeActionState,
     }
 }

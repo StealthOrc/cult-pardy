@@ -56,11 +56,11 @@ pub enum ActionMediaEvent {
     Play,
     Pause,
     Resume,
-    ChangeState(MediaState),
+    ChangeState(MediaStatus),
 }
 
 #[derive(Tsify,Debug, Clone, Serialize,Deserialize,)]
-pub struct MediaState {
+pub struct MediaStatus {
     pub video_timestamp: f64,
     pub last_updated: f64,
     pub playing: bool,
@@ -70,9 +70,9 @@ pub struct MediaState {
 
 
 
-impl MediaState {
+impl MediaStatus {
     pub fn new(websocketsession:&WebsocketSessionId) -> Self {
-        MediaState {
+        MediaStatus {
             video_timestamp: 0.0,
             last_updated: Local::now().timestamp_millis() as f64,
             playing: false,
@@ -80,6 +80,10 @@ impl MediaState {
             interaction_id: websocketsession.clone(),
         }
     }
+
+
+
+
     
 }
 
@@ -130,7 +134,7 @@ pub enum VideoEvent {
     Play,
     Pause(f64),
     Resume,
-    ChangeState(MediaState),
+    ChangeState(MediaStatus),
     
     
 }

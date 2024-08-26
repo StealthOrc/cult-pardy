@@ -28,7 +28,7 @@ export function handleEvent(event: WebsocketServerEvents): boolean {
         .with({ Media: P.select()}, (data) => {
             match(data)
             .with({ChangeState: P.select()}, (data) => {
-                mediaStateStore.setMediaState(data);
+                mediaStateStore.setMediaStatus(data);
             })
             .otherwise((data) => {
             console.error("undhandled ActionStateEvent: ",data) 

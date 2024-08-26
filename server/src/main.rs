@@ -43,7 +43,7 @@ use wasm_lib::hashs::validate::ValidateHash;
 use wasm_lib::ids::discord::DiscordID;
 use wasm_lib::ids::lobby::LobbyId;
 use wasm_lib::ids::usersession::UserSessionId;
-use wasm_lib::{DiscordUser, QuestionType, NumberScope};
+use wasm_lib::{DiscordUser, Media, MediaToken, MediaType, NumberScope, QuestionType, VideoType};
 use crate::authentication::discord;
 use crate::frontend::frontend::{assets, find_game, grant_admin_access, index};
 use crate::services::input::InputServer;
@@ -68,7 +68,7 @@ async fn main() -> Result<()> {
 
     let services = Services::init(&settings).await;
 
-    let schemas : LobbyId;
+    let schemas : MediaToken ;
     #[derive(OpenApi)]
     #[openapi(
         servers(
@@ -111,6 +111,11 @@ async fn main() -> Result<()> {
                 QuestionType,
                 LobbyCreateResponse,
                 LobbyId,
+                Media,
+                MediaType,
+                VideoType,
+                NumberScope,
+                MediaToken,
 
             ))
     )]

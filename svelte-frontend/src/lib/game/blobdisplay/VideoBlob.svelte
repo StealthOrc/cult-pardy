@@ -6,7 +6,7 @@
 	import { mediaPlayerContextStore } from "$lib/stores/MediaPlayerStore";
 	import { mediaStateStore, type MediaPlayerSessionType } from "$lib/stores/MediaStateStore";
 	import type { BoardContext, MediaPlayerContext } from "$lib/types";
-	import { type MediaState, type WebsocketSessionEvent, type NumberScope, type Media, type MediaType, type VideoType} from "cult-common";
+	import { type MediaState, type WebsocketSessionEvent, type NumberScope, type Media, type MediaType, type VideoType, type MediaStatus, type ActionState} from "cult-common";
 	import { getContext, onMount, setContext } from "svelte";
 	import JeopardyBoard from "../JeopardyBoard.svelte";
 	import { JeopardyBoardStore } from "$lib/stores/JeopardyBoardStore";
@@ -14,6 +14,7 @@
 	import { match, P } from "ts-pattern";
 	import type { EventHandler } from "svelte/elements";
 	import { WebsocketStore } from "$lib/stores/WebsocketStore";
+	import type { Action } from "@sveltejs/kit";
 
     export let video: Blob
     export let currUserIsAdmin: boolean = false;
@@ -33,6 +34,8 @@
             match(type)
             .with({ TimeSlots: P.select() }, (data) => {
                 ranges = data;
+                status = EventStatusEnum.SEEKING
+                seekToTime(ranges[0].start);
             })
             .with("Mute", () => {
                 if (player) player.muted = true;
@@ -47,13 +50,13 @@
 
 
         console.log("TEK ONLOADING!!!!!", player);
-        match(JeopardyBoardStore.getActionState())
+        match($JeopardyBoardStore?.action_state)
         .with({MediaPlayer: P.select()}, (data) => {
             if (!player) return
-            if (data.playing) determinePlayAndSeekPlay(data);
-            else determinePauseAndPauseSeek(data);
+            if (data.status.playing) determinePlayAndSeekPlay(data.status);
+            else determinePauseAndPauseSeek(data.status);
             ignore = true;
-            mediaStateStore.setMediaState(data);
+            mediaStateStore.setMediaStatus(data.status);
         })
         
         
@@ -62,14 +65,20 @@
     let mediasession: MediaPlayerSessionType;
     mediaStateStore.subscribe(value => {
         mediasession = value;
-        if(value == null || value.mediaState == null || ignore) {
+        if(value == null || value.media_status == null || ignore) {
             ignore = false;
             return;
         };
         if (player == null) {
-            JeopardyBoardStore.setActionStateType({MediaPlayer: value.mediaState});
-        } else {
-            doMediaStateChange(value.mediaState);
+            let action_state =  $JeopardyBoardStore?.action_state;
+            if (action_state == null) return;
+            if (typeof action_state == "object" && "MediaPlayer" in action_state) {
+                action_state.MediaPlayer.status = value.media_status;
+                JeopardyBoardStore.setActionState(action_state);
+            } else {
+                doMediaStateChange(value.media_status);
+            }
+
         }
     })
 
@@ -108,7 +117,7 @@
   
 
 
-    function handleEvent(state: MediaState): boolean {
+    function handleEvent(state: MediaStatus): boolean {
         if (player == null) return false;
         if (state.interaction_id.id === store.websocket_id.id) {
             let proposed_time;
@@ -131,7 +140,7 @@
     }
 
 
-    async function doMediaStateChange(state: MediaState) {
+    async function doMediaStateChange(state: MediaStatus) {
         try {
             if (!player) return;
                 if (!handleEvent(state)) return;
@@ -266,6 +275,22 @@
                 player.removeEventListener('seeked', onSeeked);
                 resolve();
             }
+
+            let delta = Math.abs(player.currentTime - time);
+
+
+            if (player.paused && delta < CONST.PAUSED_THRESH) {
+                resolve();
+                console.log("SEEKING SKIP", delta);
+                return;
+            } else if (!player.paused && delta < CONST.PLAYING_THRESH) {
+                resolve();
+                console.log("SEEKING SKIP", delta);
+                return;
+            }
+
+
+
             player.addEventListener('seeked', onSeeked);
             player.currentTime = time;
             console.log("SEEKING TO", time);
@@ -274,10 +299,10 @@
 
 
     
-    async function determinePlayAndSeekPlay(mediaState: MediaState) {
+    async function determinePlayAndSeekPlay(mediaState: MediaStatus) {
         if (!player) return;
         console.log("Playrate", play_rate);
-        console.log("Test", ((get_global_time(mediasession.correction) - mediaState.global_timestamp) / 1000 + mediaState.video_timestamp))
+        console.log("Test", ((get_global_time(mediasession.correction) - mediaState.global_timestamp) / 1000 +  mediaState.video_timestamp))
 
 
         let proposed_time = getProposedTime(mediaState);
@@ -298,10 +323,10 @@
         if (!isPlaying) player.play()
 
     }
-    function getProposedTime(mediaState: MediaState): number {
+    function getProposedTime(mediaState: MediaStatus): number {
         const play_rate = getPlayRate();
         
-        let proposed_time = ((get_global_time(mediasession.correction) - mediaState.global_timestamp) / 1000 + mediaState.video_timestamp);
+        let proposed_time = ((get_global_time(mediasession.correction) -  mediaState.global_timestamp) / 1000 +  mediaState.video_timestamp);
 
 
         return proposed_time;
@@ -310,10 +335,10 @@
         return play_rate || 1;
     }
 
-    async function determinePauseAndPauseSeek(mediaState: MediaState) {
+    async function determinePauseAndPauseSeek(mediaState: MediaStatus) {
         if (!player) return;    
         let isPause = player.paused;
-        let proposed_time =  mediaState.video_timestamp; // Video timestamp from the video itself
+        let proposed_time =   mediaState.video_timestamp; // Video timestamp from the video itself
         let isSeeking = (Math.abs(player.currentTime - proposed_time) > CONST.PAUSED_THRESH);  
         if(status != EventStatusEnum.SEEKING){
             if (isSeeking) {
@@ -330,16 +355,16 @@
 
 
     
-    function currentMediaState(playing:boolean):MediaState{
+    function currentMediaState(playing:boolean):MediaStatus {
         return {
-            video_timestamp: player?.currentTime || 0,
-            last_updated: get_global_time(mediasession.correction),
-            global_timestamp: get_global_time(mediasession.correction),
-            playing,
-            interaction_id: {
-                id: store.websocket_id.id
-            },
-        }
+                video_timestamp: player?.currentTime || 0,
+                last_updated: get_global_time(mediasession.correction),
+                global_timestamp: get_global_time(mediasession.correction),
+                playing,
+                interaction_id: {
+                    id: store.websocket_id.id
+            }
+        }   
     }
 
 
@@ -362,7 +387,7 @@
     }
 
 
-    function requestPlayerChangeState(state: MediaState): boolean {
+    function requestPlayerChangeState(state: MediaStatus): boolean {
         let changeStateEvent: WebsocketSessionEvent = { VideoEvent: {ChangeState: state} };
         store.webSocketSubject.next(changeStateEvent);
         return true;

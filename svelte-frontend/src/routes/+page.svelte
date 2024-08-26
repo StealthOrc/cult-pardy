@@ -5,7 +5,7 @@
 	import { type DiscordUser } from "cult-common";
 	import PlayerIcon from "./PlayerIcon.svelte";
 	import { discord_session} from "$lib/api/ApiRequests";
-	import FileUpload from "$lib/create/FileUpload.svelte";
+	import FileUpload from "$lib/create/file/FileUpload.svelte";
 	import { FileUploadType } from "$lib/types";
     let lobbyid = '';
 

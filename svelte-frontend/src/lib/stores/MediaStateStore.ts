@@ -1,6 +1,6 @@
 import { dev } from "$app/environment";
 import { get_global_time } from "$lib/lib";
-import type { MediaState } from "cult-common";
+import type { MediaStatus } from "cult-common";
 import { writable, type Subscriber, type Unsubscriber } from "svelte/store";
 
 
@@ -8,7 +8,7 @@ import { writable, type Subscriber, type Unsubscriber } from "svelte/store";
 export const mediaStateStore = createMediaStateStore();
 
 export type MediaPlayerSessionType = {
-    mediaState: MediaState | null,
+    media_status: MediaStatus | null,
     over_estimates :number[],
     under_estimates :number[],
     over_estimate: number,
@@ -32,7 +32,7 @@ if(dev) {
 function createMediaStateStore() {
 
     const store = writable<MediaPlayerSessionType>({
-        mediaState: null,
+        media_status: null,
         over_estimates: [],
         under_estimates: [],
         over_estimate: 0,
@@ -40,17 +40,17 @@ function createMediaStateStore() {
         correction: 0,
     });
 
-    function subscribeMediaState(this: void, run: Subscriber<MediaState>): Unsubscriber {
+    function subscribeMediaStatus(this: void, run: Subscriber<MediaStatus>): Unsubscriber {
         return store.subscribe((data) => {
-            if (data.mediaState != null) {
-                run(data.mediaState);
+            if (data.media_status != null) {
+                run(data.media_status);
             }
         });
     }
 
-    function setMediaState(mediaState: MediaState) {
+    function setMediaStatus(media_status: MediaStatus) {
         store.update((curr) => {
-            curr.mediaState = mediaState;
+            curr.media_status = media_status;
             return curr;
         });
     }
@@ -127,9 +127,9 @@ function createMediaStateStore() {
 
     return {
         store,
-        setMediaState,
+        setMediaStatus,
         subscribe,
-        subscribeMediaState,
+        subscribeMediaState: subscribeMediaStatus,
         addForward,
         addBackward,
         clearEstimates,

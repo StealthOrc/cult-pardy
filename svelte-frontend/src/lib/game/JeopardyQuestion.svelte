@@ -8,6 +8,8 @@
 	import { WebsocketStore } from '$lib/stores/WebsocketStore';
 	import BlobDisplay from './blobdisplay/BlobDisplay.svelte';
 	import YoutubeDisplay from './youtubedisplay/YoutubeDisplay.svelte';
+	import JeopardyBoard from './JeopardyBoard.svelte';
+	import JeopardyBoardCreator from '$lib/create/board/JeopardyBoardCreator.svelte';
     export let question: DtoQuestion;
 
     let ws = $WebsocketStore.webSocketSubject;
@@ -20,22 +22,32 @@
         if (value != null) {
             current = value.current;
             if ((current != null) && (current.vector2d.x === question.vector2d.x && current.vector2d.y === question.vector2d.y)) {
-                let current = value.action_state.current_type;
-                if (current != null) {
-                    match(current)
-                    .with({ Media: P.select() }, async (data) => {
-                        type = QuestionTypes.MEDIA;
-                        media = data;
-                    })
-                    .with({ Youtube: P.select() }, async (aud) => {
-                        type = QuestionTypes.YOUTUBE;
-                        youtube_id = aud;
-                    })
-                    .otherwise(() => {
 
-                        console.log("Unsupported file type");
-                    });
-                }
+                current.question_type
+
+                match(current.question_type)
+                .with({Media: P.select()}, (medias) => {
+            
+                    let action = $JeopardyBoardStore?.action_state
+                    if (action == null) {
+                        return;
+                    }
+                    if (typeof action == "object" && "MediaPlayer" in action) {
+                        type = QuestionTypes.MEDIA;
+                        console.log("MEIDA", action.MediaPlayer.current_media)
+                        let id : number = action.MediaPlayer.current_media;
+                        media =  medias[id];
+                    }
+                })
+                .with({Youtube: P.select()}, (youtube) => {
+                    type = QuestionTypes.YOUTUBE;
+                    youtube_id = youtube;
+                })
+                .with("Question", () => {
+                    type = QuestionTypes.QUESTION;
+                })
+
+
             }
         }
     })
@@ -61,15 +73,19 @@
         <button on:click={req_open_question}>${question.value}</button>
     {/if}
     {#if current && current.vector2d.x === question.vector2d.x && current.vector2d.y === question.vector2d.y}
+
         <div class="overlay" role="dialog">
                 <div class="overlay-content">
+                    {type}
                     {#if type == QuestionTypes.MEDIA && media != undefined}
                         <BlobDisplay media={media}/>
                     {:else if type == QuestionTypes.YOUTUBE}
                         <YoutubeDisplay current={current} youtube_id={youtube_id}/>
-                    {:else}
+                    {:else if type == QuestionTypes.QUESTION}
                         <h1>${current.value}</h1>
                         <p>{current.question_text}</p>
+                    {:else}
+                        <h1>ERROR</h1>
                     {/if}
                 </div>
             <div id="ov"></div>

@@ -3,12 +3,12 @@ use rand::random;
 use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
 use utoipa::ToSchema;
-use websocket_events::MediaState;
+use websocket_events::MediaStatus;
 use std::{cmp::min, hash::Hash};
 use std::string::ToString;
 use wasm_bindgen::prelude::*;
 
-use crate::backend::{ActionState, ActionStateType};
+use crate::backend::{ActionState, MediaState};
 
 pub mod ids;
 pub mod websocket_events;
@@ -92,7 +92,7 @@ impl DiscordUser {
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Default,ToSchema)]
 #[tsify(namespace)]
 pub enum QuestionType {
-    Media(Media),
+    Media(Vec<Media>),
     Youtube(String),
     #[default]
     Question
@@ -100,25 +100,40 @@ pub enum QuestionType {
 
 
 
+
+
 impl QuestionType {
-    pub fn get_action_state(self: &QuestionType,websocketsession:&WebsocketSessionId) -> ActionState {
+    pub fn get_default_actionstate(self: &QuestionType,websocket_session_id:&WebsocketSessionId) -> ActionState {
         match self {
-            QuestionType::Media(_) =>  ActionState {
-                state: ActionStateType::MediaPlayer(MediaState::new(websocketsession)),
-                current_type: Some(self.clone()),
-            },
-            _ => ActionState {
-                state: ActionStateType::None,
-                current_type: Some(self.clone()),
+            QuestionType::Media(media) => {
+                let media = media.get(0).expect("Media is empty");
+                match media.media_type {
+                    MediaType::Video(_) => {
+                        ActionState::MediaPlayer(MediaState::new(websocket_session_id))
+                    }
+                    _ => ActionState::None,
+                }
             }
+            _ => ActionState::None,
         }
     }
+
+    pub fn get_media(self: &QuestionType) -> Vec<Media> {
+        match self {
+            QuestionType::Media(media) => media.clone(),
+            _ => vec![],
+        }
+    }
+
+
 }
+
 #[derive(Tsify,Debug, Clone, Serialize, Eq, PartialEq, Default,ToSchema)]
 pub struct Media {
     pub media_type: MediaType,
     pub name: String,
-    pub media_token: MediaToken,
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub media_token: Option<MediaToken>,
 }
 
 impl Media {
@@ -127,11 +142,16 @@ impl Media {
         Media {
             media_type,
             name,
-            media_token: MediaToken::random(),
+            media_token: Some(MediaToken::random()),
         }
     }
     
 }
+
+
+
+
+
 
 impl<'de> Deserialize<'de> for Media {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -147,7 +167,7 @@ impl<'de> Deserialize<'de> for Media {
         Ok(Media {
             media_type: media.media_type,
             name: media.name,
-            media_token: MediaToken::random(),
+            media_token: Some(MediaToken::random()),
         })
     }
 }
@@ -220,7 +240,7 @@ impl VideoType {
 
 
 
-#[derive(Tsify, Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Tsify, Debug, Clone, Serialize, Deserialize, Eq, PartialEq, ToSchema)]
 pub struct NumberScope {
     pub start: usize,
     pub end: usize,

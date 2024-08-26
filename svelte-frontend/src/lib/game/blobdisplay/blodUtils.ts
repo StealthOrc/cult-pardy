@@ -1,6 +1,6 @@
 import { get_file, get_file2 } from "$lib/api/ApiRequests";
 import { buildUint8ArrayFromChunks } from "$lib/BinaryConversion";
-import { decompressData, formatSpeed } from "$lib/create/fileUploadUtils";
+import { decompressData, formatSpeed } from "$lib/create/file/fileUploadUtils";
 import type { LobbyId, MediaToken, NumberScope } from "cult-common";
 import { XXH64 } from "xxh3-ts";
 
