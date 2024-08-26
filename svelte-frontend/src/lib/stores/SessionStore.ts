@@ -22,6 +22,10 @@ function createCurrentSessionsStore() {
 
     const store = writable<DTOSession[]>([]);
 
+    function set(data: DTOSession[]) {
+        store.set(data);
+    }
+
     function addSession(dtoSession: DTOSession) {
         store.update((curr) => {
             if (curr.find((s) => s.user_session_id.id === dtoSession.user_session_id.id) != undefined){
@@ -84,6 +88,7 @@ function createCurrentSessionsStore() {
     
     return {
         store,
+        set,
         addSession,
         removeSessionById,
         getSessionById,
