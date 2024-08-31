@@ -54,13 +54,13 @@
 {#if player}
 	<div> 
 		<h1>${current.value}</h1>
-		<button on:click={() => player?.play()}>Play</button>
+		<button on:click={() => player?.play()} class="cult-btn-menu">Play</button>
 		<button on:click={() =>  {
 			console.log("test", player);
 			if (player != null) {
 				player.pause();
 			}
-		}}>Pause</button>
-		<button on:click={() => player?.stop()}>Stop</button>
+		}} class="cult-btn-menu">Pause</button>
+		<button on:click={() => player?.stop()} class="cult-btn-menu">Stop</button>
 	</div>
 {/if}

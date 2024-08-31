@@ -47,6 +47,7 @@
 		"fflate": "^0.8.2",
 		"http-proxy-middleware": "^3.0.0",
 		"js-cookie": "^3.0.5",
+		"lucide-svelte": "^0.436.0",
 		"luxon": "^3.4.4",
 		"node-fetch": "^3.3.2",
 		"readable-stream": "^4.5.2",

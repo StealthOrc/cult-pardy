@@ -1,15 +1,14 @@
 <script lang="ts">
-
 	import type { WebsocketSessionEvent, DtoQuestion, Media } from 'cult-common';
 	import { match, P } from 'ts-pattern';
 	import { JeopardyBoardStore } from '$lib/stores/JeopardyBoardStore';
-	import { CookieStore, type SessionCookies } from '$lib/stores/cookies';
-	import { QuestionTypes, VideoPlayerType } from '$lib/types';
+	import { CookieStore } from '$lib/stores/cookies';
+	import { QuestionTypes} from '$lib/types';
 	import { WebsocketStore } from '$lib/stores/WebsocketStore';
 	import BlobDisplay from './blobdisplay/BlobDisplay.svelte';
 	import YoutubeDisplay from './youtubedisplay/YoutubeDisplay.svelte';
-	import JeopardyBoard from './JeopardyBoard.svelte';
-	import JeopardyBoardCreator from '$lib/create/board/JeopardyBoardCreator.svelte';
+	import BtnBack from '$lib/ui/BtnBack.svelte';
+	import { CurrentSessionsStore } from '$lib/stores/SessionStore';
     export let question: DtoQuestion;
 
     let ws = $WebsocketStore.webSocketSubject;
@@ -64,94 +63,38 @@
         ws.next(click);
     }
 
+    function isAdmin(): boolean {
+        return CurrentSessionsStore
+            .getSessionById({ id: $CookieStore.userSessionId.id})
+            .is_admin;
+    }
 </script>
 
-<div class="jeopardy-question">
+<div class="m-1.5">
     {#if question.won_user_id !== null}
-        <button disabled>WON</button>
+        <button class="w-24 h-14 text-2xl text-cultTurq font-semibold bg-cultGrey rounded-md shadow-md shadow-black/60 cursor-not-allowed transition-colors duration-200 ease-in-out" disabled>WON</button>
     {:else}
-        <button on:click={req_open_question}>${question.value}</button>
+        <button on:click={req_open_question} class="w-24 h-14 text-2xl text-black font-semibold bg-cultTurq hover:bg-cultPink rounded-md shadow-md shadow-black/60 cursor-pointer transition-colors duration-200 ease-in-out">{question.value}</button>
     {/if}
     {#if current && current.vector2d.x === question.vector2d.x && current.vector2d.y === question.vector2d.y}
 
-        <div class="overlay" role="dialog">
-                <div class="overlay-content">
-                    {type}
-                    {#if type == QuestionTypes.MEDIA && media != undefined}
-                        <BlobDisplay media={media}/>
-                    {:else if type == QuestionTypes.YOUTUBE}
-                        <YoutubeDisplay current={current} youtube_id={youtube_id}/>
-                    {:else if type == QuestionTypes.QUESTION}
-                        <h1>${current.value}</h1>
-                        <p>{current.question_text}</p>
-                    {:else}
-                        <h1>ERROR</h1>
-                    {/if}
-                </div>
+        <div class="cult-bg-gradient fixed flex justify-center items-center top-0 left-0 w-full h-full z-10" role="dialog">
+            <div class="p-4 mw-3/4 mh-3/4 bg-cultGrey rounded-xl overflow-y-auto text-white">
+                {#if type == QuestionTypes.MEDIA && media != undefined}
+                    <BlobDisplay media={media}/>
+                {:else if type == QuestionTypes.YOUTUBE}
+                    <YoutubeDisplay current={current} youtube_id={youtube_id}/>
+                {:else if type == QuestionTypes.QUESTION}
+                    <h1>${current.value}</h1>
+                    <p>{current.question_text}</p>
+                {:else}
+                    <h1>ERROR</h1>
+                {/if}
+            </div>
             <div id="ov"></div>
-            <button class="close-button" on:click={handleClose}>Close</button>
-    </div>
+            {#if isAdmin()}
+                <BtnBack onclick={handleClose} text="Close"/>
+            {/if}
+        </div>
     {/if}
 </div>
-
-
-<style>
-    .close-button {
-        top: 10px;
-        right: 10px;
-        background-color: #f44336;
-        color: white;
-        border: none;
-        border-radius: 5px;
-        cursor: pointer;
-        transition: background-color 0.3s ease;
-        position: absolute;
-
-
-
-    }
-    .jeopardy-question {
-        margin: 5px;
-        position: relative;
-    }
-
-    .jeopardy-question button {
-        width: 100px;
-        height: 60px;
-        font-size: 24px;
-        background-color: #4CAF50;
-        color: white;
-        border: none;
-        border-radius: 5px;
-        cursor: pointer;
-        transition: background-color 0.3s ease;
-    }
-
-    .jeopardy-question button:hover {
-        background-color: #45a049;
-    }
-
-    .overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background-color: rgba(0, 0, 0, 0.5);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        z-index: 2;
-    }
-
-
-    .overlay-content {
-        background-color: white;
-        padding: 20px;
-        border-radius: 10px;
-        box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
-        max-width: 80%;
-        max-height: 80%;
-        overflow-y: auto;
-    }
-</style>

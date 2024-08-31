@@ -170,6 +170,7 @@
     }
 
     async function play(){
+        console.log("playing", status);
         if (!player)
             return;
         if (player.playbackRate != play_rate)
@@ -439,14 +440,6 @@
 
 </script>
 
-
-
-
-
-<div>
-    <h1>status: {status}</h1>
-
-</div>
 <video 
 bind:this={player}
 on:play={play} on:pause={pause} on:ended={onEnded} 
@@ -482,13 +475,11 @@ id="player" src={URL.createObjectURL(video)} controls={currUserIsAdmin} muted st
 
 {#if currUserIsAdmin && player != null && ov != null}
     {#if  ranges.length > 0}
-        <div class="fixed left-0 top-1/2 transform -translate-y-1/2 p-4 bg-white shadow-lg rounded-lg" id="ov" bind:this={ov}>
+        <div class="fixed flex flex-col gap-2 left-0 top-1/2 transform -translate-y-1/2 p-4 bg-cultGrey text-white shadow-lg rounded-lg" id="ov" bind:this={ov}>
             {#each ranges as range, i}
-                <!-- svelte-ignore a11y_click_events_have_key_events -->
-                <!-- svelte-ignore a11y_no_static_element_interactions -->
-                <div on:click={(e) => {moveTime(range.start)}}>
-                    <p>| Range {i + 1} : {range.start} - {range.end} | </p>
-                </div>
+                <button class="cult-btn-menu" on:click={(e) => {moveTime(range.start)}}>
+                    [Range{i + 1}]:[{range.start} - {range.end}]
+                </button>
             {/each}
         </div>
     {/if}

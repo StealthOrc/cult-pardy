@@ -1,13 +1,12 @@
 <script lang="ts">
 
-	import type { DtoQuestion, Media, NumberScope } from 'cult-common';
+	import type { Media } from 'cult-common';
 	import { onMount } from 'svelte';
 	import { BlobType, downloadBlob, getBlobType, type FileDownloadProgress } from './blodUtils';
 	import ImageBlob from './ImageBlob.svelte';
 	import VideoBlob from './VideoBlob.svelte';
 	import AudioBlob from './AudioBlob.svelte';
 	import TextBlob from './TextBlob.svelte';
-	import { match, P } from 'ts-pattern';
 	import { CurrentSessionsStore } from '$lib/stores/SessionStore';
 	import { CookieStore, lobby_store } from '$lib/stores/cookies';
 
@@ -29,8 +28,7 @@
 
 	async function loadBlob() {
 		if (!blob && media.media_token) {
-			
-
+		
 			await downloadBlob(media.name, $lobby_store, media.media_token,onProgress);	
 		}
 		if (typeof media.media_type === "object" && "Video" in media.media_type) {

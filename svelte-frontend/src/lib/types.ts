@@ -1,4 +1,5 @@
 import type { MediaState } from "cult-common";
+import type { Snippet } from "svelte";
 
 
 export enum FileUploadType {
@@ -32,4 +33,13 @@ export type BoardContext = {
 
 export type MediaPlayerContext = {
     changeState(state: MediaState): void;    
+}
+
+export type ButtonProps = {
+    onclick: () => void;
+    text?: string;
+}
+
+export interface BaseButtonProps extends ButtonProps {
+    Icon: Snippet;
 }
