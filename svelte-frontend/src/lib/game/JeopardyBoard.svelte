@@ -95,31 +95,14 @@
 </script>
 
 {#if gameData != null && gameData.categories != null}
-    <div class="jeopardy-container">
-        <div class=" text-center ">ID : {wsType.websocket_id.id}</div>
-        <div class="jeopardy-board">
-                {#each gameData.categories as category}
-                    <JeopardyCategory {category}/>
-                {/each}
+    <div class="flex justify-center items-center h-dvh w-dvh">
+        <!--<div class=" text-center ">ID : {wsType.websocket_id.id}</div>-->
+        <div class="grid grid-flow-col bg-transparent rounded-lg">
+            {#each gameData.categories as category}
+                <JeopardyCategory {category}/>
+            {/each}
         </div>
     </div>
     <Players/>
 {/if}
-
-<style>
-    .jeopardy-container {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        height: 100vh;
-    }
-
-    .jeopardy-board {
-        display: grid;
-        grid-template-columns: var(--grid-columns, repeat(5, 1fr));
-        grid-gap: 10px;
-        max-width: 90%;
-        max-height: 90%;
-    }
-</style>
 

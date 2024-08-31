@@ -5,16 +5,34 @@
 	import { CurrentSessionsStore } from "$lib/stores/SessionStore";
 	import { WebsocketStore } from "$lib/stores/WebsocketStore";
 	import type { DtoQuestion, DTOSession, Vector2D, WebsocketSessionEvent } from "cult-common";
-    export let session: DTOSession;
+    
+    type Props = {
+        session: DTOSession,
+    }
+
+    let { session } : Props = $props();
 
     const default_avatar: string = "https://cdn-icons-png.flaticon.com/512/149/149071.png"
 
-    let ping: number = 0;
+    let ping: number = $state(0);
     SessionPingsStore.subscribe(value => {
         ping = value.find(ping => ping.user_session_id.id === session.user_session_id.id)?.ping || 0;
     });
+    
+    let currentQuestion : DtoQuestion | undefined = $state(undefined); 
+    let canAddScore: boolean = $state(false);
+    let browserSessionIsAdmin = CurrentSessionsStore
+            .getSessionById({ id: $CookieStore.userSessionId.id})
+            .is_admin;
      
-    let current : DtoQuestion | undefined = ($JeopardyBoardStore)?.current;
+    JeopardyBoardStore?.subscribe(value => {
+        if (value == null) {
+            return;
+        }
+        currentQuestion = value.current;
+        canAddScore = browserSessionIsAdmin && currentQuestion != undefined;
+    })
+
 
     let ws = $WebsocketStore.webSocketSubject
     
@@ -39,10 +57,10 @@
     }
 
     function addStore() {
-        if (ws == null || session == null || current == undefined) {
+        if (ws == null || session == null || currentQuestion == undefined) {
             return;
         }
-        let store: WebsocketSessionEvent = {AddUserSessionScore : [session.user_session_id, current.vector2d]};
+        let store: WebsocketSessionEvent = {AddUserSessionScore : [session.user_session_id, currentQuestion.vector2d]};
         ws.next(store);
     }
 
@@ -60,7 +78,7 @@
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class={`player-card hover:border-blue-500 border border-neutral-300 border-2 flex items-center border-rounded rounded radius-10 p-2 m-2 gap-2 w-full max-w-48 overflow-hidden box-border bg-neutral-200 shadow hover:shadow-lg hover:-translate-y-2 duration-200 relative ${$$props.class || ''}`} on:click={addStore}>
+<div onclick={canAddScore? addStore : (): void => {}} class={`flex items-center border-2 border-cultGrey border-rounded rounded radius-10 p-2 m-2 gap-2 w-full max-w-48 overflow-hidden box-border bg-cultGrey shadow hover:shadow-lg hover:-translate-y-2 duration-200 relative ${canAddScore ? 'cursor-pointer hover:border-cultPink' : 'cursor-default'}`}>
     {#key session.score}
         <img src="{getAvatar()}" alt="Avatar" class="h-14 w-14 rounded-full">
         <div class="flex flex-col w-full overflow-hidden">
@@ -68,9 +86,9 @@
                 {#if session.is_admin}
                     <p class="text-red-500 text-sm font-bold mr-1">[A]</p>
                 {/if}
-                <p class="text-base font-bold overflow-hidden text-ellipsis">{getUserName(session)}</p> 
+                <p class="text-base text-white font-semibold overflow-hidden text-ellipsis">{getUserName(session)}</p> 
             </div>
-            <p class="m-0 text-lg text-gray-500">{session.score}</p>
+            <p class="m-0 text-lg text-cultGrey-light">{session.score}</p>
         </div>
         <div class="absolute bottom-0 right-0 mx-1 font-bold {get_ping_class()}">
             <div class="flex">

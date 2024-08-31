@@ -202,7 +202,6 @@ export async function api_get_request(url: string, type: RequestContentType, hea
         if (cookies == null) {
             throw new Error("No cookies");
         }
-        console.log("URL222222", url);
         headers.append("Content-Type", type);
         return await fetch(url + `?user-session-id=${cookies.userSessionId.id}&session-token=${cookies.sessionToken}`, {
             method: 'GET',

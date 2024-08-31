@@ -83,12 +83,11 @@
 </script>
 
 
-
-<div class=" h-dvh w-dvw flex flex-col items-center justify-center gap-2">
+<div class="h-dvh w-dvw flex flex-col items-center justify-center gap-2">
         {#if loaded}
-        <input bind:value={lobbyid} class="border-2 border-blue-600 placeholder-blue-600 p-2 rounded m-2" type="text" name="lobby-id" id="lobby-id" placeholder="Lobby ID"/>
-        <button on:click={() => window.location.href = `${base}/game/${lobbyid}`} class="bg-blue-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:ring-2 transition-all duration-200">Join Game</button>
-        <button on:click={() => window.location.href = `${base}/game/main`} class="bg-blue-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:ring-2 transition-all duration-200">Join /main/ Game</button>
+        <input bind:value={lobbyid} class="border-2 border-white hover:border-cultPink focus:border-cultPink placeholder-slate-400 p-2 rounded m-2 focus:outline-none" type="text" name="lobby-id" id="lobby-id" placeholder="Lobby ID"/>
+        <button on:click={() => window.location.href = `${base}/game/${lobbyid}`} class="cult-btn-menu">Join Game</button>
+        <button on:click={() => window.location.href = `${base}/game/main`} class="cult-btn-menu">Join /main/ Game</button>
         <PlayerIcon {discord_user}/>
                 {#if !discord_user}
                     <a id="discord_login" href="discord" class="flex flex-row bg-discord-blue focus:outline-none focus:ring-2 transition-all duration-200 text-white font-bold py-2 px-4 rounded-lg">
