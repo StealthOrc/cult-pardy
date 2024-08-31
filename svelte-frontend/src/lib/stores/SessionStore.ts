@@ -48,26 +48,7 @@ function createCurrentSessionsStore() {
         });
     }
 
-    function getSessionById(sessionId: UserSessionId) : DTOSession {
-        let found: DTOSession | undefined = undefined;
-        store.update((curr) => {
-            found = curr.find((s) => s.user_session_id.id === sessionId.id);
-            return curr;
-        });
-        if (found == undefined) {
-            console.error(`SessionStore: Session with id ${sessionId.id} not found`);
-            //TODO: throw error to handle with toast
-            return {
-                user_session_id: {
-                    id: "unknown" 
-                },
-                score: 0,
-                is_admin: false
-            };
-        }
-        return found;
-    }
-    
+
     function setSessions(sessions: DTOSession[]) {
         store.set(sessions.sort(doSort));
     }
@@ -91,7 +72,6 @@ function createCurrentSessionsStore() {
         set,
         addSession,
         removeSessionById,
-        getSessionById,
         setSessions,
         subscribe,
     }

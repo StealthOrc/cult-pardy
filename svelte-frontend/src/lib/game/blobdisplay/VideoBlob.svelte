@@ -27,7 +27,6 @@
     let ov : HTMLElement | null = null;
     onMount(() => {
         ov = document.getElementById("ov") as HTMLElement;
-        console.log("OV", ov);
         player = document.getElementById("player") as HTMLVideoElement;
         if (player == null) return;
         for (let type of videoTypes) {
@@ -75,10 +74,9 @@
             if (typeof action_state == "object" && "MediaPlayer" in action_state) {
                 action_state.MediaPlayer.status = value.media_status;
                 JeopardyBoardStore.setActionState(action_state);
-            } else {
-                doMediaStateChange(value.media_status);
-            }
-
+            } 
+        } else {
+            doMediaStateChange(value.media_status);
         }
     })
 
