@@ -3,14 +3,11 @@
     import PlayerCard from './PlayerCard.svelte';
 	import { CurrentSessionsStore } from '$lib/stores/SessionStore';
 
-    let current_session : DTOSession[] = [];
-    CurrentSessionsStore.subscribe(value => {
-        current_session = value;
-    })
+
 </script>
 
 <div class="player-container z-40">
-    {#each current_session as session}
+    {#each $CurrentSessionsStore as session}
         <PlayerCard {session}/>
     {/each}
 </div>

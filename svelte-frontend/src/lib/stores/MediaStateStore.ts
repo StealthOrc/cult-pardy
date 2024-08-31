@@ -48,6 +48,13 @@ function createMediaStateStore() {
         });
     }
 
+    function resetMedia() {
+        store.update((curr) => {
+            curr.media_status = null;
+            return curr;
+        });
+    }
+
     function setMediaStatus(media_status: MediaStatus) {
         store.update((curr) => {
             curr.media_status = media_status;
@@ -129,6 +136,7 @@ function createMediaStateStore() {
         store,
         setMediaStatus,
         subscribe,
+        resetMedia,
         subscribeMediaState: subscribeMediaStatus,
         addForward,
         addBackward,

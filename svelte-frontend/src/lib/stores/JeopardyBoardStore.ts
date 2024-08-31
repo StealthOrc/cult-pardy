@@ -2,6 +2,7 @@ import { dev } from "$app/environment";
 import type { ActionState, DtoJeopardyBoard, DtoQuestion } from "cult-common";
 import { writable, type Subscriber, type Unsubscriber} from "svelte/store"; 
 import { match, P } from "ts-pattern";
+import { mediaStateStore } from "./MediaStateStore";
 
 export const JeopardyBoardStore = createJeopardyBoardStore();
 
@@ -21,8 +22,21 @@ function createJeopardyBoardStore() {
 
     const store = writable<DtoJeopardyBoard|null>(null);
 
-    function setBoard(board: DtoJeopardyBoard) {
+    function setBoard(board: DtoJeopardyBoard){
+        if (board != null) {
+            console.log("setActionState: ", board.action_state);
+            match(board.action_state)
+            .with({MediaPlayer: P.select()}, (media) => {
+                mediaStateStore.setMediaStatus(media.status);
+            }).otherwise(() =>
+                mediaStateStore.resetMedia()
+            );
+
+        }
+
+
         store.set(board);        
+        console.log("setBoard !!!!!!", board);
     }
 
     function setCurrent(current: DtoQuestion) {
@@ -40,6 +54,17 @@ function createJeopardyBoardStore() {
             if (board == null) {
                 return board;
             }
+            console.log("setActionState2    : ", state);
+            match(state)
+            .with({MediaPlayer: P.select()}, (media) => {
+                mediaStateStore.setMediaStatus(media.status);
+            }).otherwise(() =>
+                mediaStateStore.resetMedia()
+            );
+
+
+
+
             board.action_state = state;
             return board;
         });       

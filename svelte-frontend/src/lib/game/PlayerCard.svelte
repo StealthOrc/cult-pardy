@@ -21,9 +21,7 @@
     
     let currentQuestion : DtoQuestion | undefined = $state(undefined); 
     let canAddScore: boolean = $state(false);
-    let browserSessionIsAdmin = CurrentSessionsStore
-            .getSessionById({ id: $CookieStore.userSessionId.id})
-            .is_admin;
+    let browserSessionIsAdmin = $CurrentSessionsStore.filter(s => s.user_session_id.id === $CookieStore.userSessionId.id && s.is_admin).length > 0;
      
     JeopardyBoardStore?.subscribe(value => {
         if (value == null) {

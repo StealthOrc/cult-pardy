@@ -6,7 +6,7 @@ use std::time::Duration;
 use actix::{Actor, ActorFutureExt, Addr, AsyncContext, Context, Handler, Message, MessageResult, Recipient, ResponseActFuture, WrapFuture};
 
 use chrono::{Local, Utc};
-use cult_common::backend::{ActionState, JeopardyBoard, Question};
+use cult_common::backend::{ActionState, JeopardyBoard, MediaState, Question};
 use cult_common::dto::board::DTOSession;
 use cult_common::wasm_lib::ids::discord::DiscordID;
 use cult_common::wasm_lib::ids::lobby::LobbyId;
@@ -529,7 +529,12 @@ impl Handler<LobbyBackClick> for Lobby {
         }.into_actor(self).map(move |allowed, lobby, _|  {
             if allowed.clone() {
                 lobby.jeopardy_board.current = None;
+                if let Ok(mut state) = lobby.jeopardy_board.action_state.lock(){
+                    state.update(ActionState::None);
+                }
                 let board = lobby.jeopardy_board.clone();
+
+                println!("Back Clicked {:#?}", board.action_state);
                 let event = WebsocketServerEvents::Board(BoardEvent::CurrentBoard(board.dto(lobby.creator.clone())));
                 lobby.send_lobby_message(&event);
             }
@@ -695,23 +700,30 @@ impl Handler<ReciveVideoEvent> for Lobby {
         }.into_actor(self).map(move |allowed, lobby: &mut Lobby, _|  {
             let mut state = lobby.jeopardy_board.action_state.lock().expect("Failed to lock action state");
             
-            let current_media_state = &state.get_media_player_or_default(&msg.websocket_session_id);
-            let current_state = &current_media_state.status;
+            let current_media_state = state.get_media_player_or_default(&msg.websocket_session_id);
+            let current_status = &current_media_state.status;
 
-
+            println!("before Action state {:#?}", lobby.jeopardy_board.action_state);
             
             if allowed.clone() {
                 match msg.event {
-                    VideoEvent::ChangeState(mut new_state) => {
-                        new_state.interaction_id = msg.websocket_session_id.clone();
-                        let to_soon = (Local::now().timestamp_millis() as f64 - current_state.last_updated) < THRESH_IGNORANCE;
-                        let other_ws = !current_state.interaction_id.id.eq(&msg.websocket_session_id.id);
-                        let stale  = new_state.last_updated < current_state.last_updated;
+                    VideoEvent::ChangeState(mut new_media_status) => {
+                        new_media_status.interaction_id = msg.websocket_session_id.clone();
+                        let to_soon = (Local::now().timestamp_millis() as f64 - current_status.last_updated) < THRESH_IGNORANCE;
+                        let other_ws = !current_status.interaction_id.id.eq(&msg.websocket_session_id.id);
+                        let stale  = new_media_status.last_updated < current_status.last_updated;
 
                         if !stale && !(to_soon && other_ws) {
-                            println!("Changing state to {:?}", new_state.clone());
-                            state.update(ActionState::MediaPlayer(current_media_state.clone()));
-                            let event: WebsocketServerEvents = WebsocketServerEvents::ActionState(ActionStateEvent::Media(ActionMediaEvent::ChangeState(new_state)));
+                            println!("Changing state to {:?}", new_media_status.clone());
+                            let new_media_state = MediaState {
+                                status: new_media_status.clone(),
+                                current_media: current_media_state.current_media.clone(),
+                            };
+                            state.update(ActionState::MediaPlayer(new_media_state));
+                            drop(state);
+                            println!("after Action state {:#?}", lobby.jeopardy_board.action_state);
+
+                            let event: WebsocketServerEvents = WebsocketServerEvents::ActionState(ActionStateEvent::Media(ActionMediaEvent::ChangeState(new_media_status)));
                             lobby.send_lobby_message(&event);
                         }
                     }
@@ -849,8 +861,9 @@ pub struct SendWSCurrentDTOBoard {
 impl Handler<SendWSCurrentDTOBoard> for Lobby {
     type Result =  ();
     fn handle(&mut self, msg: SendWSCurrentDTOBoard, _: &mut Context<Self>) -> Self::Result {
+        println!("Action state {:#?}", self.jeopardy_board.action_state);
         let dto_board = self.jeopardy_board.dto(self.creator.clone());
-        let event = WebsocketServerEvents::Board(BoardEvent::CurrentBoard(dto_board));
+        let event = WebsocketServerEvents::Board(BoardEvent::CurrentBoard(dto_board.clone()));
         self.send_websocket_session_message(&msg.websocket_session_id, event);
             
     }

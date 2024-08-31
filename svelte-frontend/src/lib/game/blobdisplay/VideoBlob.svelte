@@ -29,12 +29,11 @@
         ov = document.getElementById("ov") as HTMLElement;
         player = document.getElementById("player") as HTMLVideoElement;
         if (player == null) return;
+
         for (let type of videoTypes) {
             match(type)
             .with({ TimeSlots: P.select() }, (data) => {
                 ranges = data;
-                status = EventStatusEnum.SEEKING
-                seekToTime(ranges[0].start);
             })
             .with("Mute", () => {
                 if (player) player.muted = true;
@@ -45,39 +44,21 @@
                 if (player) player.playbackRate = play_rate;
             })
         }
+        ignore = false;
+        let status = $mediaStateStore.media_status;
+        if(status != null){
+            doMediaStateChange(status);
+        }
 
-
-
-        console.log("TEK ONLOADING!!!!!", player);
-        match($JeopardyBoardStore?.action_state)
-        .with({MediaPlayer: P.select()}, (data) => {
-            if (!player) return
-            if (data.status.playing) determinePlayAndSeekPlay(data.status);
-            else determinePauseAndPauseSeek(data.status);
-            ignore = true;
-            mediaStateStore.setMediaStatus(data.status);
-        })
-        
-        
     })
-    let ignore = false
+    let ignore = true
     let mediasession: MediaPlayerSessionType;
     mediaStateStore.subscribe(value => {
         mediasession = value;
         if(value == null || value.media_status == null || ignore) {
-            ignore = false;
             return;
-        };
-        if (player == null) {
-            let action_state =  $JeopardyBoardStore?.action_state;
-            if (action_state == null) return;
-            if (typeof action_state == "object" && "MediaPlayer" in action_state) {
-                action_state.MediaPlayer.status = value.media_status;
-                JeopardyBoardStore.setActionState(action_state);
-            } 
-        } else {
-            doMediaStateChange(value.media_status);
         }
+        doMediaStateChange(value.media_status);
     })
 
 
@@ -280,11 +261,11 @@
 
             if (player.paused && delta < CONST.PAUSED_THRESH) {
                 resolve();
-                console.log("SEEKING SKIP", delta);
+                console.log("SEEKING SKIP PAUSED_THRESH", delta);
                 return;
             } else if (!player.paused && delta < CONST.PLAYING_THRESH) {
                 resolve();
-                console.log("SEEKING SKIP", delta);
+                console.log("SEEKING SKIP PLAYING_THRESH", delta);
                 return;
             }
 
@@ -448,12 +429,16 @@ on:seeked={endSeeking}
 on:timeupdate={async () => {
     if (!player) return;
     if (!containsTime(player.currentTime)) {
-        if(player.paused){
+        /*if(player.paused){
             status = EventStatusEnum.START_SEEKING;
         } else {        
             status = EventStatusEnum.PAUSE_START_SEEKING;
             player.pause();
+        }*/
+        if (!player.paused) {
+            player.pause();
         }
+        console.log("SEEKING TO closesTimeStart" , closesTimeStart(player.currentTime));
         await seekToTime(closesTimeStart(player.currentTime));
         }
     }
