@@ -10,7 +10,7 @@
     })
 </script>
 
-<main class="cult-bg-gradient v-dvh w-dvw">
+<main class="cult-bg-gradient h-dvh w-dvw">
   {#if is_dev_loaded}
   	<ToastPanel/>
   	<slot/>
