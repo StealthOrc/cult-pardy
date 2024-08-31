@@ -51,10 +51,10 @@
 
 
  </script>
-<class class="absolute bg-white bg-opacity-60 z-10 h-full w-full flex items-center justify-center">
-    <div class="flex items-center">
+<class class="bg-cult-gradient h-full w-full flex items-center justify-center">
+    <div class="flex items-center text-white">
       <span class="text-3xl mr-4">Loading</span>
-      <svg class="animate-spin h-8 w-8 text-gray-800" fill="none"
+      <svg class="animate-spin h-8 w-8" fill="none"
         viewBox="0 0 24 24">
         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
         <path class="opacity-75" fill="currentColor"
