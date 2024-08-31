@@ -19,7 +19,6 @@ export function newToastStore(): ReturnType<typeof createToastStore> {
     type: ToastType;
     visible: boolean;
     timeout: number;
-    position: 'top-middle' | 'top-right'; // Added position property
 }
 
 
@@ -51,9 +50,9 @@ function createToastStore() {
     const { subscribe, update } = writable<ToastState>({timer:false, timerTask: null,toasts: []});
     const addional_time = 100;
 
-    function addToast(message: string, type : ToastType = ToastType.INFO ,duration: number = 3000, position: 'top-middle' | 'top-right' = 'top-middle') {
+    function addToast(message: string, type : ToastType = ToastType.INFO ,duration: number = 3000) {
         const id = Math.floor(Math.random() * 1000000);
-        const newToast : Toast  =  { id: id, message, type :type, duration, visible: true, timeout: duration, position };
+        const newToast : Toast  =  { id: id, message, type :type, duration, visible: true, timeout: duration };
         update(toast => {
             toast.toasts.push(newToast);
             if (!toast.timer) { 
@@ -109,8 +108,8 @@ function createToastStore() {
     };
   }
 
-export function showToast(message: string, type : ToastType = ToastType.INFO ,duration: number = 3000, position: 'top-middle' | 'top-right' = 'top-middle') {
-  newToastStore().addToast(message, type, duration, position);
+export function showToast(message: string, type : ToastType = ToastType.INFO ,duration: number = 3000) {
+  newToastStore().addToast(message, type, duration);
 }
 
 export function ToastInfo(message: string, duration: number = 3000) {
