@@ -4,7 +4,6 @@
 	import BtnBase from './BtnBase.svelte';
     
     let { onclick = () => {}, text = "Back"  }: ButtonProps = $props();	
-
 </script>
 
 {#snippet Icon()}

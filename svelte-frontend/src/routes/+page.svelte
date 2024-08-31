@@ -1,7 +1,6 @@
 <script lang="ts">
     import { base } from "$app/paths";
 	import { onMount } from "svelte";
-    import { CookieStore, dev_loaded,type SessionCookies } from "$lib/stores/cookies";
 	import { type DiscordUser } from "cult-common";
 	import PlayerIcon from "./PlayerIcon.svelte";
 	import { discord_session} from "$lib/api/ApiRequests";
@@ -9,85 +8,25 @@
 	import { FileUploadType } from "$lib/types";
     let lobbyid = '';
 
-    let cookies : SessionCookies; 
-    CookieStore.subscribe(value => {
-            cookies = value;
-    });
-
-
-  
     let discord_user: DiscordUser | null = null;
     let loaded = false;
 
     onMount(async () => {
-
-
-
-        
         let session_res= await discord_session();
         if (session_res) {
             discord_user = session_res;
         }
         loaded = true;
     })
-
-
-
-    function BinarytoaArrayBuffer(binary: string): ArrayBuffer {
-        var binary_string = window.atob(binary);
-        var len = binary_string.length;
-        var bytes = new Uint8Array(len);    
-        for (var i = 0; i < len; i++) {
-            bytes[i] = Number(binary_string.at(i));
-        }
-        return bytes.buffer;
-    }
-
-
-    function arrayBufferToBinary(buffer: ArrayBuffer): string {
-        //use window.btoa to convert binary to base64 for data URI
-        var binary = '';
-        var bytes = new Uint8Array(buffer);
-        var len = bytes.byteLength;
-        for (var i = 0; i < len; i++) {
-            binary += String.fromCharCode(bytes[i]);
-        }
-        return window.btoa(binary);
-    }
-
-      function fileToBinary(file:File, callback: (binary: string) => void) {  
-        var reader: FileReader = new FileReader();
-        reader.onload = (event) => {
-            callback(arrayBufferToBinary(reader.result as ArrayBuffer));
-        };
-        reader.readAsArrayBuffer(file);
-      }
-
-      var input = document.getElementById("file");
-      var output = document.getElementsByClassName("binary");
-
-
-    function changed(event: Event) {
-        var input = event.target as HTMLInputElement;
-        console.log(input.files);
-        if (!input.files) return;
-        var file = input.files[0];
-        if (file) fileToBinary(file, (binary) => {
-            console.log(binary);
-            if (output == null) return;
-            output[0].textContent = binary
-            }
-        );
-    }
-
 </script>
 
 
 <div class="h-dvh w-dvw flex flex-col items-center justify-center gap-2">
-        {#if loaded}
+    {#if loaded}
         <input bind:value={lobbyid} class="border-2 border-white hover:border-cultPink focus:border-cultPink placeholder-slate-400 p-2 rounded m-2 focus:outline-none" type="text" name="lobby-id" id="lobby-id" placeholder="Lobby ID"/>
-        <button on:click={() => window.location.href = `${base}/game/${lobbyid}`} class="cult-btn-menu">Join Game</button>
-        <button on:click={() => window.location.href = `${base}/game/main`} class="cult-btn-menu">Join /main/ Game</button>
+        <button onclick={() => window.location.href = `${base}/game/${lobbyid}`} class="cult-btn-menu">Join Game</button>
+        <button onclick={() => window.location.href = `${base}/game/main`} class="cult-btn-menu">Join /main/ Game</button>
+        <button onclick={() => window.location.href = `${base}/create`} class="cult-btn-menu">Create new Board</button>
         <PlayerIcon {discord_user}/>
                 {#if !discord_user}
                     <a id="discord_login" href="discord" class="flex flex-row bg-discord-blue focus:outline-none focus:ring-2 transition-all duration-200 text-white font-bold py-2 px-4 rounded-lg">
@@ -95,9 +34,9 @@
                         <p class="self-center">Login with Discord</p>
                     </a>
                 {/if}
-        {/if}
-        <div class="flex space-x-4">
-            <FileUpload title="Upload Question File"/>
-            <FileUpload title="Upload Board Json" uploadType={FileUploadType.BOARDJSON}/>
-        </div>
+    {/if}
+    <div class="flex space-x-4">
+        <FileUpload title="Upload Question File"/>
+        <FileUpload title="Upload Board Json" uploadType={FileUploadType.BOARDJSON}/>
+    </div>
 </div>

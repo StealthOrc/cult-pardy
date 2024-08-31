@@ -1,5 +1,3 @@
-
-
 const CONST ={
         SESSION_DATA_URL: '/api/session-data',
         AUTHORIZATION_URL: '/api/authorization',

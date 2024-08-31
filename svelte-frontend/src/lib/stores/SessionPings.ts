@@ -1,5 +1,3 @@
-
-
 import { dev } from "$app/environment";
 import type { UserSessionId, WebsocketPing } from "cult-common";
 import { writable, type Subscriber, type Unsubscriber} from "svelte/store"; 

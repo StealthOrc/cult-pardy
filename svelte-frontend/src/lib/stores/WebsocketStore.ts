@@ -5,10 +5,7 @@ import { webSocket, WebSocketSubject } from "rxjs/webSocket";
 import { writable, type Subscriber, type Unsubscriber, type Writable} from "svelte/store"; 
 import { deflateSync } from "fflate";
 
-
-// eslint-disable-next-line no-var
-export var WebsocketStore : WebsocketStore = createWebsocketStore();
-
+export const WebsocketStore : WebsocketStore = createWebsocketStore();
 
 if(dev) {
     if (import.meta.hot) {

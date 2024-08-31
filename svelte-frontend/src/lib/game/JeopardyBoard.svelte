@@ -1,11 +1,9 @@
 <script lang="ts">
     export const prerender = false;
     import JeopardyCategory from './JeopardyCategory.svelte';
-    import { getContext, onMount, setContext } from 'svelte';
-    import {WebSocketSubject} from "rxjs/webSocket";
-    import { CookieStore, lobby_store, type SessionCookies} from "$lib/stores/cookies.js";
-    import { match, P } from 'ts-pattern';
-	import type { BoardEvent, DtoJeopardyBoard, DTOSession, LobbyId, MediaState, SessionEvent, WebsocketEvent, WebsocketServerEvents, WebsocketSessionEvent } from 'cult-common';
+    import { onMount} from 'svelte';
+    import { CookieStore, lobby_store} from "$lib/stores/cookies.js";
+	import type { DtoJeopardyBoard, LobbyId, WebsocketServerEvents } from 'cult-common';
 	import Players from './Players.svelte';
 	import {CurrentSessionsStore } from '$lib/stores/SessionStore';
 	import { SessionPingsStore } from '$lib/stores/SessionPings';
@@ -96,7 +94,6 @@
 
 {#if gameData != null && gameData.categories != null}
     <div class="flex justify-center items-center h-dvh w-dvh">
-        <!--<div class=" text-center ">ID : {wsType.websocket_id.id}</div>-->
         <div class="grid grid-flow-col bg-transparent rounded-lg">
             {#each gameData.categories as category}
                 <JeopardyCategory {category}/>

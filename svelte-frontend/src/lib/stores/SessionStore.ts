@@ -2,11 +2,7 @@ import { dev } from "$app/environment";
 import type { DTOSession, UserSessionId } from "cult-common";
 import { writable, type Subscriber, type Unsubscriber} from "svelte/store"; 
 
-
-
-
 export const CurrentSessionsStore = createCurrentSessionsStore();
-
 
 if(dev) {
     if (import.meta.hot) {

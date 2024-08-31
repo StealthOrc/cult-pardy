@@ -6,8 +6,6 @@ import { mediaStateStore } from "./MediaStateStore";
 
 export const JeopardyBoardStore = createJeopardyBoardStore();
 
-
-
 if(dev) {
     if (import.meta.hot) {
         import.meta.hot.accept((newModule ) => {

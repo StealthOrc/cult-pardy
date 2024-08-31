@@ -7,7 +7,6 @@
     export let uploadType: FileUploadType = FileUploadType.MEDIA;
 
     let file: File | null = null;
-    let progress: number = 0;
     let uploadStatus: string = '';
     let progressBar: HTMLProgressElement;
     let progressText: HTMLSpanElement;

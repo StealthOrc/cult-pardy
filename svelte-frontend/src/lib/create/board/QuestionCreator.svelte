@@ -1,22 +1,18 @@
 <script lang="ts">
-
   import type { Media, MediaType, NumberScope, Question, QuestionType, VideoType } from 'cult-common';
   import { JeopardyBoardCreatorStore } from './BoardCreatorsStore';
-  import { match, P } from 'ts-pattern';
-	import JeopardyBoard from '$lib/game/JeopardyBoard.svelte';
-	import test from 'node:test';
+  import { match } from 'ts-pattern';
 
   export let question: Question;
   export let index: number;
   export let qIndex: number;
-
 
   let selection : Map<number, VideoType> = new Map();
 
   function update(event: Event) {
       const input = event.target as HTMLInputElement;
       const field = input.dataset.field as keyof Question;
-      if (field) {
+      if (field in question) {
           question[field] = input.value;
           JeopardyBoardCreatorStore.setQuestion(index, qIndex, question);
       }
@@ -73,7 +69,6 @@
       }
       JeopardyBoardCreatorStore.setQuestion(index, qIndex, question);
   }
-
 
   function changeVideoType(id:number, media_index:number)  {
       console.log("ADD VIDEO TYPE");
@@ -153,9 +148,6 @@
       }
   }
 
-
-
-
   function addTimeSlot(media_index:number, video_id:number) {
     console.log("ADD TIME SLOT");
     if (typeof question.question_type === "object" && "Media" in question.question_type) {
@@ -179,39 +171,6 @@
       }
     }
   }
-
-
-
-  function getTimeSlots(timeslots:Record<"TimeSlots", unknown>) : NumberScope[] {
-    let slots : NumberScope[] = [];
-    if ("TimeSlots" in timeslots) {
-      slots = timeslots.TimeSlots as NumberScope[];
-    }
-    return slots;
-  }
-
-
-
-  /*declare namespace MediaType {
-    export type Image = "Image";
-    export type Video = { Video: __MediaTypeVideoType[] };
-    export type Audio = "Audio";
-    export type Text = "Text";
-    export type Pdf = "Pdf";
-    export type Unknown = "Unknown";
-  *
-
-  type __VideoTypeNumberScope = NumberScope;
-declare namespace VideoType {
-    export type None = "None";
-    export type TimeSlots = { TimeSlots: __VideoTypeNumberScope[] };
-    export type Mute = "Mute";
-    export type Slowmotion = { Slowmotion: number };
-}
-
-  */
-
-  
 </script>
 
 <div class="p-2 border-b">
@@ -220,8 +179,6 @@ declare namespace VideoType {
       <option value="Media">Media</option>
       <option value="Youtube">Youtube</option>
   </select>
-
-
   {#if typeof question.question_type === "string"}
     {#if question.question_type === "Question"}
       <input type="text"  data-field="question" on:input={update} value={question.question} placeholder="Enter Question" class="border px-2 py-1 rounded w-full"/>
@@ -233,55 +190,46 @@ declare namespace VideoType {
         <button on:click={addMedia} class="bg-green-500 text-white px-4 py-2 rounded">Add Media</button>
     
       {#each question.question_type.Media as media, media_index}
-          <input type="text"data-field="name"on:input={(e) => updateMediaName(e, media_index)}  value={media.name} placeholder="Media Name"class="border px-2 py-1 rounded w-full mt-2"/>
-          <select data-field="media_type" on:input={(e) => updateMediaType(e, media_index)} value={media.media_type}>
-            <option value="Image">Image</option>
-            <option value="Audio">Audio</option>
-            <option value="Text">Text</option>
-            <option value="Pdf">Pdf</option>
-            <option value="Video">Video</option>
-          </select>
-          {typeof media.media_type === "object"}
-
-          {#if typeof media.media_type === "object"}
-            {#if "Video" in media.media_type}
-              <div class="flex flex-col">
-
-                <label><input type="checkbox" on:change={(e) => changeVideoType(1, media_index)}/> Mute</label>
-                <label><input type="checkbox" on:change={(e) => changeVideoType(2, media_index)}/> TimeSlots</label>
-                <label><input type="checkbox" on:change={(e) => changeVideoType(3, media_index)}/> Slowmotion</label>
-
+        <input type="text"data-field="name"on:input={(e) => updateMediaName(e, media_index)}  value={media.name} placeholder="Media Name"class="border px-2 py-1 rounded w-full mt-2"/>
+        <select data-field="media_type" on:input={(e) => updateMediaType(e, media_index)} value={media.media_type}>
+          <option value="Image">Image</option>
+          <option value="Audio">Audio</option>
+          <option value="Text">Text</option>
+          <option value="Pdf">Pdf</option>
+          <option value="Video">Video</option>
+        </select>
+        {typeof media.media_type === "object"}
+        {#if typeof media.media_type === "object"}
+          {#if "Video" in media.media_type}
+            <div class="flex flex-col">
+              <label><input type="checkbox" on:change={(e) => changeVideoType(1, media_index)}/> Mute</label>
+              <label><input type="checkbox" on:change={(e) => changeVideoType(2, media_index)}/> TimeSlots</label>
+              <label><input type="checkbox" on:change={(e) => changeVideoType(3, media_index)}/> Slowmotion</label>
               {#each media.media_type.Video as videotype, video_id}
-                  {#if typeof videotype === "object"}
-                    {#if "TimeSlots" in videotype}
-                        <button on:click={() => addTimeSlot(media_index, video_id)}>Add Time Slot</button>
-                        <h3>TimeSlots:</h3>
-                        {#each videotype.TimeSlots as slot, slotIndex}
+                {#if typeof videotype === "object"}
+                  {#if "TimeSlots" in videotype}
+                      <button on:click={() => addTimeSlot(media_index, video_id)}>Add Time Slot</button>
+                      <h3>TimeSlots:</h3>
+                      {#each videotype.TimeSlots as slot, slotIndex}
                         <div class="flex"> {slotIndex + 1}:
                           Start: <input type="start" on:input={(e) => updateTimeSlotStart(slotIndex, e, media_index)} value={slot.end} placeholder="TimeSlot"/>
                           End: <input type="end" on:input={(e) => updateTimeSlotEnd(slotIndex, e, media_index)} value={slot.end} placeholder="TimeSlot"/>
                         </div>
-                        {/each}
-    
-                    {/if}
-                    {#if "Slowmotion" in videotype}
-        
+                      {/each}
+                  {/if}
+                  {#if "Slowmotion" in videotype}
                     <h3>Slowmotion:</h3>
                     <input type="number" on:input={(e) => updateSlowmotion(e,media_index)} value={videotype.Slowmotion} placeholder="Slowmotion"/>
-                    
-                    {/if}
-
-                  {:else} 
                   {/if}
+                {/if}
               {/each}
-              </div>
-            {/if}
+            </div>
           {/if}
+        {/if}
       {/each}
     {:else if "Youtube" in question.question_type}
       <input type="text" data-field="Youtube" on:input={update} value={question.question_type.Youtube} placeholder="Youtube ID" class="border px-2 py-1 rounded w-full"/>
     {/if}
   {/if}
-
 </div>
 

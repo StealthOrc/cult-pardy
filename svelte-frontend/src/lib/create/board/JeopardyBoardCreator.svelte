@@ -1,8 +1,7 @@
 <script lang="ts">
     import type { JeopardyBoard } from 'cult-common';
     import CategoryCreator from './CategoryCreator.svelte';
-    import { writable } from 'svelte/store';
-	import { JeopardyBoardCreatorStore } from './BoardCreatorsStore';
+    import { JeopardyBoardCreatorStore } from './BoardCreatorsStore';
 
     let board : JeopardyBoard | undefined = undefined;
     JeopardyBoardCreatorStore.subscribe(value => {
@@ -13,7 +12,7 @@
     function addCategory() {
       JeopardyBoardCreatorStore.addCategory("New Category");
     }
-  </script>
+</script>
   
 
   {#if board}
