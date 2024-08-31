@@ -262,8 +262,14 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                                             websocket_session_id: id,
                                             current_time: time,
                                         });
+                                    },
+                                    _ => {
+                                        println!("Receive an unk client event {:?}", event);
                                     }
                                 }
+
+
+
                                 //println!("Receive an client event {:?}", event);
                             }
                             Err(err) => {

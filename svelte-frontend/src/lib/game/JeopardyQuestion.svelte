@@ -64,9 +64,7 @@
     }
 
     function isAdmin(): boolean {
-        return CurrentSessionsStore
-            .getSessionById({ id: $CookieStore.userSessionId.id})
-            .is_admin;
+        return $CurrentSessionsStore.filter(s => s.user_session_id.id === $CookieStore.userSessionId.id && s.is_admin).length > 0;
     }
 </script>
 
