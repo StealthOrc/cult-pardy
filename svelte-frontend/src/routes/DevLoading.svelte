@@ -1,19 +1,8 @@
 <script lang="ts">
-
 	import { onMount } from "svelte";
 	import { session_data, SessionData } from "$lib/api/ApiRequests";
-	import { CookieStore, dev_loaded, is_loading, type SessionCookies } from "$lib/stores/cookies";
+	import { CookieStore, dev_loaded, is_loading } from "$lib/stores/cookies";
 
-
-
-    let is_dev_loaded = false
-    dev_loaded.subscribe(value => {
-        is_dev_loaded = value;
-    })
-    let cookies : SessionCookies | null = null; 
-    CookieStore.subscribe(value => {
-            cookies = value;
-    });
     console.log("LOADING!!!")
     let loading = false;
 
@@ -28,12 +17,10 @@
             }
             is_loading.set(true);
             try {
-                console.log("Request 1")
                 let sessiondata : SessionData | null = await session_data();
                 let tries = 0;
                     while (sessiondata === null) {
                         tries++;
-                        console.log("Request" + tries);
                         sessiondata = await session_data();
                         await new Promise(r => setTimeout(r, 5000));
                     }
@@ -45,12 +32,8 @@
             }
         }
     })
+</script>
 
-        
-
-
-
- </script>
 <class class="bg-cult-gradient h-full w-full flex items-center justify-center">
     <div class="flex items-center text-white">
       <span class="text-3xl mr-4">Loading</span>

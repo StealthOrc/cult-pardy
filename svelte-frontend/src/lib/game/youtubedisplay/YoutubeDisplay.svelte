@@ -1,10 +1,7 @@
 <script lang="ts">
     export const prerender = false;
-    import { getContext, onMount, setContext } from 'svelte';
-
-    import { match, P } from 'ts-pattern';
-	import type { BoardEvent, DtoJeopardyBoard, DtoQuestion, DTOSession, MediaState, SessionEvent, WebsocketEvent, WebsocketServerEvents, WebsocketSessionEvent } from 'cult-common';
-
+    import { onMount } from 'svelte';
+	import type { DtoQuestion } from 'cult-common';
 	import YouTubePlayerPlus from 'youtube-player-plus';
 	import type { YTPP_Options } from 'youtube-player-plus/types';
     
@@ -46,9 +43,7 @@
 		playerElement = document.getElementById("ytplayer");
 		createYouTubePlayer();
 	});
-	
 </script>
-
 
 <div id="ytplayer"></div>
 {#if player}

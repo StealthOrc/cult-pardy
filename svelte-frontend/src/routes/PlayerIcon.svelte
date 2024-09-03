@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { CookieStore, dev_loaded, type  SessionCookies } from '$lib/stores/cookies';
+	import { CookieStore, type  SessionCookies } from '$lib/stores/cookies';
 	import { authorization } from '$lib/api/ApiRequests';
     import { type ApiResponse,type DiscordUser } from 'cult-common';
 	import { onMount } from 'svelte';
@@ -17,7 +17,6 @@
         isAdmin = await authorization();
         loaded = true;
     })
-
 
     function getUserName() {
         if (cookies == null) {
@@ -43,10 +42,7 @@
 {#if loaded && isAdmin && cookies}  
     <div class="fixed top-5 w-full flex justify-center items-center z-10">
         <div class="relative bg-cultGrey p-4 rounded-lg flex items-center space-x-4 shadow-lg">
-            <!-- Shadow Overlay -->  
-        
-                <div class="absolute inset-0 bg-gray-900 opacity-50 rounded-lg z-[-1]"></div>
-                {#key discord_user}
+            {#key discord_user}
                 <img src="{getAvatar()}" alt="Avatar" class="w-16 h-16 rounded-full">
                 <div class="text-white text-lg flex flex-col items-center">
                     {#if isAdmin.success}
@@ -57,8 +53,7 @@
                         <p class="text-xs">{cookies.userSessionId.id}</p> <!-- Use custom class for smaller text -->
                     {/if}
                 </div>
-                {/key}
-
+            {/key}
         </div>
     </div>
 {/if}

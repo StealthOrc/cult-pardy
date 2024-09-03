@@ -1,11 +1,8 @@
 import { dev } from "$app/environment";
 import type { JeopardyBoard, Question } from "cult-common";
-
 import { writable } from "svelte/store";
 
 export const JeopardyBoardCreatorStore = createJeopardyBoardCreatorStore();
-
-
 
 if(dev) {
     if (import.meta.hot) {

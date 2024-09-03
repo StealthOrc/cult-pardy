@@ -68,31 +68,31 @@
     }
 </script>
 
-<div class="m-1.5">
-    {#if question.won_user_id !== null}
-        <button class="w-24 h-14 text-2xl text-cultTurq font-semibold bg-cultGrey rounded-md shadow-md shadow-black/60 cursor-not-allowed transition-colors duration-200 ease-in-out" disabled>WON</button>
-    {:else}
-        <button on:click={req_open_question} class="w-24 h-14 text-2xl text-black font-semibold bg-cultTurq hover:bg-cultPink rounded-md shadow-md shadow-black/60 cursor-pointer transition-colors duration-200 ease-in-out">{question.value}</button>
-    {/if}
-    {#if current && current.vector2d.x === question.vector2d.x && current.vector2d.y === question.vector2d.y}
-
-        <div class="cult-bg-gradient fixed flex justify-center items-center top-0 left-0 w-full h-full z-10" role="dialog">
-            <div class="p-4 mw-3/4 mh-3/4 bg-cultGrey rounded-xl overflow-y-auto text-white">
-                {#if type == QuestionTypes.MEDIA && media != undefined}
-                    <BlobDisplay media={media}/>
-                {:else if type == QuestionTypes.YOUTUBE}
-                    <YoutubeDisplay current={current} youtube_id={youtube_id}/>
-                {:else if type == QuestionTypes.QUESTION}
-                    <h1>${current.value}</h1>
-                    <p>{current.question_text}</p>
-                {:else}
-                    <h1>ERROR</h1>
-                {/if}
-            </div>
-            <div id="ov"></div>
-            {#if isAdmin()}
-                <BtnBack onclick={handleClose} text="Close"/>
+{#if current && current.vector2d.x === question.vector2d.x && current.vector2d.y === question.vector2d.y}
+    <div class="cult-bg-gradient fixed flex justify-center items-center top-0 left-0 w-full h-full z-10" role="dialog">
+        <div class="cult-surface p-4 w-3/4 h-2/4 overflow-y-auto text-white">
+            {#if type == QuestionTypes.MEDIA && media != undefined}
+                <BlobDisplay media={media}/>
+            {:else if type == QuestionTypes.YOUTUBE}
+                <YoutubeDisplay current={current} youtube_id={youtube_id}/>
+            {:else if type == QuestionTypes.QUESTION}
+                <h1>${current.value}</h1>
+                <p>{current.question_text}</p>
+            {:else}
+                <h1>ERROR</h1>
             {/if}
         </div>
-    {/if}
-</div>
+        <div id="ov"></div>
+        {#if isAdmin()}
+            <BtnBack onclick={handleClose} text="Close"/>
+        {/if}
+    </div>
+{:else}
+    <div class="m-1.5">
+        {#if question.won_user_id !== null}
+            <button class="w-24 h-14 text-2xl text-cultTurq font-semibold bg-cultGrey rounded-md shadow-md shadow-black/60 cursor-not-allowed transition-colors duration-200 ease-in-out" disabled>WON</button>
+        {:else}
+            <button on:click={req_open_question} class="w-24 h-14 text-2xl text-black font-semibold bg-cultTurq hover:bg-cultPink rounded-md shadow-md shadow-black/60 cursor-pointer transition-colors duration-200 ease-in-out">{question.value}</button>
+        {/if}
+    </div>
+{/if}

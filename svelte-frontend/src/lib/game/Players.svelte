@@ -6,20 +6,8 @@
 
 </script>
 
-<div class="player-container z-40">
+<div class="fixed flex flex-wrap justify-center items-start bottom-5 w-full z-40">
     {#each $CurrentSessionsStore as session}
         <PlayerCard {session}/>
     {/each}
 </div>
-
-<style>
-    .player-container {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: center;
-        align-items: flex-start;
-        position: fixed;
-        bottom: 20px;
-        width: 100%;
-    }
-</style>

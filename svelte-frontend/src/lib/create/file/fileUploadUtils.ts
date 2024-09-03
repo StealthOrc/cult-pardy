@@ -3,9 +3,6 @@ import { XXH64 } from 'xxh3-ts';
 import { Buffer } from 'buffer';
 import { CONST } from '$lib/const';
 
-//const CHUNK_SIZE = 261_120; 
-
-
 export type FileUploadProgress = {
     current: number;
     speed: string;
@@ -109,52 +106,6 @@ export async function decompressData(data: ArrayBuffer): Promise<ArrayBuffer> {
     });
 }
 
-/*export async function compressData2(input: Uint8Array): Promise<ArrayBuffer> {
-    return new Promise((resolve, reject) => {
-        try {
-            const deflate = new Deflate();
-            const totalChunks = Math.ceil(input.byteLength / CHUNK_SIZE);
-            const result: Uint8Array[] = [];
-            let processedBytes = 0;
-
-            deflate.ondata = (data: Uint8Array, final: boolean) => {
-                result.push(data);
-                processedBytes += data.length;
-
-                const compressingProgress = (processedBytes / input.byteLength) * 100;
-                //console.log(`Compressing Progress: ${compressingProgress.toFixed(2)}%`);
-
-                if (final) {
-                    resolve(concatenateUint8Arrays(result).buffer);
-                }
-            };
-
-            for (let i = 0; i < totalChunks; i++) {
-                const start = i * CHUNK_SIZE;
-                const end = Math.min((i + 1) * CHUNK_SIZE, input.byteLength);
-                const chunk = input.slice(start, end);
-                deflate.push(chunk, i === totalChunks - 1);
-            }
-
-        } catch (error) {
-            reject(error);
-        }
-    });
-}
-    
-function concatenateUint8Arrays(chunks: Uint8Array[]): Uint8Array {
-    const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
-    const result = new Uint8Array(totalLength);
-    let offset = 0;
-    for (const chunk of chunks) {
-        result.set(chunk, offset);
-        offset += chunk.length;
-    }
-
-    return result;
-}
-
-*/
 export function formatSpeed(bytes: number, seconds: number) {
     if (seconds <= 0) return '0 MB/s';
     const megabytes = bytes / (1024 * 1024);

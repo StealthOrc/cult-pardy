@@ -3,8 +3,6 @@ import { get_global_time } from "$lib/lib";
 import type { MediaStatus } from "cult-common";
 import { writable, type Subscriber, type Unsubscriber } from "svelte/store";
 
-
-
 export const mediaStateStore = createMediaStateStore();
 
 export type MediaPlayerSessionType = {

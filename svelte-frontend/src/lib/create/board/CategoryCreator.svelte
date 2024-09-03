@@ -1,8 +1,6 @@
 <script lang="ts">
   import type { Category, Question, QuestionType } from 'cult-common';
   import QuestionCreator from './QuestionCreator.svelte';
-  import type { Writable } from 'svelte/store';
-  import JeopardyBoardCreator from './JeopardyBoardCreator.svelte';
   import { JeopardyBoardCreatorStore } from './BoardCreatorsStore';
 
   export let category: Category;
@@ -10,7 +8,6 @@
 
   function addQuestion() {
     let question : QuestionType = "Question";
-
 
     let newQuestion : Question = {
       question: "New Question",

@@ -98,7 +98,6 @@
 
 {#if gameData != null && gameData.categories != null}
     <div class="flex justify-center items-center h-dvh w-dvh">
-        <!--<div class=" text-center ">ID : {wsType.websocket_id.id}</div>-->
         <div class="grid grid-flow-col bg-transparent rounded-lg">
             {#each gameData.categories as category}
                 <JeopardyCategory {category}/>
