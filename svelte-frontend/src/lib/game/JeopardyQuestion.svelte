@@ -59,7 +59,7 @@
     
     function req_open_question() {
         if (ws == null ) return;
-        let click : WebsocketSessionEvent = {Click : question.vector2d};
+        let click : WebsocketSessionEvent = {ChooseQuestion : question.vector2d};
         ws.next(click);
     }
 

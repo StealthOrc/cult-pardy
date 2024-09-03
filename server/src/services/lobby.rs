@@ -5,8 +5,8 @@ use std::sync::Arc;
 use std::time::Duration;
 use actix::{Actor, ActorFutureExt, Addr, AsyncContext, Context, Handler, Message, MessageResult, Recipient, ResponseActFuture, WrapFuture};
 
-use chrono::{Local, Utc};
-use cult_common::backend::{ActionState, JeopardyBoard, MediaState, Question};
+use chrono::{DateTime, Local, Utc};
+use cult_common::backend::{ActionState, BuzzerState, JeopardyBoard, MediaState, Question};
 use cult_common::dto::board::DTOSession;
 use cult_common::wasm_lib::ids::discord::DiscordID;
 use cult_common::wasm_lib::ids::lobby::LobbyId;
@@ -14,6 +14,7 @@ use cult_common::wasm_lib::ids::usersession::UserSessionId;
 use cult_common::wasm_lib::ids::websocketsession::WebsocketSessionId;
 use cult_common::wasm_lib::websocket_events::{ActionMediaEvent, ActionStateEvent, BoardEvent, MediaStatus, SessionEvent, VideoEvent, WebsocketEvent, WebsocketPing, WebsocketServerEvents};
 use cult_common::wasm_lib::{MediaToken, MediaType, QuestionType, Vector2D};
+use itertools::Itertools;
 use mongodb::bson::doc;
 use ritelinked::{LinkedHashMap, LinkedHashSet};
 use serde::{Deserialize, Serialize};
@@ -270,7 +271,7 @@ impl Lobby {
         self.creator.eq(user_session_id)
     }
 
-    pub fn set_current_question(&mut self, vector2d: Vector2D, user_session_id: &UserSessionId, websocket_session_id: &WebsocketSessionId) -> Option<Question>{
+    pub fn set_current_question(&mut self, vector2d: Vector2D, websocket_session_id: &WebsocketSessionId) -> Option<Question>{
         let qeuestion = self.jeopardy_board.get_mut_question(vector2d).cloned();
         if let Some(value) = qeuestion.clone() {
             self.jeopardy_board.current = Some(vector2d);
@@ -433,7 +434,7 @@ impl Lobby {
 
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, EnumIter, Display)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Display)]
 pub enum GameState{
     Waiting,
     Starting,
@@ -497,7 +498,7 @@ impl Handler<LobbyClick> for Lobby {
                     Some(id) => id,
                 };
                 let vec = msg.vector_2d.clone();
-                if let Some(question) = lobby.set_current_question(vec, &msg.user_data.user_session_id, &ws_id) {
+                if let Some(question) = lobby.set_current_question(vec,  &ws_id) {
                     let action_state = lobby.jeopardy_board.action_state.lock().expect("Failed to lock action state").clone();
                     let event = WebsocketServerEvents::Board(BoardEvent::CurrentQuestion(question.dto(true, vec.clone()), action_state));
                     lobby.send_lobby_message(&event);
@@ -533,7 +534,6 @@ impl Handler<LobbyBackClick> for Lobby {
                     state.update(ActionState::None);
                 }
                 let board = lobby.jeopardy_board.clone();
-
                 println!("Back Clicked {:#?}", board.action_state);
                 let event = WebsocketServerEvents::Board(BoardEvent::CurrentBoard(board.dto(lobby.creator.clone())));
                 lobby.send_lobby_message(&event);
@@ -840,6 +840,8 @@ impl Handler<WebsocketConnect> for Lobby {
         ctx.address().do_send(SendWSCurrentDTOBoard{websocket_session_id: websocket_session_id.clone()});
         ctx.address().do_send(SendDTOSessionJoined{user_session_id: msg.user_session_id.clone()});
         ctx.address().do_send(SendCurrentDTOSessions{}); 
+        
+
 
         let session_pings = self.get_sessions_pings();
 
@@ -1042,7 +1044,7 @@ pub struct BeforeMedia{
 impl Handler<BeforeMedia> for Lobby {
     type Result = MessageResult<BeforeMedia>;
     
-    fn handle(&mut self, msg: BeforeMedia, _: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: BeforeMedia, t: &mut Self::Context) -> Self::Result {
         let current = match self.jeopardy_board.current.clone() {
             Some(c) => c,
             None => return MessageResult(()),
@@ -1077,6 +1079,139 @@ impl Handler<BeforeMedia> for Lobby {
     }
 
 }
+
+
+
+
+
+
+
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct BuzzerClicked{
+    pub user_session_id: UserSessionId,
+    pub current_time:  DateTime<Local>,
+}
+impl Handler<BuzzerClicked> for Lobby {
+    type Result = ();
+
+    fn handle(&mut self, msg: BuzzerClicked,ctx: &mut Self::Context) -> Self::Result {
+        let mut buzzer_state = self.jeopardy_board.buzzer_state.lock().expect("Failed to lock buzzer_state");
+
+        if let BuzzerState::BuzzerOpen(ref mut state_map) = *buzzer_state {
+            if state_map.contains_key(&msg.user_session_id) {
+                println!("User {:?} has already buzzed", msg.user_session_id.id);
+                return;
+            }
+            let grace_period = chrono::Duration::seconds(2);
+            let grace_period2 = Duration::from_secs(2);
+
+            if let Some(&first_buzz_time) = state_map.values().next() {
+                if msg.current_time.signed_duration_since(first_buzz_time) > grace_period {
+                    println!(
+                        "User {:?} has buzzed too late by {:?}",
+                        msg.user_session_id.id,
+                        msg.current_time.signed_duration_since(first_buzz_time)
+                    );
+                    return;
+                }
+            }
+            let clone_user_session_id = msg.user_session_id.clone();
+            if state_map.len() == 0 {
+                ctx.run_later(grace_period2, move |act, t| {
+                    let buzzer_state = act.jeopardy_board.buzzer_state.lock().expect("Failed to lock buzzer_state");
+                    if let BuzzerState::BuzzerOpen(_) = *buzzer_state {
+                        println!("Buzzer grace period has ended BuzzeringStopped");
+                        t.address().do_send(BuzzeringStopped{user_session_id:clone_user_session_id});
+                    }
+                });
+            }
+
+
+
+            state_map.insert(msg.user_session_id.clone(), msg.current_time);
+            println!(
+                "User {:?} buzzed in at time {:?}",
+                msg.user_session_id.id, msg.current_time
+            );
+        }
+    }
+}
+
+
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct BuzzeringStarting {
+    pub user_session_id: UserSessionId,
+}
+impl Handler<BuzzeringStarting> for Lobby {
+    type Result = ();
+
+    fn handle(&mut self, msg: BuzzeringStarting,ctx: &mut Self::Context) -> Self::Result {
+        let mut buzzer_state = self.jeopardy_board.buzzer_state.lock().expect("Failed to lock buzzer_state");
+
+        match *buzzer_state {
+            BuzzerState::BuzzerOpen(_) => {
+                println!("Buzzer is already open");
+            }
+            BuzzerState::BuzzerdClosed(_) | BuzzerState::None => {
+                *buzzer_state = BuzzerState::BuzzerOpen(HashMap::new());
+                let event = WebsocketServerEvents::Board(BoardEvent::BuzzeringStarting);
+                self.send_lobby_message(&event);
+                println!("Buzzer has been opened");
+            } 
+
+        }
+
+    }
+
+}
+
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct BuzzeringStopped {
+    pub user_session_id: UserSessionId
+}
+impl Handler<BuzzeringStopped> for Lobby {
+    type Result = ();
+
+    fn handle(&mut self, msg: BuzzeringStopped, _: &mut Self::Context) -> Self::Result {
+        let mut buzzer_state = self.jeopardy_board.buzzer_state.lock().expect("Failed to lock buzzer_state");
+        if let BuzzerState::BuzzerOpen(ref mut state_map) = *buzzer_state {
+            if state_map.len() == 0 {
+                return;
+            }
+            let sorted_vec: Vec<UserSessionId> = state_map.iter().sorted_by(|a, b| a.1.cmp(b.1)).map(|(k, _)| k.clone()).collect();
+            *buzzer_state = BuzzerState::BuzzerdClosed(sorted_vec.clone());
+            let event = WebsocketServerEvents::Board(BoardEvent::BuzzeringClosed(sorted_vec));
+            self.send_lobby_message(&event);
+            println!("Buzzer has been closed");
+        }
+    }
+}
+
+
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct BuzzerReset{
+    pub user_session_id: UserSessionId
+}
+impl Handler<BuzzerReset> for Lobby {
+    type Result = ();
+
+    fn handle(&mut self, msg: BuzzerReset, _: &mut Self::Context) -> Self::Result {
+        let mut buzzer_state = self.jeopardy_board.buzzer_state.lock().expect("Failed to lock buzzer_state");
+        *buzzer_state = BuzzerState::None;
+        println!("Buzzer has been reset");
+    }
+}
+
+
+
+
+
+
+
 
 
 pub async fn get_session(db: &Arc<MongoServer>, user_session_id: &UserSessionId) -> Option<UserSession> {

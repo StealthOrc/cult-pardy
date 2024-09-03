@@ -1,9 +1,14 @@
+
 use chrono::{DateTime, Local};
+use ritelinked::LinkedHashMap;
 use serde::{Deserialize, Deserializer, Serialize};
+use serde_json::Map;
 use tsify_next::Tsify;
 use utoipa::ToSchema;
+use std::collections::HashMap;
 use std::string::ToString;
 use std::sync::{Arc, Mutex};
+use std::vec;
 use wasm_bindgen::prelude::*;
 
 use crate::dto::board::{DtoCategory, DtoJeopardyBoard, DtoQuestion};
@@ -30,6 +35,8 @@ pub struct JeopardyBoard {
     pub create: DateTime<Local>,
     #[serde(skip_serializing)]
     pub action_state: Arc<Mutex<ActionState>>,
+    #[serde(skip_serializing)]
+    pub buzzer_state: Arc<Mutex<BuzzerState>>,
 }
 
 
@@ -89,6 +96,7 @@ impl JeopardyBoard {
             current: None,
             create: Local::now(),
             action_state: Arc::new(Mutex::new(ActionState::None)),
+            buzzer_state: Arc::new(Mutex::new(BuzzerState::None)),
         }
     }
 
@@ -134,6 +142,7 @@ impl JeopardyBoard {
             categories: cat,
             current,
             action_state: self.action_state.lock().expect("Error while locking action state").clone(),
+            buzzer_state: self.buzzer_state.lock().expect("Error while locking buzzer state").clone(),
         }
     }
 
@@ -220,6 +229,7 @@ impl<'de> Deserialize<'de> for JeopardyBoard {
             current: None,
             create: Local::now(),
             action_state:   Arc::new(Mutex::new(ActionState::None)),
+            buzzer_state: Arc::new(Mutex::new(BuzzerState::None)),
         };
 
         Ok(board)
@@ -333,6 +343,18 @@ impl ActionState {
     }
 
 }
+
+#[derive(Tsify,Debug, Clone, Serialize, Deserialize)]
+pub enum  BuzzerState {
+    None,
+    BuzzerOpen(HashMap<UserSessionId, DateTime<Local>>),
+    BuzzerdClosed(Vec<UserSessionId>),
+}
+
+
+
+
+
 
 
 /*#[derive(Tsify,Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]

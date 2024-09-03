@@ -1,12 +1,11 @@
 <script lang="ts">
 
-
 	import { CONST } from "$lib/const";
 	import { get_global_time } from "$lib/lib";
 	import { mediaPlayerContextStore } from "$lib/stores/MediaPlayerStore";
 	import { mediaStateStore, type MediaPlayerSessionType } from "$lib/stores/MediaStateStore";
 	import type { BoardContext, MediaPlayerContext } from "$lib/types";
-	import { type MediaState, type WebsocketSessionEvent, type NumberScope, type Media, type MediaType, type VideoType, type MediaStatus, type ActionState} from "cult-common";
+	import { type MediaState, type WebsocketSessionEvent, type NumberScope, type Media, type MediaType, type VideoType, type MediaStatus, type ActionState, type MediaEvent, type VideoEvent} from "cult-common";
 	import { getContext, onMount, setContext } from "svelte";
 	import JeopardyBoard from "../JeopardyBoard.svelte";
 	import { JeopardyBoardStore } from "$lib/stores/JeopardyBoardStore";
@@ -368,7 +367,9 @@
 
 
     function requestPlayerChangeState(state: MediaStatus): boolean {
-        let changeStateEvent: WebsocketSessionEvent = { VideoEvent: {ChangeState: state} };
+        let changeState : VideoEvent = {  ChangeState:  state };
+        let videoEvent : MediaEvent = {  VideoEvent:  changeState };
+        let changeStateEvent: WebsocketSessionEvent = { MediaEvent:videoEvent } ;
         store.webSocketSubject.next(changeStateEvent);
         return true;
     }

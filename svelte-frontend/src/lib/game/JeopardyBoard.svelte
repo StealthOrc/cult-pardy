@@ -5,7 +5,7 @@
     import {WebSocketSubject} from "rxjs/webSocket";
     import { CookieStore, lobby_store, type SessionCookies} from "$lib/stores/cookies.js";
     import { match, P } from 'ts-pattern';
-	import type { BoardEvent, DtoJeopardyBoard, DTOSession, LobbyId, MediaState, SessionEvent, WebsocketEvent, WebsocketServerEvents, WebsocketSessionEvent } from 'cult-common';
+	import type { BoardEvent, DtoJeopardyBoard, DTOSession, LobbyId, Media, MediaEvent, MediaState, SessionEvent, WebsocketEvent, WebsocketServerEvents, WebsocketSessionEvent } from 'cult-common';
 	import Players from './Players.svelte';
 	import {CurrentSessionsStore } from '$lib/stores/SessionStore';
 	import { SessionPingsStore } from '$lib/stores/SessionPings';
@@ -84,9 +84,11 @@
             });
 
             for (let i = 0; i < CONST.num_time_sync_cycles; i++) {
-		        ws.next( "SyncBackwardRequest" );
+                let syncBackwardRequest : MediaEvent = "SyncBackwardRequest";
+		        ws.next({MediaEvent: syncBackwardRequest});
                 timeout(20);
-                ws.next({SyncForwardRequest: get_global_time(0)});
+                let SyncForward: MediaEvent = {SyncForwardRequest: get_global_time(0)};
+                ws.next({MediaEvent: SyncForward});
                 timeout(20);
 	        }
             console.log("JeopardyBoard: Websocket connected");

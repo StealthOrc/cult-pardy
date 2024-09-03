@@ -1,18 +1,20 @@
 use std::time::{Duration, Instant};
 
 use actix::prelude::*;
+use cult_common::backend::BuzzerState;
 use cult_common::{compress, decompress};
+use mongodb::change_stream::event;
 use serde::{Deserialize, Serialize};
 
 use crate::services::game::{self};
-use crate::services::lobby::{AddLobbySessionScore, Lobby, LobbyBackClick, LobbyClick, ReciveVideoEvent, SyncBackwardRequest, SyncForwardRequest, UpdateWebsocketPing, WebsocketConnect, WebsocketDisconnect};
+use crate::services::lobby::{AddLobbySessionScore, BuzzerClicked, BuzzerReset, BuzzeringStarting, Lobby, LobbyBackClick, LobbyClick, ReciveVideoEvent, SyncBackwardRequest, SyncForwardRequest, UpdateWebsocketPing, WebsocketConnect, WebsocketDisconnect};
 use actix_web::web;
 use actix_web_actors::ws;
 use chrono::{DateTime, Local};
 use cult_common::wasm_lib::ids::lobby::LobbyId;
 use cult_common::wasm_lib::ids::usersession::UserSessionId;
 use cult_common::wasm_lib::ids::websocketsession::WebsocketSessionId;
-use cult_common::wasm_lib::websocket_events::{WebsocketEvent, WebsocketServerEvents, WebsocketSessionEvent};
+use cult_common::wasm_lib::websocket_events::{BuzzorEvent, MediaEvent, WebsocketEvent, WebsocketServerEvents, WebsocketSessionEvent};
 
 /// How often heartbeat pings are sent
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
@@ -214,7 +216,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                         match serde_json::from_slice::<WebsocketSessionEvent>(&bytes) {
                             Ok(event) => {
                                 match event.clone() {
-                                    WebsocketSessionEvent::Click(vector2d) => {
+                                    WebsocketSessionEvent::ChooseQuestion(vector2d) => {
                                         self.lobby_addr.do_send(LobbyClick {
                                             vector_2d: vector2d,
                                             user_data: self.player.clone(),
@@ -232,45 +234,69 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                                             vector2d
                                         });
                                     }
-                                    WebsocketSessionEvent::VideoEvent(event) => {
-                                        let id = match self.player.websocket_session_id.clone() {
-                                            Some(data) => data,
-                                            None => return,
-                                        };
-                               
-                                        self.lobby_addr.do_send(ReciveVideoEvent{
-                                        user_session_id: self.player.user_session_id.clone(),
-                                        websocket_session_id: id,
-                                        event
-                                    })
-                                    }
-                                    WebsocketSessionEvent::SyncBackwardRequest => {
-                                        let id = match self.player.websocket_session_id.clone() {
-                                            Some(data) => data,
-                                            None => return,
-                                        };
-                                        self.lobby_addr.do_send(SyncBackwardRequest{
-                                            websocket_session_id: id,
-                                        });
-                                    }
-                                    WebsocketSessionEvent::SyncForwardRequest(time) => {
-                                        let id = match self.player.websocket_session_id.clone() {
-                                            Some(data) => data,
-                                            None => return,
-                                        };
-                                        self.lobby_addr.do_send(SyncForwardRequest{
-                                            websocket_session_id: id,
-                                            current_time: time,
-                                        });
+                                    WebsocketSessionEvent::MediaEvent(media_event) => {
+                                        match media_event {
+                                            MediaEvent::VideoEvent(event) => {
+                                                let id = match self.player.websocket_session_id.clone() {
+                                                    Some(data) => data,
+                                                    None => return,
+                                                };
+                                                self.lobby_addr.do_send(ReciveVideoEvent{
+                                                    user_session_id: self.player.user_session_id.clone(),
+                                                    websocket_session_id: id,
+                                                    event
+                                                })
+                                            },
+                                            MediaEvent::SyncBackwardRequest => {
+                                                let id = match self.player.websocket_session_id.clone() {
+                                                    Some(data) => data,
+                                                    None => return,
+                                                };
+                                                self.lobby_addr.do_send(SyncBackwardRequest{
+                                                    websocket_session_id: id,
+                                                });
+                                            },
+                                            MediaEvent::SyncForwardRequest(time) => {
+                                                let id = match self.player.websocket_session_id.clone() {
+                                                    Some(data) => data,
+                                                    None => return,
+                                                };
+                                                self.lobby_addr.do_send(SyncForwardRequest{
+                                                    websocket_session_id: id,
+                                                    current_time: time,
+                                                });
+                                            }
+                                        }
                                     },
-                                    _ => {
-                                        println!("Receive an unk client event {:?}", event);
+                                    WebsocketSessionEvent::BuzzoringEvent(buzzer_event) => {
+                                        match buzzer_event {
+                                            BuzzorEvent::BuzzorClick => {
+                                                self.lobby_addr.do_send(BuzzerClicked{
+                                                    user_session_id: self.player.user_session_id.clone(),
+                                                    current_time: Local::now(),
+                                                });
+                                            }
+                                            BuzzorEvent::BuzzorStarting => {
+                                                self.lobby_addr.do_send(BuzzeringStarting{
+                                                    user_session_id: self.player.user_session_id.clone(),
+                                                });
+                                            }
+                                            BuzzorEvent::BuzzorStop => {
+                                                self.lobby_addr.do_send(BuzzerClicked{
+                                                    user_session_id: self.player.user_session_id.clone(),
+                                                    current_time: Local::now(),
+                                                });
+                                            },
+                                            BuzzorEvent::BuzzorReset => {
+                                                self.lobby_addr.do_send(BuzzerReset{
+                                                    user_session_id: self.player.user_session_id.clone(),
+                                                });
+                                            }
+                                        }
+                               
                                     }
+                                
                                 }
-
-
-
-                                //println!("Receive an client event {:?}", event);
                             }
                             Err(err) => {
                                 println!("Error deserializing JSON data:  {:?}", err);

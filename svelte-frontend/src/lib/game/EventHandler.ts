@@ -59,10 +59,28 @@ function handleBoardEvent(boardEvent: BoardEvent): boolean {
         JeopardyBoardStore.setCurrent(data[0]);
         JeopardyBoardStore.setActionState(data[1]);
         return true;
-    })    
-    .otherwise(() => {
-        console.log("Event not found: ",boardEvent)
-    });
+    })
+    .with({ UpdateCurrentQuestion: P.select() }, (data) => {    
+        console.log("NOT IMPLEMENTED: UpdateCurrentQuestion: ", data);
+        return true;
+    })
+    .with({ UpdateSessionScore: P.select() }, (data) => {
+        console.log("NOT IMPLEMENTED: UpdateSessionScore: ", data);
+        return true;
+    })
+    .with( "BuzzeringStarting", (data) => {
+        console.log("NOT IMPLEMENTED: BuzzeringStarting: ", data);
+        return true;
+    })
+    .with({ BuzzeringClosed: P.select() }, (data) => {
+        console.log("NOT IMPLEMENTED: BuzzeringEnding: ", data);
+        return true;
+    })
+    .with( "BuzzeringReset", (data) => {
+        console.log("NOT IMPLEMENTED: BuzzeringEnding: ", data);
+        return true;
+    })
+    .exhaustive();
     return true;
 }
 

@@ -75,6 +75,7 @@ impl MediaStatus {
         MediaStatus {
             video_timestamp: 0.0,
             last_updated: Local::now().timestamp_millis() as f64,
+ 
             playing: false,
             global_timestamp: 0.0,
             interaction_id: websocketsession.clone(),
@@ -97,6 +98,9 @@ pub enum BoardEvent {
     CurrentQuestion(DtoQuestion, ActionState),
     UpdateCurrentQuestion(Option<Vector2D>),
     UpdateSessionScore(UserSessionId, i32),
+    BuzzeringStarting,
+    BuzzeringClosed(Vec<UserSessionId>),
+    BuzzeringReset,
 }
 
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, Display)]
@@ -117,17 +121,58 @@ pub enum SessionEvent {
     SessionDisconnected(UserSessionId),
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, Display)]
 #[tsify(namespace)] 
 pub enum WebsocketSessionEvent {
-    Click(Vector2D),
+    ChooseQuestion(Vector2D),
     Back,
     AddUserSessionScore(UserSessionId, Vector2D),
+    MediaEvent(MediaEvent),
+    BuzzoringEvent(BuzzorEvent),
+}
+
+
+
+
+#[derive(Tsify,Debug, Clone, Serialize, Deserialize, Display)]
+#[tsify(namespace)]
+pub enum BuzzorEvent {
+    BuzzorClick,
+    BuzzorStarting,
+    BuzzorStop,
+    BuzzorReset,
+}
+
+
+
+
+
+
+
+#[derive(Tsify,Debug, Clone, Serialize, Deserialize, Display)]
+#[tsify(namespace)] 
+pub enum MediaEvent {
     VideoEvent(VideoEvent),
     SyncBackwardRequest,
     SyncForwardRequest(f64)
-    
 }
+
+
+
+
+
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, Display)]
 #[tsify(namespace)] 
 pub enum VideoEvent {
@@ -135,8 +180,6 @@ pub enum VideoEvent {
     Pause(f64),
     Resume,
     ChangeState(MediaStatus),
-    
-    
 }
 
 

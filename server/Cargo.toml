@@ -33,3 +33,4 @@ config = { version = "0.14.0", features = ["toml"] }
 ritelinked = "0.3.2"
 utoipa = { version = "4", features = ["actix_extras", "chrono"] }
 utoipa-swagger-ui = { version = "7", features = ["actix-web"] }
+itertools = "0.13.0"
