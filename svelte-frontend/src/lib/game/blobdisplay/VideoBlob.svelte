@@ -44,6 +44,7 @@
             })
         }
         ignore = false;
+        let test = mediaStateStore;
         let status = $mediaStateStore.media_status;
         if(status != null){
             doMediaStateChange(status);
