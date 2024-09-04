@@ -6,6 +6,7 @@ use chrono::{DateTime, Duration, Local, Utc};
 
 use cult_common::backend::{JeopardyBoard, LobbyCreateResponse};
 use cult_common::dto::board::DTOSession;
+use cult_common::dto::file::DTOFileMetadata;
 use cult_common::wasm_lib::hashs::validate::ValidateHash;
 use cult_common::wasm_lib::ids::discord::DiscordID;
 use cult_common::wasm_lib::ids::lobby::LobbyId;
@@ -203,13 +204,6 @@ impl SessionToken {
 
 
 
-#[derive(Clone, Debug, Serialize, Deserialize, Hash, Eq, PartialEq)]
-pub struct FileMetadata {
-    pub file_type: String,
-    pub validate_hash: ValidateHash,
-    pub uploader: DiscordID,
-}
-
 
 #[derive(Debug, Clone,Serialize, Deserialize, ToSchema)]
 pub struct DiscordData {
@@ -219,6 +213,24 @@ pub struct DiscordData {
 
 
 
+#[derive(Clone, Debug, Serialize, Deserialize, Hash, Eq, PartialEq)]
+pub struct FileMetadata {
+    pub file_type: String,
+    pub validate_hash: ValidateHash,
+    pub uploader: DiscordID,
+}
+
+impl FileMetadata {
+
+    pub fn to_dto(&self) -> DTOFileMetadata {
+        DTOFileMetadata {
+            file_type: self.file_type.clone(),
+            validate_hash: self.validate_hash.clone(),
+            uploader: self.uploader.clone(),
+        }
+    }
+    
+}
 
 
 

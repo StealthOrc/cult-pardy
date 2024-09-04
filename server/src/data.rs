@@ -1,6 +1,6 @@
 use bson::{oid::ObjectId, DateTime};
 use bytes::Bytes;
-use cult_common::wasm_lib::{ids::usersession::UserSessionId, NumberScope};
+use cult_common::{dto::file::DTOFileData, wasm_lib::{ids::usersession::UserSessionId, NumberScope}};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -49,6 +49,23 @@ impl FileData {
       end: end_chunk,
     }
   }
+
+
+  pub fn to_dto(&self) -> Option<DTOFileData> {
+     if let Some(metadata) = &self.metadata {
+       Some(DTOFileData {
+         length: self.length,
+         upload_date: self.upload_date.to_string(),
+         file_name: self.file_name.clone(),
+         metadata: metadata.clone().to_dto(),
+       })
+     } else {
+       None
+     }
+   
+   
+  }
+
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]

@@ -30,7 +30,7 @@ use dto::api::ApiResponse;
 use dto::file::FileMultiPart;
 use futures::stream::once;
 use futures::AsyncReadExt;
-use rest::file::{get_file_from_name, upload_file_part};
+use rest::file::{get_file_from_name, get_file_list, get_file_size, upload_file_part};
 use services::db::MongoServer;
 use services::game::{DiscordData, SessionToken, UserSession};
 use settings::Settings;
@@ -84,6 +84,8 @@ async fn main() -> Result<()> {
             rest::api::discord_session,
             rest::api::create_game_lobby,
             rest::api::join_game,
+            rest::file::get_file_size,
+            rest::file::get_file_list,
         ),
         components(
             schemas(
@@ -179,6 +181,8 @@ async fn main() -> Result<()> {
             .service(join_game)
             .service(get_file_from_name)
             .service(upload_file_part)
+            .service(get_file_list)
+            .service(get_file_size)
             .default_service(
                 web::route().to(not_found)
             )
@@ -210,7 +214,7 @@ async fn not_found(settings:web::Data<Arc<Settings>>) -> std::result::Result<Htt
 
 
 /* Maybe using sometimes streamd with range
-#[get("/api/file2")]
+#[get("/api/file/download2")]
 async fn get_file_from_name2(req: HttpRequest,  db: web::Data<Arc<MongoServer>>, settings:web::Data<Arc<Settings>>) -> Result<HttpResponse, actix_web::Error> {
     let user_session = match get_session(&req, &db).await {
         Some(data) => data,

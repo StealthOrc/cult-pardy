@@ -10,7 +10,7 @@ use actix::Addr;
 
 use actix_multipart::Multipart;
 use actix_web::{get, HttpRequest, HttpResponse, post, web};
-use bson::{doc, Bson};
+use bson::{bson, doc, Bson};
 use bytes::Bytes;
 use chrono::Local;
 use cult_common::dto::api::{ApiResponse};
@@ -20,6 +20,7 @@ use cult_common::wasm_lib::{DiscordUser, JeopardyMode};
 use futures::stream::once;
 use futures::{AsyncReadExt, AsyncWriteExt, StreamExt};
 use mongodb::gridfs::GridFsUploadStream;
+use mongodb::options::FindOptions;
 use serde::Serialize;
 use serde_json::json;
 use cult_common::backend::JeopardyBoard;
@@ -35,7 +36,7 @@ use super::error::ApiFileError;
 
 #[utoipa::path(
     post,
-    path = "/api/upload/filepart",
+    path = "/api/file/upload",
     params(
         ("user_session_id" = Option<String>, Query, description = "User session ID"),
         ("user_session_token" = Option<String>, Query, description = "User session token"),
@@ -65,7 +66,7 @@ use super::error::ApiFileError;
         ("cookie" = ["user_session_id", "user_session_token"])
     )
 )]
-#[post("/api/upload/filepart")]
+#[post("/api/file/upload")]
 async fn upload_file_part(req: HttpRequest,db: web::Data<Arc<MongoServer>>,mut payload: Multipart) -> Result<HttpResponse, actix_web::Error> {
     let user_session = match get_session(&req, &db).await {
         Some(data) => data,
@@ -211,7 +212,7 @@ impl From<FileMetadata> for Bson {
 
 
 
-#[get("/api/file")]
+#[get("/api/file/download")]
 async fn get_file_from_name(req: HttpRequest,  db: web::Data<Arc<MongoServer>>, settings:web::Data<Arc<Settings>>, game_server:web::Data<Addr<GameServer>>) -> Result<HttpResponse, actix_web::Error> {
     let user_session = match get_session(&req, &db).await {
         Some(data) => data,
@@ -252,6 +253,9 @@ async fn get_file_from_name(req: HttpRequest,  db: web::Data<Arc<MongoServer>>, 
 
     if token != media_token {
         return Ok(file_part_error(None, ApiFileError::FileError("Token not valid".to_string()).to_api_error()).await);
+    
+    
+    
     }
 
         
@@ -299,6 +303,146 @@ async fn get_file_from_name(req: HttpRequest,  db: web::Data<Arc<MongoServer>>, 
                                         .streaming(once(async move {
                                             Ok::<_, actix_web::Error>(Bytes::from(buf))
                                         }));
+
+    set_session_token_cookie(&mut response, &settings,&user_session);
+    Ok(response)
+}
+
+
+
+#[utoipa::path(
+    get,
+    path = "/api/files",
+    params(
+        ("user_session_id" = Option<String>, Query, description = "User session ID"),
+        ("user_session_token" = Option<String>, Query, description = "User session token"),
+    ),
+    responses(
+        // 200
+        (status = 200, description = "FIX ME"),
+    ),
+    security(
+        ("cookie" = ["user_session_id", "user_session_token"])
+    )
+)]
+#[get("/api/files")]
+async fn get_file_size(req: HttpRequest,  db: web::Data<Arc<MongoServer>>, settings:web::Data<Arc<Settings>>) -> Result<HttpResponse, actix_web::Error> {
+    let user_session = match get_session(&req, &db).await {
+        Some(data) => data,
+        None => return Ok(file_part_error(None, ApiSessionError::NotFound.to_api_error()).await),
+    };
+
+    if is_admin(&user_session, &db).await == false {
+        return Ok(file_part_error(None, ApiSessionError::NotAdmin.to_api_error()).await);
+    }
+
+    let file_count = match db.collections.file_bucket_files.count_documents(doc!{}).await {
+        Ok(data) => data,
+        Err(_) => 0,
+    };
+
+
+    let mut response = HttpResponse::Ok().json(json!({
+        "file_count": file_count,
+    }));
+
+    set_session_token_cookie(&mut response, &settings,&user_session);
+    Ok(response)
+
+
+}
+
+
+#[utoipa::path(
+    get,
+    path = "/api/file/list",
+    params(
+        ("user_session_id" = Option<String>, Query, description = "User session ID"),
+        ("user_session_token" = Option<String>, Query, description = "User session token"),
+        ("page_size" = u64, Header, description = "Token do access media file"),
+        ("page" = u64, Header, description = "page"),
+    ),
+    responses(
+        // 200
+        (status = 200, description = "FIX ME"),
+    ),
+    security(
+        ("cookie" = ["user_session_id", "user_session_token"])
+    )
+)]
+#[get("/api/file/list")]
+async fn get_file_list(req: HttpRequest,  db: web::Data<Arc<MongoServer>>, settings:web::Data<Arc<Settings>>) -> Result<HttpResponse, actix_web::Error> {
+    let user_session = match get_session(&req, &db).await {
+        Some(data) => data,
+        None => return Ok(file_part_error(None, ApiSessionError::NotFound.to_api_error()).await),
+    };
+    if is_admin(&user_session, &db).await == false {
+        return Ok(file_part_error(None, ApiSessionError::NotAdmin.to_api_error()).await);
+    }
+
+    let page = match extract_header_string(&req, "page") {
+        Ok(data) => u64::from_str_radix(&data, 10).unwrap_or(0),
+        Err(e) => return Ok(e),
+    };
+
+    let page_size = match extract_header_string(&req, "page_size") {
+        Ok(data) => u64::from_str_radix(&data, 10).unwrap_or(10),
+        Err(e) => return Ok(e),
+    };
+
+    // Count total files
+    let file_count = match db.collections.file_bucket_files.count_documents(doc! {}).await {
+        Ok(count) => count,
+        Err(_) => return Ok(file_part_error(None, ApiFileError::FileError("Error counting files".to_string()).to_api_error()).await),
+    };
+
+    // Validate pagination
+    if page_size == 0 {
+        return Ok(file_part_error(None, ApiFileError::FileError("Page size cannot be zero".to_string()).to_api_error()).await);
+    }
+    
+    if page > file_count / page_size {
+        return Ok(file_part_error(None, ApiFileError::FileError("Page out of range".to_string()).to_api_error()).await);
+    }
+
+    // Prepare MongoDB find options
+    let skip = page * page_size as u64;
+    let find_options = FindOptions::builder()
+        .sort(doc! { "filename": 1 })  // Sort by filename in ascending order
+        .skip(skip)
+        .limit(page_size as i64)
+        .build();
+
+
+
+    let mut cursor  = match db.collections.file_bucket_files.find(doc!{}).with_options(find_options).await {
+        Ok(data) => data,
+        Err(_) => return Ok(file_part_error(None, ApiFileError::FileError("Error getting files".to_string()).to_api_error()).await),
+    };
+
+    let mut dto_file_data = Vec::new();
+
+    while let Some(result) = cursor.next().await {
+        match result {
+            Ok(data) => {
+                match data.to_dto() {
+                    Some(data) => dto_file_data.push(data),
+                    None => return Ok(file_part_error(None, ApiFileError::FileError("Error converting file data".to_string()).to_api_error()).await),
+                }
+            },
+            Err(_) => return Ok(file_part_error(None, ApiFileError::FileError("Error getting file data".to_string()).to_api_error()).await),
+        }
+        
+    }
+
+    let mut response = HttpResponse::Ok().json(json!({
+        "files": dto_file_data,
+        "page": page,
+        "page_size": page_size,
+    }));
+
+
+
 
     set_session_token_cookie(&mut response, &settings,&user_session);
     Ok(response)

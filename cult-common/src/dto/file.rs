@@ -2,6 +2,7 @@
 use std::fs::File;
 
 use bytes::Bytes;
+use chrono::{DateTime, Local};
 use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
 use utoipa::ToSchema;
@@ -41,3 +42,22 @@ pub struct DTOCFile{
 }
 
 
+
+
+#[derive(Debug, Clone,Serialize,Deserialize, Hash,Eq, PartialEq, ToSchema)]
+pub struct DTOFileData {
+    pub length : usize,
+    pub upload_date: String,
+    pub file_name: String,
+    pub metadata: DTOFileMetadata,
+}
+
+
+
+
+#[derive(Clone, Debug, Serialize, Deserialize, Hash, Eq, PartialEq)]
+pub struct DTOFileMetadata {
+    pub file_type: String,
+    pub validate_hash: ValidateHash,
+    pub uploader: DiscordID,
+}
