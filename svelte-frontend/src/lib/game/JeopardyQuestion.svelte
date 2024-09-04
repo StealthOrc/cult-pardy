@@ -4,11 +4,11 @@
 	import { JeopardyBoardStore } from '$lib/stores/JeopardyBoardStore';
 	import { CookieStore } from '$lib/stores/cookies';
 	import { QuestionTypes} from '$lib/types';
-	import { WebsocketStore } from '$lib/stores/WebsocketStore';
 	import BlobDisplay from './blobdisplay/BlobDisplay.svelte';
 	import YoutubeDisplay from './youtubedisplay/YoutubeDisplay.svelte';
 	import BtnBack from '$lib/ui/BtnBack.svelte';
 	import { CurrentSessionsStore } from '$lib/stores/SessionStore';
+	import { WebsocketStore } from '$lib/stores/WebsocketStore';
     export let question: DtoQuestion;
 
     let ws = $WebsocketStore.webSocketSubject;

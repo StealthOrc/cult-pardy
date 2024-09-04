@@ -11,9 +11,8 @@
 	import { JeopardyBoardStore } from "$lib/stores/JeopardyBoardStore";
 	import JeopardyCategory from "../JeopardyCategory.svelte";
 	import { match, P } from "ts-pattern";
-	import type { EventHandler } from "svelte/elements";
-	import { WebsocketStore } from "$lib/stores/WebsocketStore";
 	import type { Action } from "@sveltejs/kit";
+	import { WebsocketStore } from "$lib/stores/WebsocketStore";
 
     export let video: Blob
     export let currUserIsAdmin: boolean = false;
@@ -44,7 +43,6 @@
             })
         }
         ignore = false;
-        let test = mediaStateStore;
         let status = $mediaStateStore.media_status;
         if(status != null){
             doMediaStateChange(status);

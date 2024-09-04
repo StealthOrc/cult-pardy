@@ -8,13 +8,13 @@
 	import type { BoardEvent, DtoJeopardyBoard, DTOSession, LobbyId, Media, MediaEvent, MediaState, SessionEvent, WebsocketEvent, WebsocketServerEvents, WebsocketSessionEvent } from 'cult-common';
 	import Players from './Players.svelte';
 	import {CurrentSessionsStore } from '$lib/stores/SessionStore';
-	import { SessionPingsStore } from '$lib/stores/SessionPings';
-	import {WebsocketStore, type WebsocketStoreType} from '$lib/stores/WebsocketStore';
+	import {WebsocketStore, type WebsocketStoreDataType, type WebsocketStoreType} from '$lib/stores/WebsocketStore';
 	import { JeopardyBoardStore } from '$lib/stores/JeopardyBoardStore';
 	import { inflate } from 'fflate';
 	import { CONST } from '$lib/const';
 	import { get_global_time, timeout } from '$lib/lib';
 	import { handleEvent } from './EventHandler';
+	import { SessionPingsStore } from '$lib/stores/SessionPings';
 
     type Props = { 
         lobbyId: string;
@@ -25,9 +25,9 @@
     let lobby_id :LobbyId = {id: lobbyId};
     lobby_store.set(lobby_id);
 
- 
-    const wsType : WebsocketStoreType = WebsocketStore.new_ws(lobbyId, $CookieStore.userSessionId, $CookieStore.sessionToken);
-    const ws = wsType.webSocketSubject;
+
+    WebsocketStore.new_ws(lobbyId, $CookieStore.userSessionId, $CookieStore.sessionToken);
+    const ws = $WebsocketStore.webSocketSubject
 
 
     let gameData: DtoJeopardyBoard | null = $state(null);
@@ -91,7 +91,7 @@
                 ws.next({MediaEvent: SyncForward});
                 timeout(20);
 	        }
-            console.log("JeopardyBoard: Websocket connected");
+            console.log("JeopardyBoard: Websocket connneded");
         }
     });
 </script>

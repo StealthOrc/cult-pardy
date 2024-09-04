@@ -6,7 +6,7 @@ import {CurrentSessionsStore } from '$lib/stores/SessionStore';
 import { SessionPingsStore } from '$lib/stores/SessionPings';
 import { JeopardyBoardStore } from '$lib/stores/JeopardyBoardStore';
 import { mediaStateStore } from '$lib/stores/MediaStateStore';
-import {  WebsocketStore } from '../stores/WebsocketStore';
+import { WebsocketStore } from '$lib/stores/WebsocketStore';
 
 
 export function handleEvent(event: WebsocketServerEvents): boolean {
