@@ -92,6 +92,18 @@ export async function UserInfo() {
 
 }
 
+export async function api_files(): Promise<Response> {
+    return await api_get_request(CONST.FILES_URL, RequestContentType.JSON);
+}
+
+export async function api_file_list(page_size: number, page: number): Promise<Response> {
+    const headers = new Headers();
+    headers.append("page_size", page_size.toString());
+    headers.append("page", page.toString());
+    return await api_get_request(CONST.FILE_LIST_URL, RequestContentType.JSON, headers);
+
+}
+
 export async function get_file(filename: string, lobby_id:LobbyId,media_token:MediaToken): Promise<Response> {
     const headers = new Headers();
     headers.append("file-name", filename);

@@ -7,6 +7,8 @@ const CONST ={
         FILEPART: '/api/file/upload',
         GETFILE_URL: '/api/file/download',
         CREATE_LOBBY_URL: '/api/create',
+        FILE_LIST_URL: '/api/file/list',
+        FILES_URL: '/api/files',
         //Contexts
         MEDIAPLAYERCTX: 'mediaplayer',
         BOARDCTX: 'board',
@@ -21,3 +23,20 @@ const CONST ={
 
 
     
+export enum FileType {
+    PNG = '/_svelte_kit_assets/assets/icons/png.png',
+    UNKNOWN = '/_svelte_kit_assets/icons/unknow.png',
+    PDF = '/_svelte_kit_assets/icons/pdf.png',
+    MP4 = '/_svelte_kit_assets/icons/mp4.png',
+    JPG = '/_svelte_kit_assets/icons/jpg.png'
+}
+
+export function getFileType(file_name: string): string {
+    const extension = getFileExtension(file_name);
+    return FileType[extension as keyof typeof FileType] || FileType.UNKNOWN;
+}
+
+function getFileExtension(filetype: string): string {
+    const parts = filetype.split('/');
+    return parts.length > 1 ? parts.pop()!.toUpperCase() : '';
+}
