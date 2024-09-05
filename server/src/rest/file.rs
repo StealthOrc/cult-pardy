@@ -224,38 +224,39 @@ async fn get_file_from_name(req: HttpRequest,  db: web::Data<Arc<MongoServer>>, 
         Err(e) => return Ok(e),
     };
 
-
-    let media_token = match get_media_token_from_header(&req) {
-        Some(data) => data,
-        None => return Ok(file_part_error(None, ApiFileError::FileInvalid("No media token found".to_string()).to_api_error()).await),
-    }; 
-
-    let lobby_id = match extract_header_string(&req, "lobby-id") {
-        Ok(data) => LobbyId::of(data),
-        Err(e) => return Ok(e)
-    };
-
-
-    let opt_token =  match game_server.send(GetLobbyMediaToken{
-        lobby_id: lobby_id.clone()
-    }).await {
-        Ok(data) => data,
-        Err(_) => return Ok(file_part_error(None, ApiFileError::FileError("Can´t get token".to_string()).to_api_error()).await),
-    };
-
-    let token = match opt_token {
-        Some(data) => data,
-        None => return Ok(file_part_error(None, ApiFileError::FileError("No token found".to_string()).to_api_error()).await),
-    };
-
-
-    println!("{:#?} == {:#?}", token, media_token);
-
-    if token != media_token {
-        return Ok(file_part_error(None, ApiFileError::FileError("Token not valid".to_string()).to_api_error()).await);
+    if !is_admin(&user_session, &db).await {
+        
+        let media_token = match get_media_token_from_header(&req) {
+            Some(data) => data,
+            None => return Ok(file_part_error(None, ApiFileError::FileInvalid("No media token found".to_string()).to_api_error()).await),
+        }; 
+    
+        let lobby_id = match extract_header_string(&req, "lobby-id") {
+            Ok(data) => LobbyId::of(data),
+            Err(e) => return Ok(e)
+        };
+    
+        
+        let opt_token =  match game_server.send(GetLobbyMediaToken{
+            lobby_id: lobby_id.clone()
+        }).await {
+            Ok(data) => data,
+            Err(_) => return Ok(file_part_error(None, ApiFileError::FileError("Can´t get token".to_string()).to_api_error()).await),
+        };
+    
+        let token = match opt_token {
+            Some(data) => data,
+            None => return Ok(file_part_error(None, ApiFileError::FileError("No token found".to_string()).to_api_error()).await),
+        };
     
     
+        println!("{:#?} == {:#?}", token, media_token);
     
+        if token != media_token {
+            return Ok(file_part_error(None, ApiFileError::FileError("Token not valid".to_string()).to_api_error()).await);
+        }
+    } else {
+        println!("Token check skipped, user is admin");
     }
 
         

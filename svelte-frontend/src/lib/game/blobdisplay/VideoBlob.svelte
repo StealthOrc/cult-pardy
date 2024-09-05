@@ -15,6 +15,8 @@
 	import { WebsocketStore } from "$lib/stores/WebsocketStore";
 
     export let video: Blob
+
+    export let is_ws = false;
     export let currUserIsAdmin: boolean = false;
     export let videoTypes: VideoType[] = [];
     let player: HTMLVideoElement | null = null;
@@ -23,42 +25,46 @@
     let play_rate = 1;
 
     let ov : HTMLElement | null = null;
-    onMount(() => {
-        ov = document.getElementById("ov") as HTMLElement;
-        player = document.getElementById("player") as HTMLVideoElement;
-        if (player == null) return;
 
-        for (let type of videoTypes) {
-            match(type)
-            .with({ TimeSlots: P.select() }, (data) => {
-                ranges = data;
-            })
-            .with("Mute", () => {
-                if (player) player.muted = true;
-                muted = true;
-            })
-            .with({ Slowmotion: P.select() }, (data) => {
-                play_rate = data / 100;
-                if (player) player.playbackRate = play_rate;
-            })
-        }
-        ignore = false;
-        let status = $mediaStateStore.media_status;
-        if(status != null){
-            doMediaStateChange(status);
-        }
+    if (is_ws){
+        onMount(() => {
+            ov = document.getElementById("ov") as HTMLElement;
+            player = document.getElementById("player") as HTMLVideoElement;
+            if (player == null) return;
+            for (let type of videoTypes) {
+                match(type)
+                .with({ TimeSlots: P.select() }, (data) => {
+                    ranges = data;
+                })
+                .with("Mute", () => {
+                    if (player) player.muted = true;
+                    muted = true;
+                })
+                .with({ Slowmotion: P.select() }, (data) => {
+                    play_rate = data / 100;
+                    if (player) player.playbackRate = play_rate;
+                })
+            }
+            ignore = false;
+            let status = $mediaStateStore.media_status;
+            if(status != null){
+                doMediaStateChange(status);
+            }
 
-    })
-    let ignore = true
-    let mediasession: MediaPlayerSessionType;
-    mediaStateStore.subscribe(value => {
-        mediasession = value;
-        if(value == null || value.media_status == null || ignore) {
-            return;
-        }
-        doMediaStateChange(value.media_status);
-    })
+        })
 
+        
+        
+        let ignore = true
+        let mediasession: MediaPlayerSessionType;
+        mediaStateStore.subscribe(value => {
+            mediasession = value;
+            if(value == null || value.media_status == null || ignore) {
+                return;
+            }
+            doMediaStateChange(value.media_status);
+        })
+    }
 
     enum EventStatusEnum {
         NONE = "NONE",
@@ -134,7 +140,7 @@
 
 
     async function pause() {
-        if (!player)
+        if (!player || !is_ws)
             return;
         if (status == EventStatusEnum.PAUSE || status == EventStatusEnum.PAUSE_START_SEEKING) {
             update_status(StateUpdateType.PAUSE)
@@ -150,7 +156,7 @@
 
     async function play(){
         console.log("playing", status);
-        if (!player)
+        if (!player || !is_ws)
             return;
         if (player.playbackRate != play_rate)
             player.playbackRate = play_rate;
@@ -169,7 +175,7 @@
 
     async function seek() {
         console.log("START SEEKING", status);
-        if (!player)
+        if (!player|| !is_ws)
             return;
         if(player.paused){
             update_status(StateUpdateType.SEEK);
@@ -226,7 +232,7 @@
 
 
     function onEnded(event: any) {
-        if (!player)
+        if (!player|| !is_ws)
             return;
         try {
             player.load();
@@ -348,7 +354,7 @@
 
     function endSeeking() {
         console.log("SEEKED");
-        if (!player)
+        if (!player|| !is_ws)
             return;
         if (status == EventStatusEnum.SEEKING || status == EventStatusEnum.SEEKING_PLAY || status == EventStatusEnum.START_SEEKING) {
             update_status(StateUpdateType.STOPING_SEEKING);
@@ -427,7 +433,7 @@ on:play={play} on:pause={pause} on:ended={onEnded}
 on:seeking={seek}
 on:seeked={endSeeking}
 on:timeupdate={async () => {
-    if (!player) return;
+    if (!player || !is_ws) return;
     if (!containsTime(player.currentTime)) {
         /*if(player.paused){
             status = EventStatusEnum.START_SEEKING;
@@ -444,7 +450,7 @@ on:timeupdate={async () => {
     }
 }
 on:volumechange={() => {
-    if (!player) return;
+    if (!player || !is_ws) return;
     if (muted) {
         player.muted = true;
     }
@@ -452,13 +458,16 @@ on:volumechange={() => {
 
 
 
-id="player" src={URL.createObjectURL(video)} controls={currUserIsAdmin} muted style="width: 640px; height: 360px;" disablepictureinpicture controlslist="nodownload noplaybackrate">
+id="player" src={URL.createObjectURL(video)} controls={currUserIsAdmin || !is_ws} muted style="width: 640px; height: 360px;" disablepictureinpicture controlslist="nodownload noplaybackrate">
     <track kind="captions" />
 </video>
 
 
 
-{#if currUserIsAdmin && player != null && ov != null}
+
+
+
+{#if currUserIsAdmin && player != null && ov != null && is_ws}
     {#if  ranges.length > 0}
         <div class="fixed flex flex-col gap-2 left-0 top-1/2 transform -translate-y-1/2 p-4 bg-cultGrey text-white shadow-lg rounded-lg" id="ov" bind:this={ov}>
             {#each ranges as range, i}

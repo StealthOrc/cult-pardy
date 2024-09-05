@@ -19,6 +19,7 @@
 	const onProgress = (progress: FileDownloadProgress) => {
         if (blob != undefined)  return;
 		if (progress.blob) {
+			console.log("Blob", getBlobType(progress.blob));
             blobType = getBlobType(progress.blob);
 			blob = progress.blob;
 		} else {
@@ -27,13 +28,9 @@
 	};
 
 	async function loadBlob() {
-		if (!blob && media.media_token) {
-		
+		if (!blob) {
 			await downloadBlob(media.name, $lobby_store, media.media_token,onProgress);	
 		}
-		if (typeof media.media_type === "object" && "Video" in media.media_type) {
-        return media.media_type.Video; // Access the VideoType
-    	}
 	}
 
     function isAdmin(): boolean {
@@ -43,10 +40,10 @@
 	onMount(loadBlob);
 </script>
 
-{#if blob && typeof media.media_type === "object"}
+{#if blob}
 	{#if blobType === BlobType.IMAGE}
 		<ImageBlob image={blob} />
-	{:else if blobType === BlobType.VIDEO && "Video" in media.media_type}
+	{:else if blobType === BlobType.VIDEO && typeof media.media_type === "object" && "Video" in media.media_type}
 		<VideoBlob video={blob} videoTypes={media.media_type.Video} currUserIsAdmin = {isAdmin()} />
 	{:else if blobType === BlobType.AUDIO}
 		<AudioBlob audio={blob} />

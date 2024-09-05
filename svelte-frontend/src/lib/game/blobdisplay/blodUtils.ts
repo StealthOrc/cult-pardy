@@ -80,7 +80,7 @@ export async function downloadBlob2(filename: string, range: NumberScope): Promi
 
 
 
-export async function downloadBlob(filename: string, lobby_id:LobbyId, media_token:MediaToken, onProgress: (progress: FileDownloadProgress) => void): Promise<void> {
+export async function downloadBlob(filename: string, lobby_id:LobbyId, media_token:MediaToken | undefined, onProgress: (progress: FileDownloadProgress) => void): Promise<void> {
         console.log("filename", filename);
         const response: Response = await get_file(filename, lobby_id,media_token);
         if (!response.ok || !response.body || !(response.body instanceof ReadableStream)) {

@@ -10,7 +10,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::wasm_lib::hashs::validate::ValidateHash;
 use crate::wasm_lib::ids::discord::DiscordID;
-use crate::wasm_lib::NumberScope;
+use crate::wasm_lib::{Media, NumberScope};
 
 
 #[derive(Tsify,Debug, Serialize, Deserialize, Default, ToSchema)]
@@ -44,18 +44,19 @@ pub struct DTOCFile{
 
 
 
-#[derive(Tsify, Debug, Clone,Serialize,Deserialize, Hash,Eq, PartialEq, ToSchema)]
+#[derive(Tsify, Debug, Clone,Serialize,Deserialize,Eq, PartialEq, ToSchema)]
 pub struct DTOFileData {
     pub length : usize,
     pub upload_date: String,
     pub file_name: String,
     pub metadata: DTOFileMetadata,
+    pub media: Media
 }
 
 
 
 
-#[derive(Tsify,Clone, Debug, Serialize, Deserialize, Hash, Eq, PartialEq)]
+#[derive(Tsify,Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct DTOFileMetadata {
     pub file_type: String,
     pub validate_hash: ValidateHash,

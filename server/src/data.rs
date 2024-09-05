@@ -1,6 +1,6 @@
 use bson::{oid::ObjectId, DateTime};
 use bytes::Bytes;
-use cult_common::{dto::file::DTOFileData, wasm_lib::{ids::usersession::UserSessionId, NumberScope}};
+use cult_common::{dto::file::DTOFileData, wasm_lib::{ids::usersession::UserSessionId, Media, MediaType, NumberScope}};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -53,11 +53,19 @@ impl FileData {
 
   pub fn to_dto(&self) -> Option<DTOFileData> {
      if let Some(metadata) = &self.metadata {
+      let media = Media {
+        media_type: MediaType::from_string(&metadata.file_type),
+        name: self.file_name.clone(),
+        media_token: None,
+      };
+
+
        Some(DTOFileData {
          length: self.length,
          upload_date: self.upload_date.to_string(),
          file_name: self.file_name.clone(),
          metadata: metadata.clone().to_dto(),
+         media,
        })
      } else {
        None

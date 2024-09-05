@@ -104,11 +104,13 @@ export async function api_file_list(page_size: number, page: number): Promise<Re
 
 }
 
-export async function get_file(filename: string, lobby_id:LobbyId,media_token:MediaToken): Promise<Response> {
+export async function get_file(filename: string, lobby_id:LobbyId,media_token:MediaToken |undefined): Promise<Response> {
     const headers = new Headers();
     headers.append("file-name", filename);
-    headers.append("media-token", media_token.token);
-    headers.append("lobby-id", lobby_id.id);
+    if (media_token != null) {
+        headers.append("media-token", media_token.token);
+        headers.append("lobby-id", lobby_id.id);
+    }
     return await api_get_request(CONST.GETFILE_URL, RequestContentType.OCTET_STREAM, headers);
 }
 

@@ -208,6 +208,29 @@ pub enum MediaType {
     Unknown,
 }
 
+
+impl MediaType {
+
+    pub fn from_string(string_type: &str) -> MediaType {
+
+        let type_vec: Vec<&str> = string_type.split("/").collect();
+        let media_type = match type_vec[..] {
+            [media_type, _] => media_type.to_lowercase(),
+            _ => "unknown".to_owned(),
+        };
+        match media_type.as_str() {
+            "image" => MediaType::Image,
+            "audio" => MediaType::Audio,
+            "text" => MediaType::Text,
+            "pdf" => MediaType::Pdf,
+            "video" => MediaType::Video(vec![]),
+            _ => MediaType::Unknown,
+        }
+    }
+    
+}
+
+
 #[derive(Tsify,Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Default,ToSchema)]
 #[tsify(namespace)]
 pub enum VideoType {
